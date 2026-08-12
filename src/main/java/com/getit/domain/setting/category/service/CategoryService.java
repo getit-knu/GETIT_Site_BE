@@ -1,11 +1,14 @@
 package com.getit.domain.setting.category.service;
 
+import com.getit.domain.setting.category.dto.CategoryTreeResult.SubCategoryNode;
+import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
 import com.getit.domain.setting.category.exception.CategoryErrorCode;
 import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.global.exception.BusinessException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ public class CategoryService {
 
   private final TrackRepository trackRepository;
   private final SubCategoryRepository subCategoryRepository;
+  private final CategoryUsageChecker categoryUsageChecker;
 
   @Transactional
   public Track createTrack(String name, Integer order) {
@@ -57,4 +61,17 @@ public class CategoryService {
   }
 
   private Integer nextSubCategoryOrder(Long trackId) { return (int) subCategoryRepository.countByTrackId(trackId) + 1; }
+
+  public List<TrackNode> getCategoryTree() {
+    return trackRepository.findAllByOrderByOrderAsc().stream()
+        .map(track -> TrackNode.of(track, subCategoryNodesOf(track.getId())))
+        .toList();
+  }
+
+  private List<SubCategoryNode> subCategoryNodesOf(Long trackId) {
+    return subCategoryRepository.findAllByTrackIdOrderByOrderAsc(trackId).stream()
+        .map(subCategory -> SubCategoryNode.of(
+            subCategory, categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId())))
+        .toList();
+  }
 }
