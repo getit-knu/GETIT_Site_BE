@@ -18,4 +18,9 @@ public class GenerationQueryServiceImpl implements GenerationQueryService {
   public Optional<GenerationSummary> findActive() {
     return generationRepository.findByIsActiveTrue().map(GenerationSummary::from);
   }
+
+  @Override
+  public Optional<GenerationSummary> findById(Long generationId) {
+    return generationRepository.findById(generationId).map(GenerationSummary::from);
+  }
 }

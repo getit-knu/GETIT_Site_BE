@@ -15,4 +15,7 @@ public interface GenerationQueryService {
 
   /** 현재 활성 기수. 활성 기수가 없으면 empty. */
   Optional<GenerationSummary> findActive();
+
+  /** id 로 기수를 조회한다. 없으면 empty. */
+  Optional<GenerationSummary> findById(Long generationId);
 }
