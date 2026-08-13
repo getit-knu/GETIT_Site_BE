@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Category", description = "강의 분류")
+@Tag(name = "Setting.Category", description = "강의 분류")
 @RestController
 @RequestMapping("/api/admin/setting")
 @RequiredArgsConstructor
