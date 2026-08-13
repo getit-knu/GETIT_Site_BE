@@ -4,8 +4,8 @@ import com.getit.domain.recruitment.dto.RecruitmentScheduleResult;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
-import com.getit.domain.setting.generation.entity.Generation;
-import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.setting.generation.dto.GenerationSummary;
+import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.time.LocalDateTime;
@@ -20,12 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecruitmentScheduleService {
 
   private final RecruitmentScheduleRepository recruitmentScheduleRepository;
-  private final GenerationRepository generationRepository;
+  private final GenerationQueryService generationQueryService;
 
   public RecruitmentScheduleResult getSchedule() {
-    Generation activeGeneration = findActiveGeneration();
+    GenerationSummary activeGeneration = findActiveGeneration();
 
-    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.getId())
+    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.SCHEDULE_NOT_FOUND));
 
     return RecruitmentScheduleResult.of(activeGeneration, schedule);
@@ -41,23 +41,23 @@ public class RecruitmentScheduleService {
   ) {
     validateOrder(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
 
-    Generation activeGeneration = findActiveGeneration();
+    GenerationSummary activeGeneration = findActiveGeneration();
 
-    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.getId())
+    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
         .map(existing -> {
           existing.update(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
           return existing;
         })
         .orElseGet(() -> recruitmentScheduleRepository.save(
             RecruitmentSchedule.create(
-                activeGeneration.getId(),
+                activeGeneration.id(),
                 totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt)));
 
     return RecruitmentScheduleResult.of(activeGeneration, schedule);
   }
 
-  private Generation findActiveGeneration() {
-    return generationRepository.findByIsActiveTrue()
+  private GenerationSummary findActiveGeneration() {
+    return generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND));
   }
 
