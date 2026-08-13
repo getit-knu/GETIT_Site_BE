@@ -136,6 +136,21 @@ class CategoryControllerTest {
   class UpdateTrack {
 
     @Test
+    @DisplayName("수정에 성공하면 200과 변경된 필드를 반환한다")
+    void updatesTrack() throws Exception {
+      Track track = trackRepository.save(Track.create("SW", 1));
+      String body = objectMapper.writeValueAsString(new TrackUpdate("SW 개편", 2));
+
+      mockMvc.perform(put(TRACKS_PATH + "/" + track.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("SW 개편"))
+          .andExpect(jsonPath("$.data.order").value(2));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 트랙이면 404 다")
     void returns404WhenNotFound() throws Exception {
       String body = objectMapper.writeValueAsString(new TrackUpdate("SW 개편", 1));
@@ -146,6 +161,20 @@ class CategoryControllerTest {
               .content(body))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("TRACK_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("order가 1보다 작으면 400 이다")
+    void returns400WhenOrderBelowMinimum() throws Exception {
+      Track track = trackRepository.save(Track.create("SW", 1));
+      String body = objectMapper.writeValueAsString(new TrackUpdate("SW 개편", 0));
+
+      mockMvc.perform(put(TRACKS_PATH + "/" + track.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
   }
 
@@ -161,6 +190,15 @@ class CategoryControllerTest {
       mockMvc.perform(delete(TRACKS_PATH + "/" + track.getId())
               .header("Authorization", adminToken()))
           .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 트랙이면 404 다")
+    void returns404WhenNotFound() throws Exception {
+      mockMvc.perform(delete(TRACKS_PATH + "/999999")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("TRACK_NOT_FOUND"));
     }
   }
 
@@ -202,6 +240,23 @@ class CategoryControllerTest {
   class UpdateSubCategory {
 
     @Test
+    @DisplayName("수정에 성공하면 200과 변경된 필드를 반환한다")
+    void updatesSubCategory() throws Exception {
+      Track track = trackRepository.save(Track.create("SW", 1));
+      SubCategory subCategory = subCategoryRepository.save(SubCategory.create("웹기초", 1, track.getId()));
+      String body = objectMapper.writeValueAsString(new SubCategoryUpdate("웹심화", 2));
+
+      mockMvc.perform(put(SUBCATEGORIES_PATH + "/" + subCategory.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("웹심화"))
+          .andExpect(jsonPath("$.data.order").value(2))
+          .andExpect(jsonPath("$.data.trackId").value(track.getId()));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 소분류면 404 다")
     void returns404WhenNotFound() throws Exception {
       String body = objectMapper.writeValueAsString(new SubCategoryUpdate("웹심화", 1));
@@ -228,6 +283,15 @@ class CategoryControllerTest {
       mockMvc.perform(delete(SUBCATEGORIES_PATH + "/" + subCategory.getId())
               .header("Authorization", adminToken()))
           .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 소분류면 404 다")
+    void returns404WhenNotFound() throws Exception {
+      mockMvc.perform(delete(SUBCATEGORIES_PATH + "/999999")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("SUBCATEGORY_NOT_FOUND"));
     }
   }
 }
