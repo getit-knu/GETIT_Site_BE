@@ -26,8 +26,7 @@ public class CategoryTreeResult {
   ) {
 
     public static SubCategoryNode of(SubCategory subCategory, long lectureCount) {
-      return new SubCategoryNode(
-          subCategory.getId(), subCategory.getName(), subCategory.getOrder(), lectureCount);
+      return new SubCategoryNode(subCategory.getId(), subCategory.getName(), subCategory.getOrder(), lectureCount);
     }
   }
 }

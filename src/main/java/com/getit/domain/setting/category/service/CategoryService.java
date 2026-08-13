@@ -23,9 +23,8 @@ public class CategoryService {
   private final CategoryUsageChecker categoryUsageChecker;
 
   @Transactional
-  public Track createTrack(String name, Integer order) {
-    Integer resolvedOrder = order != null ? order : nextTrackOrder();
-    return trackRepository.save(Track.create(name, resolvedOrder));
+  public Track createTrack(String name) {
+    return trackRepository.save(Track.create(name, nextTrackOrder()));
   }
 
   @Transactional
@@ -68,13 +67,12 @@ public class CategoryService {
   }
 
   @Transactional
-  public SubCategory createSubCategory(Long trackId, String name, Integer order) {
+  public SubCategory createSubCategory(Long trackId, String name) {
     if (!trackRepository.existsById(trackId)) {
       throw new BusinessException(CategoryErrorCode.TRACK_NOT_FOUND);
     }
 
-    Integer resolvedOrder = order != null ? order : nextSubCategoryOrder(trackId);
-    return subCategoryRepository.save(SubCategory.create(name, resolvedOrder, trackId));
+    return subCategoryRepository.save(SubCategory.create(name, nextSubCategoryOrder(trackId), trackId));
   }
 
   @Transactional
