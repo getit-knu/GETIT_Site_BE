@@ -38,6 +38,29 @@ public class CategoryService {
     return track;
   }
 
+  @Transactional
+  public void deleteTrack(Long id, boolean force) {
+    Track track = trackRepository.findById(id)
+        .orElseThrow(() -> new BusinessException(CategoryErrorCode.TRACK_NOT_FOUND));
+
+    List<SubCategory> subCategories = subCategoryRepository.findAllByTrackIdOrderByOrderAsc(id);
+
+    if (!force && isTrackInUse(id, subCategories)) {
+      throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
+    }
+
+    subCategoryRepository.deleteAll(subCategories);
+    trackRepository.delete(track);
+  }
+
+  private boolean isTrackInUse(Long trackId, List<SubCategory> subCategories) {
+    if (categoryUsageChecker.countLecturesByTrackId(trackId) > 0) {
+      return true;
+    }
+    return subCategories.stream()
+        .anyMatch(subCategory -> categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId()) > 0);
+  }
+
   private Integer nextTrackOrder() {
     return trackRepository.findTopByOrderByOrderDesc()
         .map(Track::getOrder)
@@ -62,6 +85,18 @@ public class CategoryService {
     Integer resolvedOrder = order != null ? order : subCategory.getOrder();
     subCategory.update(name, resolvedOrder);
     return subCategory;
+  }
+
+  @Transactional
+  public void deleteSubCategory(Long id, boolean force) {
+    SubCategory subCategory = subCategoryRepository.findById(id)
+        .orElseThrow(() -> new BusinessException(CategoryErrorCode.SUBCATEGORY_NOT_FOUND));
+
+    if (!force && categoryUsageChecker.countLecturesBySubCategoryId(id) > 0) {
+      throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
+    }
+
+    subCategoryRepository.delete(subCategory);
   }
 
   private Integer nextSubCategoryOrder(Long trackId) {
