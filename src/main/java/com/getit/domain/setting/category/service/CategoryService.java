@@ -38,7 +38,11 @@ public class CategoryService {
     return track;
   }
 
-  private Integer nextTrackOrder() { return (int) trackRepository.count() + 1; }
+  private Integer nextTrackOrder() {
+    return trackRepository.findTopByOrderByOrderDesc()
+        .map(Track::getOrder)
+        .orElse(0) + 1;
+  }
 
   @Transactional
   public SubCategory createSubCategory(Long trackId, String name, Integer order) {
@@ -60,7 +64,11 @@ public class CategoryService {
     return subCategory;
   }
 
-  private Integer nextSubCategoryOrder(Long trackId) { return (int) subCategoryRepository.countByTrackId(trackId) + 1; }
+  private Integer nextSubCategoryOrder(Long trackId) {
+    return subCategoryRepository.findTopByTrackIdOrderByOrderDesc(trackId)
+        .map(SubCategory::getOrder)
+        .orElse(0) + 1;
+  }
 
   public List<TrackNode> getCategoryTree() {
     return trackRepository.findAllByOrderByOrderAsc().stream()
