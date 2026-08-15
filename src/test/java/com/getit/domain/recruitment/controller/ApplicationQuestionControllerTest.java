@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
 import com.getit.domain.recruitment.dto.ApplicationQuestionRequest;
-import com.getit.domain.recruitment.dto.QuestionOption;
 import com.getit.domain.recruitment.dto.QuestionOrderRequest;
 import com.getit.domain.recruitment.entity.ApplicationQuestion;
 import com.getit.domain.recruitment.entity.QuestionType;
