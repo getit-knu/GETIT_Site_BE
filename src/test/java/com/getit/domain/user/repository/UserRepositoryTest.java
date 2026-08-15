@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
+import com.getit.domain.user.entity.UserStatus;
 import com.getit.global.config.JpaAuditingConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -114,5 +115,27 @@ class UserRepositoryTest {
     User found = userRepository.findById(user.getId()).orElseThrow();
     assertThat(found.isDeleted()).isTrue();
     assertThat(found.getRole()).isEqualTo(Role.GUEST);
+  }
+
+  @Test
+  @DisplayName("특정 기수의 활성 부원만 조회한다")
+  void findsActiveMembersByGenerationNo() {
+    User member9 = userRepository.save(guest("google-sub-9", "i@getit.com"));
+    member9.promoteToMember(9);
+
+    User otherGeneration = userRepository.save(guest("google-sub-10", "j@getit.com"));
+    otherGeneration.promoteToMember(8);
+
+    userRepository.save(guest("google-sub-11", "k@getit.com"));
+
+    User withdrawnMember = userRepository.save(guest("google-sub-12", "l@getit.com"));
+    withdrawnMember.promoteToMember(9);
+    withdrawnMember.withdraw();
+
+    userRepository.flush();
+
+    assertThat(userRepository.findByRoleAndStatusAndGenerationNo(Role.MEMBER, UserStatus.ACTIVE, 9))
+        .extracting(User::getEmail)
+        .containsExactly("i@getit.com");
   }
 }
