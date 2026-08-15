@@ -2,6 +2,7 @@ plugins {
   id 'java'
   id 'org.springframework.boot' version '3.5.16'
   id 'io.spring.dependency-management' version '1.1.7'
+  id 'com.diffplug.spotless' version '8.9.0'
 }
 
 group = 'com.getit'
@@ -107,6 +108,37 @@ tasks.register('schemaTest', Test) {
       ?: 'jdbc:mysql://localhost:3307/getit_schema_test?characterEncoding=UTF-8&serverTimezone=Asia/Seoul'
   systemProperty 'schema.test.username', System.getenv('SCHEMA_TEST_DB_USERNAME') ?: 'getit'
   systemProperty 'schema.test.password', System.getenv('SCHEMA_TEST_DB_PASSWORD') ?: 'getit'
+}
+
+/**
+ * 코드 포맷 검사. CI 의 '정적 검사' job 이 spotlessCheck 를 호출한다.
+ *
+ * 위반 시 ./gradlew spotlessApply 로 자동 수정한다.
+ *
+ * 규칙을 의도적으로 얕게 잡았다. 현재 코드가 그대로 통과하는 수준이다.
+ * importOrder 나 googleJavaFormat 을 켜면 80개 파일이 한 번에 바뀌어
+ * 진행 중인 브랜치가 전부 충돌한다. 강화는 작업이 적은 시점에 별도 PR 로 한다.
+ */
+spotless {
+  java {
+    target 'src/**/*.java'
+
+    // ./gradlew build 는 포맷을 검사하지 않는다. CI 의 정적 검사 job 에서만 강제한다.
+    // 개발 중에 포맷 때문에 빌드가 막히면 반복 속도가 떨어진다.
+    enforceCheck = false
+
+    removeUnusedImports()
+    trimTrailingWhitespace()
+    endWithNewline()
+    // 탭을 공백으로 바꾼다. 들여쓰기 폭을 다시 계산하지는 않는다
+    leadingTabsToSpaces(2)
+  }
+
+  format 'misc', {
+    target '*.gradle', '*.md', '.gitignore', '.editorconfig', 'src/**/*.yml', '.github/**/*.yml'
+    trimTrailingWhitespace()
+    endWithNewline()
+  }
 }
 
 tasks.withType(JavaCompile).configureEach {
