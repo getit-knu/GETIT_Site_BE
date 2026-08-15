@@ -11,7 +11,8 @@ import org.springframework.http.HttpStatus;
 public enum RecruitmentErrorCode implements ErrorCode {
 
   ACTIVE_GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "진행 중인 기수가 없습니다."),
-  SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "모집 일정을 찾을 수 없습니다.");
+  SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "모집 일정을 찾을 수 없습니다."),
+  QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "질문 항목을 찾을 수 없습니다.");
 
   private final HttpStatus status;
   private final String message;
