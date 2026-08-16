@@ -169,6 +169,21 @@ class ApplicationQuestionControllerTest {
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("QUESTION_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 질문이면 404 다")
+    void returns404WhenQuestionBelongsToInactiveGeneration() throws Exception {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      ApplicationQuestion otherQuestion = applicationQuestionRepository.save(ApplicationQuestion.create(
+          otherGeneration.getId(), 1, QuestionType.TEXT, "지난 기수 질문", false, 300, null));
+
+      mockMvc.perform(put(QUESTIONS_PATH + "/" + otherQuestion.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(textRequestJson("내용")))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("QUESTION_NOT_FOUND"));
+    }
   }
 
   @Nested

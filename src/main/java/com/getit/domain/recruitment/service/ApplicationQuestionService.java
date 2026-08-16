@@ -59,7 +59,8 @@ public class ApplicationQuestionService {
   ) {
     validateOptions(type, options);
 
-    ApplicationQuestion question = findQuestion(questionId);
+    GenerationSummary activeGeneration = findActiveGeneration();
+    ApplicationQuestion question = findQuestion(questionId, activeGeneration.id());
     question.update(type, content, required, resolveMaxLength(type, maxLength), options);
 
     return ApplicationQuestionResult.from(question);
@@ -67,19 +68,26 @@ public class ApplicationQuestionService {
 
   @Transactional
   public void deleteQuestion(Long questionId) {
-    applicationQuestionRepository.delete(findQuestion(questionId));
+    GenerationSummary activeGeneration = findActiveGeneration();
+    applicationQuestionRepository.delete(findQuestion(questionId, activeGeneration.id()));
   }
 
   /** 6.7. 배열 인덱스 순서대로 order 를 1부터 재부여한다. */
   @Transactional
   public void reorderQuestions(List<Long> orderedIds) {
+    GenerationSummary activeGeneration = findActiveGeneration();
+
     for (int i = 0; i < orderedIds.size(); i++) {
-      findQuestion(orderedIds.get(i)).updateOrder(i + 1);
+      findQuestion(orderedIds.get(i), activeGeneration.id()).updateOrder(i + 1);
     }
   }
 
-  private ApplicationQuestion findQuestion(Long questionId) {
-    return applicationQuestionRepository.findById(questionId)
+  /**
+   * id 와 활성 기수 소속 여부를 함께 확인한다. 다른 기수(이미 지원서가 제출된 기수 포함)의 질문은
+   * 수정 · 삭제 · 재정렬 대상에서 제외해야 기존 답변이 orphan 상태가 되는 것을 막을 수 있다 (#33 리뷰).
+   */
+  private ApplicationQuestion findQuestion(Long questionId, Long activeGenerationId) {
+    return applicationQuestionRepository.findByIdAndGenerationId(questionId, activeGenerationId)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.QUESTION_NOT_FOUND));
   }
 

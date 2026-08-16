@@ -137,6 +137,21 @@ class ApplicationQuestionServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.QUESTION_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 질문을 수정하면 예외가 발생한다")
+    void throwsWhenQuestionBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      ApplicationQuestion otherQuestion = applicationQuestionRepository.save(
+          ApplicationQuestion.create(
+              otherGeneration.getId(), 1, QuestionType.TEXT, "지난 기수 질문", false, 300, null));
+
+      assertThatThrownBy(() -> applicationQuestionService.updateQuestion(
+          otherQuestion.getId(), QuestionType.TEXT, "내용", false, 300, null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.QUESTION_NOT_FOUND);
+    }
   }
 
   @Nested
@@ -158,6 +173,20 @@ class ApplicationQuestionServiceTest {
     @DisplayName("없는 질문을 삭제하면 예외가 발생한다")
     void throwsWhenQuestionNotFound() {
       assertThatThrownBy(() -> applicationQuestionService.deleteQuestion(999L))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.QUESTION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 질문을 삭제하면 예외가 발생한다")
+    void throwsWhenQuestionBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      ApplicationQuestion otherQuestion = applicationQuestionRepository.save(
+          ApplicationQuestion.create(
+              otherGeneration.getId(), 1, QuestionType.TEXT, "지난 기수 질문", false, 300, null));
+
+      assertThatThrownBy(() -> applicationQuestionService.deleteQuestion(otherQuestion.getId()))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.QUESTION_NOT_FOUND);

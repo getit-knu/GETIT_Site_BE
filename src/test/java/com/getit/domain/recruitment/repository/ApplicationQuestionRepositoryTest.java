@@ -50,4 +50,13 @@ class ApplicationQuestionRepositoryTest {
     assertThat(applicationQuestionRepository.countByGenerationId(1L)).isEqualTo(2);
     assertThat(applicationQuestionRepository.countByGenerationId(999L)).isZero();
   }
+
+  @Test
+  @DisplayName("id 와 기수가 모두 일치해야 조회된다")
+  void findsByIdAndGenerationIdOnlyWhenBothMatch() {
+    ApplicationQuestion saved = applicationQuestionRepository.save(question(1L, 1, "첫번째"));
+
+    assertThat(applicationQuestionRepository.findByIdAndGenerationId(saved.getId(), 1L)).isPresent();
+    assertThat(applicationQuestionRepository.findByIdAndGenerationId(saved.getId(), 2L)).isEmpty();
+  }
 }
