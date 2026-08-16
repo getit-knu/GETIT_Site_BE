@@ -10,7 +10,12 @@ import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,13 +85,32 @@ public class ApplicationQuestionService {
         .forEach(q -> q.updateOrder(q.getOrder() - 1));
   }
 
-  /** 6.7. 배열 인덱스 순서대로 order 를 1부터 재부여한다. */
+  /**
+   * 6.7. 배열 인덱스 순서대로 order 를 1부터 재부여한다.
+   *
+   * <p>활성 기수의 질문 전체가, 중복 없이, 정확히 한 번씩 포함되어 있어야 한다. 일부만 보내거나
+   * (나머지 order 와 충돌), id 가 중복되거나, 다른 기수의 질문 id 가 섞여 있으면 거부한다 (#33 리뷰).
+   */
   @Transactional
   public void reorderQuestions(List<Long> orderedIds) {
+    if (new HashSet<>(orderedIds).size() != orderedIds.size()) {
+      throw new BusinessException(CommonErrorCode.VALIDATION_FAILED, "중복된 질문 id 가 있습니다.");
+    }
+
     GenerationSummary activeGeneration = findActiveGeneration();
+    List<ApplicationQuestion> questions =
+        applicationQuestionRepository.findByGenerationId(activeGeneration.id());
+    Map<Long, ApplicationQuestion> questionsById =
+        questions.stream().collect(Collectors.toMap(ApplicationQuestion::getId, Function.identity()));
+
+    Set<Long> orderedIdSet = new HashSet<>(orderedIds);
+    if (orderedIds.size() != questions.size() || !questionsById.keySet().equals(orderedIdSet)) {
+      throw new BusinessException(
+          CommonErrorCode.VALIDATION_FAILED, "활성 기수의 질문 전체를 빠짐없이 보내야 합니다.");
+    }
 
     for (int i = 0; i < orderedIds.size(); i++) {
-      findQuestion(orderedIds.get(i), activeGeneration.id()).updateOrder(i + 1);
+      questionsById.get(orderedIds.get(i)).updateOrder(i + 1);
     }
   }
 

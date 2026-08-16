@@ -232,5 +232,52 @@ class ApplicationQuestionServiceTest {
       assertThat(applicationQuestionRepository.findById(q1.getId()).orElseThrow().getOrder()).isEqualTo(2);
       assertThat(applicationQuestionRepository.findById(q2.getId()).orElseThrow().getOrder()).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("일부 질문만 보내면 검증 실패한다")
+    void rejectsPartialList() {
+      ApplicationQuestion q1 = applicationQuestionRepository.save(
+          ApplicationQuestion.create(activeGeneration.getId(), 1, QuestionType.TEXT, "1번", false, 300, null));
+      applicationQuestionRepository.save(
+          ApplicationQuestion.create(activeGeneration.getId(), 2, QuestionType.TEXT, "2번", false, 300, null));
+
+      assertThatThrownBy(() -> applicationQuestionService.reorderQuestions(List.of(q1.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("중복된 id 를 보내면 검증 실패한다")
+    void rejectsDuplicateIds() {
+      ApplicationQuestion q1 = applicationQuestionRepository.save(
+          ApplicationQuestion.create(activeGeneration.getId(), 1, QuestionType.TEXT, "1번", false, 300, null));
+      ApplicationQuestion q2 = applicationQuestionRepository.save(
+          ApplicationQuestion.create(activeGeneration.getId(), 2, QuestionType.TEXT, "2번", false, 300, null));
+
+      assertThatThrownBy(() -> applicationQuestionService.reorderQuestions(
+          List.of(q1.getId(), q1.getId(), q2.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("다른 기수의 질문 id 가 섞여 있으면 검증 실패한다")
+    void rejectsIdFromAnotherGeneration() {
+      ApplicationQuestion q1 = applicationQuestionRepository.save(
+          ApplicationQuestion.create(activeGeneration.getId(), 1, QuestionType.TEXT, "1번", false, 300, null));
+
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      ApplicationQuestion otherQuestion = applicationQuestionRepository.save(
+          ApplicationQuestion.create(
+              otherGeneration.getId(), 1, QuestionType.TEXT, "다른 기수 질문", false, 300, null));
+
+      assertThatThrownBy(() -> applicationQuestionService.reorderQuestions(
+          List.of(otherQuestion.getId(), q1.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+    }
   }
 }
