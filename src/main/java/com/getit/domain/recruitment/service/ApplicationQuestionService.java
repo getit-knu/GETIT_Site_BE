@@ -66,10 +66,18 @@ public class ApplicationQuestionService {
     return ApplicationQuestionResult.from(question);
   }
 
+  /** 6.6. 삭제 후 뒤 순서를 한 칸씩 당겨서 order 중복(예: 3번 삭제 후 4번이 2개)을 막는다. */
   @Transactional
   public void deleteQuestion(Long questionId) {
     GenerationSummary activeGeneration = findActiveGeneration();
-    applicationQuestionRepository.delete(findQuestion(questionId, activeGeneration.id()));
+    ApplicationQuestion question = findQuestion(questionId, activeGeneration.id());
+    int deletedOrder = question.getOrder();
+
+    applicationQuestionRepository.delete(question);
+
+    applicationQuestionRepository.findByGenerationId(activeGeneration.id()).stream()
+        .filter(q -> q.getOrder() > deletedOrder)
+        .forEach(q -> q.updateOrder(q.getOrder() - 1));
   }
 
   /** 6.7. 배열 인덱스 순서대로 order 를 1부터 재부여한다. */

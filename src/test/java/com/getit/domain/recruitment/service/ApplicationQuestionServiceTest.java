@@ -191,6 +191,25 @@ class ApplicationQuestionServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.QUESTION_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("삭제 후 뒤 순서의 질문들이 한 칸씩 당겨져서 order 중복이 생기지 않는다")
+    void compactsOrderAfterDelete() {
+      ApplicationQuestionResult first = applicationQuestionService.createQuestion(
+          QuestionType.TEXT, "1번", false, 300, null);
+      ApplicationQuestionResult second = applicationQuestionService.createQuestion(
+          QuestionType.TEXT, "2번", false, 300, null);
+      ApplicationQuestionResult third = applicationQuestionService.createQuestion(
+          QuestionType.TEXT, "3번", false, 300, null);
+
+      applicationQuestionService.deleteQuestion(second.id());
+
+      List<ApplicationQuestionResult> remaining = applicationQuestionService.getQuestions();
+      assertThat(remaining).extracting(ApplicationQuestionResult::id)
+          .containsExactly(first.id(), third.id());
+      assertThat(remaining).extracting(ApplicationQuestionResult::order)
+          .containsExactly(1, 2);
+    }
   }
 
   @Nested
