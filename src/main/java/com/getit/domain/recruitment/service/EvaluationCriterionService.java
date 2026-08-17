@@ -19,17 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class EvaluationCriterionService {
 
-  /**
-   * 배점 합계 상한. (API 명세서 6.9)
-   *
-   * <p>명세서 문구("추가·수정·삭제 모든 쓰기 시점에 합계 100 검증")를 문자 그대로 "항상 정확히
-   * 100"으로 해석하면, 기준을 하나씩 추가하는 중간 상태(예: 20점만 추가된 시점)조차 저장할 수
-   * 없어진다. 이 값을 넘을 때만 거부하는 방식으로 구현하고, 정확히 100인지는
-   * {@link EvaluationCriteriaSummary#valid()} 로만 안내한다. 삭제는 합계를 줄이기만 하므로
-   * 이 검증에 걸릴 일이 없다.
-   */
-  private static final int MAX_TOTAL_SCORE = 100;
-
   private final EvaluationCriterionRepository evaluationCriterionRepository;
   private final GenerationQueryService generationQueryService;
 
@@ -90,8 +79,17 @@ public class EvaluationCriterionService {
         .forEach(c -> c.updateOrder(c.getOrder() - 1));
   }
 
+  /**
+   * 배점 합계 검증. (API 명세서 6.9)
+   *
+   * <p>명세서 문구("추가·수정·삭제 모든 쓰기 시점에 합계 100 검증")를 문자 그대로 "항상 정확히
+   * 100"으로 해석하면, 기준을 하나씩 추가하는 중간 상태(예: 20점만 추가된 시점)조차 저장할 수
+   * 없어진다. {@link EvaluationCriteriaSummary#MAX_TOTAL_SCORE} 를 넘을 때만 거부하는 방식으로
+   * 구현하고, 정확히 100인지는 {@link EvaluationCriteriaSummary#valid()} 로만 안내한다. 삭제는
+   * 합계를 줄이기만 하므로 이 검증에 걸릴 일이 없다.
+   */
   private void validateTotal(int total) {
-    if (total > MAX_TOTAL_SCORE) {
+    if (total > EvaluationCriteriaSummary.MAX_TOTAL_SCORE) {
       throw new BusinessException(
           RecruitmentErrorCode.INVALID_CRITERIA_TOTAL,
           "평가 기준 배점 합계는 100점을 초과할 수 없습니다. (현재 " + total + "점)");
