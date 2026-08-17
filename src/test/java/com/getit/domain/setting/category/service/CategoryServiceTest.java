@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +16,7 @@ import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
@@ -42,11 +43,15 @@ class CategoryServiceTest {
   private CategoryService categoryService;
 
   private Track track() {
-    return Track.create("SW", 1);
+    Track track = Track.create("SW", 1);
+    ReflectionTestUtils.setField(track, "id", 100L);
+    return track;
   }
 
   private SubCategory subCategory(Long trackId) {
-    return SubCategory.create("웹기초", 1, trackId);
+    SubCategory subCategory = SubCategory.create("웹기초", 1, trackId);
+    ReflectionTestUtils.setField(subCategory, "id", 10L);
+    return subCategory;
   }
 
   @Nested
@@ -115,6 +120,7 @@ class CategoryServiceTest {
       when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
       when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(1L)).thenReturn(List.of());
       when(categoryUsageChecker.countLecturesByTrackId(1L)).thenReturn(0L);
+      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of())).thenReturn(Map.of());
 
       categoryService.deleteTrack(1L, false);
 
@@ -142,7 +148,8 @@ class CategoryServiceTest {
       when(trackRepository.findById(1L)).thenReturn(Optional.of(track()));
       when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(1L)).thenReturn(List.of(subCategory));
       when(categoryUsageChecker.countLecturesByTrackId(1L)).thenReturn(0L);
-      when(categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId())).thenReturn(2L);
+      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
+          .thenReturn(Map.of(subCategory.getId(), 2L));
 
       assertThatThrownBy(() -> categoryService.deleteTrack(1L, false))
           .isInstanceOf(BusinessException.class)
@@ -231,8 +238,10 @@ class CategoryServiceTest {
       Track track = track();
       SubCategory subCategory = subCategory(track.getId());
       when(trackRepository.findAllByOrderByOrderAsc()).thenReturn(List.of(track));
-      when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(track.getId())).thenReturn(List.of(subCategory));
-      when(categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId())).thenReturn(3L);
+      when(subCategoryRepository.findAllByTrackIdInOrderByTrackIdAscOrderAsc(List.of(track.getId())))
+          .thenReturn(List.of(subCategory));
+      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
+          .thenReturn(Map.of(subCategory.getId(), 3L));
 
       List<TrackNode> tree = categoryService.getCategoryTree();
 

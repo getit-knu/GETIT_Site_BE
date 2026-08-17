@@ -8,7 +8,10 @@ import com.getit.domain.setting.category.exception.CategoryErrorCode;
 import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.global.exception.BusinessException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,8 +59,9 @@ public class CategoryService {
     if (categoryUsageChecker.countLecturesByTrackId(trackId) > 0) {
       return true;
     }
-    return subCategories.stream()
-        .anyMatch(subCategory -> categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId()) > 0);
+    List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
+    return categoryUsageChecker.countLecturesBySubCategoryIds(subCategoryIds).values().stream()
+        .anyMatch(count -> count > 0);
   }
 
   private Integer nextTrackOrder() {
@@ -104,15 +108,25 @@ public class CategoryService {
   }
 
   public List<TrackNode> getCategoryTree() {
-    return trackRepository.findAllByOrderByOrderAsc().stream()
-        .map(track -> TrackNode.of(track, subCategoryNodesOf(track.getId())))
+    List<Track> tracks = trackRepository.findAllByOrderByOrderAsc();
+    List<Long> trackIds = tracks.stream().map(Track::getId).toList();
+
+    List<SubCategory> subCategories = subCategoryRepository.findAllByTrackIdInOrderByTrackIdAscOrderAsc(trackIds);
+    Map<Long, List<SubCategory>> subCategoriesByTrackId = subCategories.stream()
+        .collect(Collectors.groupingBy(SubCategory::getTrackId, LinkedHashMap::new, Collectors.toList()));
+
+    List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
+    Map<Long, Long> lectureCounts = categoryUsageChecker.countLecturesBySubCategoryIds(subCategoryIds);
+
+    return tracks.stream()
+        .map(track -> TrackNode.of(track, subCategoryNodesOf(track.getId(), subCategoriesByTrackId, lectureCounts)))
         .toList();
   }
 
-  private List<SubCategoryNode> subCategoryNodesOf(Long trackId) {
-    return subCategoryRepository.findAllByTrackIdOrderByOrderAsc(trackId).stream()
-        .map(subCategory -> SubCategoryNode.of(
-            subCategory, categoryUsageChecker.countLecturesBySubCategoryId(subCategory.getId())))
+  private List<SubCategoryNode> subCategoryNodesOf(
+      Long trackId, Map<Long, List<SubCategory>> subCategoriesByTrackId, Map<Long, Long> lectureCounts) {
+    return subCategoriesByTrackId.getOrDefault(trackId, List.of()).stream()
+        .map(subCategory -> SubCategoryNode.of(subCategory, lectureCounts.getOrDefault(subCategory.getId(), 0L)))
         .toList();
   }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
 import com.getit.global.config.JpaAuditingConfig;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,21 @@ class SubCategoryRepositoryTest {
     assertThat(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(track.getId()))
         .extracting(SubCategory::getName)
         .containsExactly("웹기초", "React.js");
+  }
+
+  @Test
+  @DisplayName("여러 트랙 id 배치 조회: 트랙·order 순으로 반환")
+  void findsAllByTrackIdInOrderedByTrackAndOrder() {
+    Track track = trackRepository.save(Track.create("SW", 1));
+    Track otherTrack = trackRepository.save(Track.create("창업", 2));
+    subCategoryRepository.save(SubCategory.create("React.js", 2, track.getId()));
+    subCategoryRepository.save(SubCategory.create("웹기초", 1, track.getId()));
+    subCategoryRepository.save(SubCategory.create("Figma", 1, otherTrack.getId()));
+
+    assertThat(subCategoryRepository.findAllByTrackIdInOrderByTrackIdAscOrderAsc(
+            List.of(track.getId(), otherTrack.getId())))
+        .extracting(SubCategory::getName)
+        .containsExactly("웹기초", "React.js", "Figma");
   }
 
   @Test
