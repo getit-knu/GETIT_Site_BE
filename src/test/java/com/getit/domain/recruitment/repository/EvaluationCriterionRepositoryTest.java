@@ -40,17 +40,6 @@ class EvaluationCriterionRepositoryTest {
   }
 
   @Test
-  @DisplayName("기수별 기준 개수를 센다")
-  void countsByGenerationId() {
-    evaluationCriterionRepository.save(criterion(1L, 1, "전공 적합성", 20));
-    evaluationCriterionRepository.save(criterion(1L, 2, "지원 동기", 30));
-    evaluationCriterionRepository.save(criterion(2L, 1, "다른 기수", 50));
-
-    assertThat(evaluationCriterionRepository.countByGenerationId(1L)).isEqualTo(2);
-    assertThat(evaluationCriterionRepository.countByGenerationId(999L)).isZero();
-  }
-
-  @Test
   @DisplayName("id 와 기수가 모두 일치해야 조회된다")
   void findsByIdAndGenerationIdOnlyWhenBothMatch() {
     EvaluationCriterion saved = evaluationCriterionRepository.save(criterion(1L, 1, "전공 적합성", 20));

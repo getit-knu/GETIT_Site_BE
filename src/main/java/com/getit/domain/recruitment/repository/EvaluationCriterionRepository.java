@@ -17,9 +17,6 @@ public interface EvaluationCriterionRepository extends JpaRepository<EvaluationC
   @Query("select c from EvaluationCriterion c where c.generationId = :generationId order by c.order asc")
   List<EvaluationCriterion> findByGenerationId(@Param("generationId") Long generationId);
 
-  /** 새 기준의 order(마지막 + 1)를 정하는 데 쓴다. (6.9) */
-  long countByGenerationId(Long generationId);
-
   /**
    * id 와 소속 기수를 함께 확인한다. (6.10 · 6.11)
    *
