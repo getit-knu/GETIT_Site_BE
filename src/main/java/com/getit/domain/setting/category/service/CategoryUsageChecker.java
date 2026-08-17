@@ -10,4 +10,6 @@ public interface CategoryUsageChecker {
   long countLecturesBySubCategoryId(Long subCategoryId);
 
   Map<Long, Long> countLecturesBySubCategoryIds(List<Long> subCategoryIds);
+
+  void disconnectLecturesBySubCategoryIds(List<Long> subCategoryIds);
 }

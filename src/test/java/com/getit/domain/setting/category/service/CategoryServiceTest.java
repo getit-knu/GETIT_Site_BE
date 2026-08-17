@@ -166,9 +166,11 @@ class CategoryServiceTest {
 
       categoryService.deleteTrack(1L, true);
 
+      verify(categoryUsageChecker).disconnectLecturesBySubCategoryIds(List.of(subCategory.getId()));
       verify(subCategoryRepository).deleteAll(List.of(subCategory));
       verify(trackRepository).delete(track);
       verify(categoryUsageChecker, never()).countLecturesByTrackId(anyLong());
+      verify(categoryUsageChecker, never()).countLecturesBySubCategoryIds(any());
     }
   }
 
@@ -223,6 +225,7 @@ class CategoryServiceTest {
 
       categoryService.deleteSubCategory(1L, true);
 
+      verify(categoryUsageChecker).disconnectLecturesBySubCategoryIds(List.of(1L));
       verify(subCategoryRepository).delete(subCategory);
       verify(categoryUsageChecker, never()).countLecturesBySubCategoryId(anyLong());
     }

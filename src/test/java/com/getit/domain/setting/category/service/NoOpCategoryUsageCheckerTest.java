@@ -1,6 +1,7 @@
 package com.getit.domain.setting.category.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.List;
 import java.util.Map;
@@ -24,5 +25,12 @@ class NoOpCategoryUsageCheckerTest {
     Map<Long, Long> result = checker.countLecturesBySubCategoryIds(List.of(1L, 2L));
 
     assertThat(result).isEqualTo(Map.of(1L, 0L, 2L, 0L));
+  }
+
+  @Test
+  @DisplayName("연결 해제: lecture 도메인이 없는 동안은 아무 동작도 하지 않는다")
+  void disconnectDoesNothing() {
+    assertThatCode(() -> checker.disconnectLecturesBySubCategoryIds(List.of(1L, 2L)))
+        .doesNotThrowAnyException();
   }
 }

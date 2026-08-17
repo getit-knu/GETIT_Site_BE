@@ -20,4 +20,7 @@ public class NoOpCategoryUsageChecker implements CategoryUsageChecker {
   public Map<Long, Long> countLecturesBySubCategoryIds(List<Long> subCategoryIds) {
     return subCategoryIds.stream().collect(Collectors.toMap(Function.identity(), id -> 0L));
   }
+
+  @Override
+  public void disconnectLecturesBySubCategoryIds(List<Long> subCategoryIds) { }
 }

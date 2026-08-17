@@ -47,7 +47,10 @@ public class CategoryService {
 
     List<SubCategory> subCategories = subCategoryRepository.findAllByTrackIdOrderByOrderAsc(id);
 
-    if (!force && isTrackInUse(id, subCategories)) {
+    if (force) {
+      List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
+      categoryUsageChecker.disconnectLecturesBySubCategoryIds(subCategoryIds);
+    } else if (isTrackInUse(id, subCategories)) {
       throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
     }
 
@@ -94,7 +97,9 @@ public class CategoryService {
     SubCategory subCategory = subCategoryRepository.findById(id)
         .orElseThrow(() -> new BusinessException(CategoryErrorCode.SUBCATEGORY_NOT_FOUND));
 
-    if (!force && categoryUsageChecker.countLecturesBySubCategoryId(id) > 0) {
+    if (force) {
+      categoryUsageChecker.disconnectLecturesBySubCategoryIds(List.of(id));
+    } else if (categoryUsageChecker.countLecturesBySubCategoryId(id) > 0) {
       throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
     }
 
