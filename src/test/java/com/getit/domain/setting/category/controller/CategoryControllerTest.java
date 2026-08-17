@@ -129,6 +129,19 @@ class CategoryControllerTest {
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
+
+    @Test
+    @DisplayName("name이 50자를 초과하면 400 이다")
+    void returns400WhenNameTooLong() throws Exception {
+      String body = objectMapper.writeValueAsString(new TrackCreate("a".repeat(51)));
+
+      mockMvc.perform(post(TRACKS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
   }
 
   @Nested
@@ -232,6 +245,20 @@ class CategoryControllerTest {
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.data.name").value("웹기초"))
           .andExpect(jsonPath("$.data.trackId").value(track.getId()));
+    }
+
+    @Test
+    @DisplayName("name이 50자를 초과하면 400 이다")
+    void returns400WhenNameTooLong() throws Exception {
+      Track track = trackRepository.save(Track.create("SW", 1));
+      String body = objectMapper.writeValueAsString(new SubCategoryCreate(track.getId(), "a".repeat(51)));
+
+      mockMvc.perform(post(SUBCATEGORIES_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
   }
 
