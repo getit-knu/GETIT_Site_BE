@@ -13,7 +13,8 @@ class AssignmentTest {
   void createsAssignment() {
     LocalDateTime deadline = LocalDateTime.of(2026, 6, 19, 23, 59, 59);
 
-    Assignment assignment = Assignment.create(1L, "자기소개 페이지 만들기", "HTML과 CSS로 만들어보세요.", deadline);
+    Assignment assignment =
+        Assignment.create(1L, "자기소개 페이지 만들기", "HTML과 CSS로 만들어보세요.", deadline);
 
     assertThat(assignment.getLectureId()).isEqualTo(1L);
     assertThat(assignment.getTitle()).isEqualTo("자기소개 페이지 만들기");

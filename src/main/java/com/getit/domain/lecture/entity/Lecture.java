@@ -110,7 +110,5 @@ public class Lecture extends SoftDeletableEntity {
         .build();
   }
 
-  public boolean isPublished() {
-    return published;
-  }
+  public boolean isPublished() { return published; }
 }

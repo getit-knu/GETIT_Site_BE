@@ -152,7 +152,8 @@ class LectureServiceTest {
     @DisplayName("과제를 함께 생성한다")
     void createsAssignmentTogether() {
       LocalDateTime deadline = LocalDateTime.of(2026, 6, 19, 23, 59, 59);
-      AssignmentPart assignmentPart = new AssignmentPart("자기소개 페이지 만들기", "HTML/CSS로 만들어보세요.", deadline);
+      AssignmentPart assignmentPart =
+          new AssignmentPart("자기소개 페이지 만들기", "HTML/CSS로 만들어보세요.", deadline);
 
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(

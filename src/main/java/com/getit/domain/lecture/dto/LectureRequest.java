@@ -24,9 +24,7 @@ public class LectureRequest {
   ) {
 
     /** isPublished 는 명세서 기본값이 false 다. */
-    public boolean isPublishedOrDefault() {
-      return Boolean.TRUE.equals(isPublished);
-    }
+    public boolean isPublishedOrDefault() { return Boolean.TRUE.equals(isPublished); }
   }
 
   public record AssignmentPart(
