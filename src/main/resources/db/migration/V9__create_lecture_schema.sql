@@ -11,7 +11,7 @@ CREATE TABLE lecture
     is_published      bit(1)       NOT NULL,
 
     generation_id     bigint       NOT NULL,
-    track_id          bigint       NOT NULL,
+    track_id          bigint       DEFAULT NULL,
     sub_category_id   bigint       DEFAULT NULL,
     created_by        bigint       NOT NULL,
 

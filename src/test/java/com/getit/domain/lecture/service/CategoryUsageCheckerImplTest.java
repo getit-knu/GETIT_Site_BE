@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 다른 도메인(category)이 소비하는 강의 사용 여부 조회 계약. (이슈 #25, PR #31 리뷰) */
+/** 다른 도메인(category)이 소비하는 강의 사용 여부 조회·연결 해제 계약. */
 @SpringBootTest
 @Transactional
 class CategoryUsageCheckerImplTest {
@@ -66,5 +66,20 @@ class CategoryUsageCheckerImplTest {
     Lecture reloaded = lectureRepository.findById(lecture.getId()).orElseThrow();
     assertThat(reloaded.getSubCategoryId()).isNull();
     assertThat(reloaded.getTrackId()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("트랙 연결을 해제하면 트랙·소분류 둘 다 비워진다")
+  void disconnectsTrackAndSubCategory() {
+    Lecture withSubCategory = save(1L, 1L);
+    Lecture withoutSubCategory = save(1L, null);
+    Lecture otherTrack = save(2L, null);
+
+    categoryUsageChecker.disconnectLecturesByTrackId(1L);
+
+    assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getTrackId()).isNull();
+    assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getSubCategoryId()).isNull();
+    assertThat(lectureRepository.findById(withoutSubCategory.getId()).orElseThrow().getTrackId()).isNull();
+    assertThat(lectureRepository.findById(otherTrack.getId()).orElseThrow().getTrackId()).isEqualTo(2L);
   }
 }

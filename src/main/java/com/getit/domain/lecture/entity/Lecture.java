@@ -46,7 +46,7 @@ public class Lecture extends SoftDeletableEntity {
   @Column(name = "generation_id", nullable = false)
   private Long generationId;
 
-  @Column(name = "track_id", nullable = false)
+  @Column(name = "track_id")
   private Long trackId;
 
   @Column(name = "sub_category_id")
