@@ -1,6 +1,6 @@
 package com.getit.domain.setting.category.controller;
 
-import com.getit.domain.lecture.service.CategoryUsageChecker;
+import com.getit.domain.lecture.service.CategoryLectureLinkService;
 import com.getit.domain.setting.category.dto.CategoryRequest.SubCategoryCreate;
 import com.getit.domain.setting.category.dto.CategoryRequest.SubCategoryUpdate;
 import com.getit.domain.setting.category.dto.CategoryRequest.TrackCreate;
@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CategoryController {
 
   private final CategoryService categoryService;
-  private final CategoryUsageChecker categoryUsageChecker;
+  private final CategoryLectureLinkService categoryLectureLinkService;
 
   @Operation(summary = "강의 분류 트리 조회", description = "명세서 10.3")
   @GetMapping("/tracks")
@@ -56,7 +56,7 @@ public class CategoryController {
   @PutMapping("/tracks/{id}")
   public ApiResponse<TrackResult> updateTrack(@PathVariable Long id, @Valid @RequestBody TrackUpdate request) {
     Track track = categoryService.updateTrack(id, request.name(), request.order());
-    long lectureCount = categoryUsageChecker.countLecturesByTrackId(id);
+    long lectureCount = categoryLectureLinkService.countLecturesByTrackId(id);
 
     return ApiResponse.success(TrackResult.of(track, lectureCount));
   }
@@ -82,7 +82,7 @@ public class CategoryController {
       @PathVariable Long id, @Valid @RequestBody SubCategoryUpdate request
   ) {
     SubCategory subCategory = categoryService.updateSubCategory(id, request.name(), request.order());
-    long lectureCount = categoryUsageChecker.countLecturesBySubCategoryId(id);
+    long lectureCount = categoryLectureLinkService.countLecturesBySubCategoryId(id);
 
     return ApiResponse.success(SubCategoryResult.of(subCategory, lectureCount));
   }

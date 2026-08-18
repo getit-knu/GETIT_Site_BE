@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CategoryUsageCheckerImpl implements CategoryUsageChecker {
+public class CategoryLectureLinkServiceImpl implements CategoryLectureLinkService {
 
   private final LectureRepository lectureRepository;
 

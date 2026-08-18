@@ -15,10 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 /** 다른 도메인(category)이 소비하는 강의 사용 여부 조회·연결 해제 계약. */
 @SpringBootTest
 @Transactional
-class CategoryUsageCheckerImplTest {
+class CategoryLectureLinkServiceImplTest {
 
   @Autowired
-  private CategoryUsageChecker categoryUsageChecker;
+  private CategoryLectureLinkService categoryLectureLinkService;
 
   @Autowired
   private LectureRepository lectureRepository;
@@ -35,7 +35,7 @@ class CategoryUsageCheckerImplTest {
     save(1L, 2L);
     save(2L, null);
 
-    assertThat(categoryUsageChecker.countLecturesByTrackId(1L)).isEqualTo(2);
+    assertThat(categoryLectureLinkService.countLecturesByTrackId(1L)).isEqualTo(2);
   }
 
   @Test
@@ -43,7 +43,7 @@ class CategoryUsageCheckerImplTest {
   void countsLecturesBySubCategoryId() {
     save(1L, 1L);
 
-    assertThat(categoryUsageChecker.countLecturesBySubCategoryId(1L)).isEqualTo(1);
+    assertThat(categoryLectureLinkService.countLecturesBySubCategoryId(1L)).isEqualTo(1);
   }
 
   @Test
@@ -51,7 +51,7 @@ class CategoryUsageCheckerImplTest {
   void batchCountsFillZeroForUnusedId() {
     save(1L, 1L);
 
-    Map<Long, Long> counts = categoryUsageChecker.countLecturesBySubCategoryIds(List.of(1L, 2L));
+    Map<Long, Long> counts = categoryLectureLinkService.countLecturesBySubCategoryIds(List.of(1L, 2L));
 
     assertThat(counts).isEqualTo(Map.of(1L, 1L, 2L, 0L));
   }
@@ -61,7 +61,7 @@ class CategoryUsageCheckerImplTest {
   void disconnectsSubCategoryOnly() {
     Lecture lecture = save(1L, 1L);
 
-    categoryUsageChecker.disconnectLecturesBySubCategoryIds(List.of(1L));
+    categoryLectureLinkService.disconnectLecturesBySubCategoryIds(List.of(1L));
 
     Lecture reloaded = lectureRepository.findById(lecture.getId()).orElseThrow();
     assertThat(reloaded.getSubCategoryId()).isNull();
@@ -75,7 +75,7 @@ class CategoryUsageCheckerImplTest {
     Lecture withoutSubCategory = save(1L, null);
     Lecture otherTrack = save(2L, null);
 
-    categoryUsageChecker.disconnectLecturesByTrackId(1L);
+    categoryLectureLinkService.disconnectLecturesByTrackId(1L);
 
     assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getTrackId()).isNull();
     assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getSubCategoryId()).isNull();
