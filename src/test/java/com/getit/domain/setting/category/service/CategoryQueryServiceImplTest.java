@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 다른 도메인이 소비하는 트랙·소분류 조회 계약. (이슈 #25) */
 @SpringBootTest
 @Transactional
 class CategoryQueryServiceImplTest {
