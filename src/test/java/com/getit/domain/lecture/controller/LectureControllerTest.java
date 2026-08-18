@@ -134,6 +134,20 @@ class LectureControllerTest {
     }
 
     @Test
+    @DisplayName("title이 255자를 초과하면 400 이다")
+    void returns400WhenTitleTooLong() throws Exception {
+      Create request = new Create(
+          null, trackId, subCategoryId, 1, "a".repeat(256), null, null, null, null, null, true, null);
+
+      mockMvc.perform(post(LECTURES_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 트랙이면 404 이다")
     void returns404WhenTrackNotFound() throws Exception {
       Create request = new Create(
