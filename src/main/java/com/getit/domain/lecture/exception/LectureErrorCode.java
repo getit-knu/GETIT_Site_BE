@@ -20,7 +20,5 @@ public enum LectureErrorCode implements ErrorCode {
   private final String message;
 
   @Override
-  public String getCode() {
-    return name();
-  }
+  public String getCode() { return name(); }
 }
