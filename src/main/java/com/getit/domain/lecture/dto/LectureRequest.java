@@ -4,6 +4,7 @@ import com.getit.domain.lecture.entity.SubmissionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -15,10 +16,10 @@ public class LectureRequest {
       @NotNull Long trackId,
       Long subCategoryId,
       @NotNull Integer week,
-      @NotBlank String title,
+      @NotBlank @Size(max = 255) String title,
       String description,
-      String youtubeUrl,
-      String materialUrl,
+      @Size(max = 512) String youtubeUrl,
+      @Size(max = 512) String materialUrl,
       Integer durationMinutes,
       List<Long> fileIds,
       Boolean isPublished,
@@ -29,10 +30,10 @@ public class LectureRequest {
   }
 
   public record AssignmentPart(
-      @NotBlank String title,
+      @NotBlank @Size(max = 255) String title,
       @NotBlank String description,
       @NotNull LocalDateTime deadline,
       @NotEmpty Set<SubmissionType> allowedTypes,
-      String linkPlaceholder
+      @Size(max = 255) String linkPlaceholder
   ) { }
 }
