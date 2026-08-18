@@ -12,7 +12,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 강의 자료 파일. {@code fileId} 는 file 도메인의 FileAsset 을 가리키는 FK 값만 보유한다(R9). */
 @Entity
 @Table(name = "lecture_file")
 @Getter

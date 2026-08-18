@@ -137,7 +137,8 @@ public class LectureService {
     if (assignment == null) {
       return;
     }
-    assignmentRepository.save(
-        Assignment.create(lectureId, assignment.title(), assignment.description(), assignment.deadline()));
+    assignmentRepository.save(Assignment.create(
+        lectureId, assignment.title(), assignment.description(), assignment.deadline(),
+        assignment.allowedTypes(), assignment.linkPlaceholder()));
   }
 }

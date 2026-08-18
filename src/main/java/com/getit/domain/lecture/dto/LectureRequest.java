@@ -1,13 +1,15 @@
 package com.getit.domain.lecture.dto;
 
+import com.getit.domain.lecture.entity.SubmissionType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public class LectureRequest {
 
-  /** 8.2 강의 추가. {@code generationId} 생략 시 활성 기수로 채운다. */
   public record Create(
       Long generationId,
       @NotNull Long trackId,
@@ -23,13 +25,14 @@ public class LectureRequest {
       AssignmentPart assignment
   ) {
 
-    /** isPublished 는 명세서 기본값이 false 다. */
     public boolean isPublishedOrDefault() { return Boolean.TRUE.equals(isPublished); }
   }
 
   public record AssignmentPart(
       @NotBlank String title,
       @NotBlank String description,
-      @NotNull LocalDateTime deadline
+      @NotNull LocalDateTime deadline,
+      @NotEmpty Set<SubmissionType> allowedTypes,
+      String linkPlaceholder
   ) { }
 }
