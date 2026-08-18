@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 다른 도메인(category)이 소비하는 강의 사용 여부 조회·연결 해제 계약. */
 @SpringBootTest
 @Transactional
 class CategoryLectureLinkServiceImplTest {
