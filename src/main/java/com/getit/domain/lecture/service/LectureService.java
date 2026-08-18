@@ -119,11 +119,12 @@ public class LectureService {
     if (fileIds == null || fileIds.isEmpty()) {
       return;
     }
+    List<Long> distinctFileIds = fileIds.stream().distinct().toList();
 
-    Map<Long, FileInfo> fileInfoByFileId = fileQueryService.findAllByIds(fileIds).stream()
+    Map<Long, FileInfo> fileInfoByFileId = fileQueryService.findAllByIds(distinctFileIds).stream()
         .collect(Collectors.toMap(FileInfo::fileId, Function.identity()));
 
-    for (Long fileId : fileIds) {
+    for (Long fileId : distinctFileIds) {
       FileInfo fileInfo = fileInfoByFileId.get(fileId);
       if (fileInfo == null) {
         throw new BusinessException(FileErrorCode.FILE_NOT_FOUND);
