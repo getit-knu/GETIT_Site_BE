@@ -145,7 +145,8 @@ class ApplicationControllerTest {
     @DisplayName("내 지원서와 답변을 반환한다")
     void returnsMyApplication() throws Exception {
       Application application = applicationRepository.save(Application.createDraft(
-          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2));
+          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
       applicationAnswerRepository.save(
           ApplicationAnswer.create(application.getId(), 10L, "지원 동기입니다.", null));
 

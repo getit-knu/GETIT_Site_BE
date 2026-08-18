@@ -174,7 +174,8 @@ class ApplicationServiceTest {
     @DisplayName("지원서와 답변을 함께 반환한다")
     void returnsApplicationWithAnswers() {
       Application application = applicationRepository.save(Application.createDraft(
-          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2));
+          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
       applicationAnswerRepository.save(
           ApplicationAnswer.create(application.getId(), 10L, "지원 동기입니다.", null));
       applicationAnswerRepository.save(
@@ -195,7 +196,7 @@ class ApplicationServiceTest {
     @DisplayName("다른 사용자의 지원서는 반환하지 않는다")
     void doesNotReturnOtherUsersApplication() {
       applicationRepository.save(Application.createDraft(
-          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", null, null, null, 2));
+          1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", null, null, null, 2, null));
 
       assertThat(applicationService.getMyApplication(2L)).isNull();
     }
