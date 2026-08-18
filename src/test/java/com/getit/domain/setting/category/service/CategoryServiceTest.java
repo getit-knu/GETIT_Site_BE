@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.getit.domain.lecture.service.CategoryUsageChecker;
+import com.getit.domain.lecture.service.CategoryLectureLinkService;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
@@ -38,7 +38,7 @@ class CategoryServiceTest {
   private SubCategoryRepository subCategoryRepository;
 
   @Mock
-  private CategoryUsageChecker categoryUsageChecker;
+  private CategoryLectureLinkService categoryLectureLinkService;
 
   @InjectMocks
   private CategoryService categoryService;
@@ -120,8 +120,8 @@ class CategoryServiceTest {
       Track track = track();
       when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
       when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(1L)).thenReturn(List.of());
-      when(categoryUsageChecker.countLecturesByTrackId(1L)).thenReturn(0L);
-      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of())).thenReturn(Map.of());
+      when(categoryLectureLinkService.countLecturesByTrackId(1L)).thenReturn(0L);
+      when(categoryLectureLinkService.countLecturesBySubCategoryIds(List.of())).thenReturn(Map.of());
 
       categoryService.deleteTrack(1L, false);
 
@@ -133,7 +133,7 @@ class CategoryServiceTest {
     void throwsWhenTrackItselfInUse() {
       when(trackRepository.findById(1L)).thenReturn(Optional.of(track()));
       when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(1L)).thenReturn(List.of());
-      when(categoryUsageChecker.countLecturesByTrackId(1L)).thenReturn(1L);
+      when(categoryLectureLinkService.countLecturesByTrackId(1L)).thenReturn(1L);
 
       assertThatThrownBy(() -> categoryService.deleteTrack(1L, false))
           .isInstanceOf(BusinessException.class)
@@ -148,8 +148,8 @@ class CategoryServiceTest {
       SubCategory subCategory = subCategory(1L);
       when(trackRepository.findById(1L)).thenReturn(Optional.of(track()));
       when(subCategoryRepository.findAllByTrackIdOrderByOrderAsc(1L)).thenReturn(List.of(subCategory));
-      when(categoryUsageChecker.countLecturesByTrackId(1L)).thenReturn(0L);
-      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
+      when(categoryLectureLinkService.countLecturesByTrackId(1L)).thenReturn(0L);
+      when(categoryLectureLinkService.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
           .thenReturn(Map.of(subCategory.getId(), 2L));
 
       assertThatThrownBy(() -> categoryService.deleteTrack(1L, false))
@@ -167,11 +167,11 @@ class CategoryServiceTest {
 
       categoryService.deleteTrack(1L, true);
 
-      verify(categoryUsageChecker).disconnectLecturesByTrackId(1L);
+      verify(categoryLectureLinkService).disconnectLecturesByTrackId(1L);
       verify(subCategoryRepository).deleteAll(List.of(subCategory));
       verify(trackRepository).delete(track);
-      verify(categoryUsageChecker, never()).countLecturesByTrackId(anyLong());
-      verify(categoryUsageChecker, never()).countLecturesBySubCategoryIds(any());
+      verify(categoryLectureLinkService, never()).countLecturesByTrackId(anyLong());
+      verify(categoryLectureLinkService, never()).countLecturesBySubCategoryIds(any());
     }
   }
 
@@ -211,7 +211,7 @@ class CategoryServiceTest {
     void throwsWhenInUse() {
       SubCategory subCategory = subCategory(1L);
       when(subCategoryRepository.findById(1L)).thenReturn(Optional.of(subCategory));
-      when(categoryUsageChecker.countLecturesBySubCategoryId(1L)).thenReturn(1L);
+      when(categoryLectureLinkService.countLecturesBySubCategoryId(1L)).thenReturn(1L);
 
       assertThatThrownBy(() -> categoryService.deleteSubCategory(1L, false))
           .isInstanceOf(BusinessException.class)
@@ -226,9 +226,9 @@ class CategoryServiceTest {
 
       categoryService.deleteSubCategory(1L, true);
 
-      verify(categoryUsageChecker).disconnectLecturesBySubCategoryIds(List.of(1L));
+      verify(categoryLectureLinkService).disconnectLecturesBySubCategoryIds(List.of(1L));
       verify(subCategoryRepository).delete(subCategory);
-      verify(categoryUsageChecker, never()).countLecturesBySubCategoryId(anyLong());
+      verify(categoryLectureLinkService, never()).countLecturesBySubCategoryId(anyLong());
     }
   }
 
@@ -244,7 +244,7 @@ class CategoryServiceTest {
       when(trackRepository.findAllByOrderByOrderAsc()).thenReturn(List.of(track));
       when(subCategoryRepository.findAllByTrackIdInOrderByTrackIdAscOrderAsc(List.of(track.getId())))
           .thenReturn(List.of(subCategory));
-      when(categoryUsageChecker.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
+      when(categoryLectureLinkService.countLecturesBySubCategoryIds(List.of(subCategory.getId())))
           .thenReturn(Map.of(subCategory.getId(), 3L));
 
       List<TrackNode> tree = categoryService.getCategoryTree();
