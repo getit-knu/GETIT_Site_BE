@@ -87,6 +87,31 @@ public class RecruitmentSchedule extends BaseTimeEntity {
         .build();
   }
 
+  /**
+   * 모집 단계 판정. (API 명세서 2.8 · 3.1)
+   *
+   * <p>명세서 표는 INTERVIEW 상한을 {@code interviewEndAt} 으로, FINAL_ANNOUNCED 조건을
+   * {@code now > totalEndAt} 으로 각각 적는다. 두 값은 생성 · 수정 시 항상 같게 맞춰지므로
+   * (PR #39 리뷰) 굳이 두 필드를 따로 안 쓰고 {@code totalEndAt} 하나로 두 조건을 표현한다.
+   * 활성 기수가 없는 {@code CLOSED} 는 이 메서드가 호출되는 시점(활성 기수 존재)에는 해당하지
+   * 않아 호출자가 별도로 처리한다.
+   */
+  public RecruitmentPhase resolvePhase(LocalDateTime now) {
+    if (now.isBefore(documentStartAt)) {
+      return RecruitmentPhase.BEFORE_OPEN;
+    }
+    if (!now.isAfter(documentEndAt)) {
+      return RecruitmentPhase.DOCUMENT_OPEN;
+    }
+    if (now.isBefore(interviewStartAt)) {
+      return RecruitmentPhase.DOCUMENT_REVIEW;
+    }
+    if (!now.isAfter(totalEndAt)) {
+      return RecruitmentPhase.INTERVIEW;
+    }
+    return RecruitmentPhase.FINAL_ANNOUNCED;
+  }
+
   /** 6.2 PUT. interviewEndAt 은 totalEndAt 으로 재동기화한다. */
   public void update(
       LocalDateTime totalStartAt,
