@@ -24,9 +24,7 @@ public class CategoryQueryServiceImpl implements CategoryQueryService {
   private final SubCategoryRepository subCategoryRepository;
 
   @Override
-  public boolean existsTrack(Long trackId) {
-    return trackRepository.existsById(trackId);
-  }
+  public boolean existsTrack(Long trackId) { return trackRepository.existsById(trackId); }
 
   @Override
   public Optional<Long> findTrackIdOfSubCategory(Long subCategoryId) {
