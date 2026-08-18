@@ -42,6 +42,10 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
   @Query("update Lecture l set l.subCategoryId = null where l.subCategoryId in :subCategoryIds")
   void disconnectBySubCategoryIds(@Param("subCategoryIds") List<Long> subCategoryIds);
 
+  @Modifying(clearAutomatically = true)
+  @Query("update Lecture l set l.trackId = null, l.subCategoryId = null where l.trackId = :trackId")
+  void disconnectByTrackId(@Param("trackId") Long trackId);
+
   interface SubCategoryLectureCount {
     Long getSubCategoryId();
     Long getCount();

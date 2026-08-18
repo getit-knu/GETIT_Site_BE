@@ -41,4 +41,10 @@ public class CategoryUsageCheckerImpl implements CategoryUsageChecker {
   public void disconnectLecturesBySubCategoryIds(List<Long> subCategoryIds) {
     lectureRepository.disconnectBySubCategoryIds(subCategoryIds);
   }
+
+  @Override
+  @Transactional
+  public void disconnectLecturesByTrackId(Long trackId) {
+    lectureRepository.disconnectByTrackId(trackId);
+  }
 }

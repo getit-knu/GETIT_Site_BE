@@ -1,5 +1,6 @@
 package com.getit.domain.setting.category.controller;
 
+import com.getit.domain.lecture.service.CategoryUsageChecker;
 import com.getit.domain.setting.category.dto.CategoryRequest.SubCategoryCreate;
 import com.getit.domain.setting.category.dto.CategoryRequest.SubCategoryUpdate;
 import com.getit.domain.setting.category.dto.CategoryRequest.TrackCreate;
@@ -9,7 +10,6 @@ import com.getit.domain.setting.category.dto.CategoryResponse.TrackResult;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
-import com.getit.domain.lecture.service.CategoryUsageChecker;
 import com.getit.domain.setting.category.service.CategoryService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;

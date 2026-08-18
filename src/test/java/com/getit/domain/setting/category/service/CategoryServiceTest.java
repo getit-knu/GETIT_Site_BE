@@ -167,7 +167,7 @@ class CategoryServiceTest {
 
       categoryService.deleteTrack(1L, true);
 
-      verify(categoryUsageChecker).disconnectLecturesBySubCategoryIds(List.of(subCategory.getId()));
+      verify(categoryUsageChecker).disconnectLecturesByTrackId(1L);
       verify(subCategoryRepository).deleteAll(List.of(subCategory));
       verify(trackRepository).delete(track);
       verify(categoryUsageChecker, never()).countLecturesByTrackId(anyLong());
