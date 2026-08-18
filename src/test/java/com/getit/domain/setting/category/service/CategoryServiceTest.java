@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.getit.domain.lecture.service.CategoryUsageChecker;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;

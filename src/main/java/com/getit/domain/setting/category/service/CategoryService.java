@@ -1,5 +1,6 @@
 package com.getit.domain.setting.category.service;
 
+import com.getit.domain.lecture.service.CategoryUsageChecker;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.SubCategoryNode;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
