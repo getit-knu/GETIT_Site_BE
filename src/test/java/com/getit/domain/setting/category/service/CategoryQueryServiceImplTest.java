@@ -1,11 +1,14 @@
 package com.getit.domain.setting.category.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
+import com.getit.domain.setting.category.dto.CategorySummary;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
 import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,5 +56,21 @@ class CategoryQueryServiceImplTest {
   @DisplayName("없는 소분류 id면 빈 Optional 을 반환한다")
   void returnsEmptyForUnknownSubCategory() {
     assertThat(categoryQueryService.findTrackIdOfSubCategory(999_999L)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("트랙 order 순으로, 각 트랙의 소분류도 order 순으로 묶어 반환한다")
+  void findsAllTracksWithSubCategories() {
+    Track sw = trackRepository.save(Track.create("SW", 2));
+    Track startup = trackRepository.save(Track.create("창업", 1));
+    subCategoryRepository.save(SubCategory.create("React.js", 2, sw.getId()));
+    subCategoryRepository.save(SubCategory.create("웹기초", 1, sw.getId()));
+
+    List<CategorySummary> result = categoryQueryService.findAllTracksWithSubCategories();
+
+    assertThat(result).extracting("id", "name")
+        .containsExactly(tuple(startup.getId(), "창업"), tuple(sw.getId(), "SW"));
+    assertThat(result.get(1).subCategories()).extracting("name").containsExactly("웹기초", "React.js");
+    assertThat(result.get(0).subCategories()).isEmpty();
   }
 }
