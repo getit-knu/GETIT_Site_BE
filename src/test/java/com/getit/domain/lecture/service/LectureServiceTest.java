@@ -151,6 +151,21 @@ class LectureServiceTest {
     }
 
     @Test
+    @DisplayName("fileIds에 중복이 있어도 한 번만 연결한다")
+    void deduplicatesFileIds() {
+      FileAsset file = fileAssetRepository.save(
+          FileAsset.upload("key/1", "1주차자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              List.of(file.getId(), file.getId()), true, null),
+          100L);
+
+      assertThat(lectureFileRepository.findAllByLectureId(lecture.getId())).hasSize(1);
+    }
+
+    @Test
     @DisplayName("과제를 함께 생성한다")
     void createsAssignmentTogether() {
       LocalDateTime deadline = LocalDateTime.of(2026, 6, 19, 23, 59, 59);
