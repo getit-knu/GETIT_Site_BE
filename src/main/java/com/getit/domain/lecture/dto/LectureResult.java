@@ -3,13 +3,14 @@ package com.getit.domain.lecture.dto;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.Lecture;
+import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.setting.category.dto.CategorySummary;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public class LectureResult {
 
-  /** 8.2 강의 추가 응답. */
   public record CreateResult(Long id, String title, Integer week, LocalDateTime createdAt) {
 
     public static CreateResult from(Lecture lecture) {
@@ -17,13 +18,8 @@ public class LectureResult {
     }
   }
 
-  /** 8.1 강의 목록 응답. */
   public record ListResult(List<CategorySummary> tracks, List<LectureCard> lectures) { }
 
-  /**
-   * 목록 카드. {@code submittedCount}/{@code totalCount}/{@code feedbackDoneCount} 는
-   * Submission·Feedback 엔티티가 아직 없어(#27·#28) 이번 응답엔 포함하지 않는다.
-   */
   public record LectureCard(
       Long id,
       Integer week,
@@ -40,7 +36,6 @@ public class LectureResult {
     }
   }
 
-  /** 8.3 강의 단건 조회 응답. */
   public record DetailResult(
       Long id,
       Long generationId,
@@ -72,11 +67,19 @@ public class LectureResult {
     }
   }
 
-  public record AssignmentResult(Long id, String title, String description, LocalDateTime deadline) {
+  public record AssignmentResult(
+      Long id,
+      String title,
+      String description,
+      LocalDateTime deadline,
+      Set<SubmissionType> allowedTypes,
+      String linkPlaceholder
+  ) {
 
     public static AssignmentResult from(Assignment assignment) {
       return new AssignmentResult(
-          assignment.getId(), assignment.getTitle(), assignment.getDescription(), assignment.getDeadline());
+          assignment.getId(), assignment.getTitle(), assignment.getDescription(), assignment.getDeadline(),
+          assignment.getAllowedTypes(), assignment.getLinkPlaceholder());
     }
   }
 }

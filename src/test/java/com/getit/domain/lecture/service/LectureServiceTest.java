@@ -11,6 +11,7 @@ import com.getit.domain.lecture.dto.LectureRequest;
 import com.getit.domain.lecture.dto.LectureRequest.AssignmentPart;
 import com.getit.domain.lecture.dto.LectureResult;
 import com.getit.domain.lecture.entity.Lecture;
+import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.LectureFileRepository;
 import com.getit.domain.setting.category.entity.SubCategory;
@@ -22,6 +23,7 @@ import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -152,8 +154,9 @@ class LectureServiceTest {
     @DisplayName("과제를 함께 생성한다")
     void createsAssignmentTogether() {
       LocalDateTime deadline = LocalDateTime.of(2026, 6, 19, 23, 59, 59);
-      AssignmentPart assignmentPart =
-          new AssignmentPart("자기소개 페이지 만들기", "HTML/CSS로 만들어보세요.", deadline);
+      AssignmentPart assignmentPart = new AssignmentPart(
+          "자기소개 페이지 만들기", "HTML/CSS로 만들어보세요.", deadline,
+          Set.of(SubmissionType.LINK), "GitHub 저장소 URL을 입력하세요");
 
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(
@@ -164,6 +167,8 @@ class LectureServiceTest {
       LectureResult.DetailResult detail = lectureService.getLecture(lecture.getId());
       assertThat(detail.assignment()).isNotNull();
       assertThat(detail.assignment().deadline()).isEqualTo(deadline);
+      assertThat(detail.assignment().allowedTypes()).containsExactly(SubmissionType.LINK);
+      assertThat(detail.assignment().linkPlaceholder()).isEqualTo("GitHub 저장소 URL을 입력하세요");
     }
   }
 

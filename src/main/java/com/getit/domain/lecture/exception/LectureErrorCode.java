@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-/** 강의 도메인 에러 코드. (API 명세서 0.4) */
 @Getter
 @RequiredArgsConstructor
 public enum LectureErrorCode implements ErrorCode {
