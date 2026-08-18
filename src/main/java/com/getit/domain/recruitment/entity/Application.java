@@ -21,9 +21,14 @@ import org.hibernate.type.SqlTypes;
 /**
  * 지원서. (API 명세서 3.1 · 3.2)
  *
- * <p>기본 정보(name · email · phoneNumber · collegeId · majorId · grade)는 지원서 제출 시점 값을
- * 그대로 담는다. {@code User} 의 값과 다를 수 있다 — 지원 당시 정보이기 때문이다. 합격자는
- * 9.4 승격 시 이 값이 {@code User} 로 복사된다.
+ * <p>기본 정보(name · email · phoneNumber · collegeId · majorId · grade · studentNumber)는 지원서
+ * 제출 시점 값을 그대로 담는다. {@code User} 의 값과 다를 수 있다 — 지원 당시 정보이기 때문이다.
+ * 합격자는 9.4 승격 시 이 값이 {@code User} 로 복사된다.
+ *
+ * <p>{@code studentNumber} 는 명세서 3.1 ~ 3.4 의 JSON 응답 · 요청 본문에는 나와 있지 않지만,
+ * {@code User.studentNumber} 의 기존 주석("지원서 기본 정보에서 수집한다")과 PR #39 리뷰(학번이
+ * 지원서에서 수집돼야 한다는 지적)에 따라 엔티티 · 스키마에는 먼저 반영한다. API 응답에 노출할지는
+ * 3.3 ~ 3.5 구현 시 다시 확인한다.
  *
  * <p>이번 이슈(3.1 · 3.2)는 조회만 다뤄서 저장 · 제출 메서드는 아직 없다. 3.3 ~ 3.5 에서 추가한다.
  */
@@ -70,6 +75,13 @@ public class Application extends BaseTimeEntity {
   @Column
   private Integer grade;
 
+  /**
+   * 학번. {@code User.STUDENT_NUMBER_PATTERN}(년도 4자리 + 고유번호 6자리)과 같은 형식이다.
+   * DB CHECK 제약도 {@code User} 와 동일하게 건다 (마이그레이션 참고).
+   */
+  @Column(columnDefinition = "CHAR(10)")
+  private String studentNumber;
+
   /** 제출 전(DRAFT)에는 null 이다. */
   @Column
   private LocalDateTime submittedAt;
@@ -85,6 +97,7 @@ public class Application extends BaseTimeEntity {
       Long collegeId,
       Long majorId,
       Integer grade,
+      String studentNumber,
       LocalDateTime submittedAt
   ) {
     this.userId = userId;
@@ -96,6 +109,7 @@ public class Application extends BaseTimeEntity {
     this.collegeId = collegeId;
     this.majorId = majorId;
     this.grade = grade;
+    this.studentNumber = studentNumber;
     this.submittedAt = submittedAt;
   }
 
@@ -108,7 +122,8 @@ public class Application extends BaseTimeEntity {
       String phoneNumber,
       Long collegeId,
       Long majorId,
-      Integer grade
+      Integer grade,
+      String studentNumber
   ) {
     return Application.builder()
         .userId(userId)
@@ -120,6 +135,7 @@ public class Application extends BaseTimeEntity {
         .collegeId(collegeId)
         .majorId(majorId)
         .grade(grade)
+        .studentNumber(studentNumber)
         .build();
   }
 }

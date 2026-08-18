@@ -9,6 +9,9 @@
 -- 현재 최신 버전이 V5(#33)라 V7 로 잡았다. PR #37(V6, 평가 기준)이 아직 병합 전이고
 -- feat/#24-Track-SubCategory-CRUD(V4)도 병합 전이라, 실제 병합 순서에 따라 버전 재조정이
 -- 필요할 수 있다.
+--
+-- application.student_number 는 users.student_number(V1)와 같은 이유 · 같은 형식(CHAR(10))이라
+-- CHECK 제약도 ck_users_student_number 를 그대로 옮겨왔다 (PR #39 리뷰).
 
 CREATE TABLE application
 (
@@ -28,6 +31,8 @@ CREATE TABLE application
     college_id    bigint       DEFAULT NULL,
     major_id      bigint       DEFAULT NULL,
     grade         int          DEFAULT NULL,
+    -- 년도 4자리 + 고유번호 6자리. users.student_number(V1)와 형식이 같다.
+    student_number char(10)    DEFAULT NULL,
 
     -- 제출 전(DRAFT)에는 NULL 이다.
     submitted_at  datetime(6)  DEFAULT NULL,
@@ -37,7 +42,11 @@ CREATE TABLE application
 
     PRIMARY KEY (id),
     -- 사용자당 기수별 지원서는 최대 1건이다.
-    UNIQUE KEY uk_application_user_generation (user_id, generation_id)
+    UNIQUE KEY uk_application_user_generation (user_id, generation_id),
+
+    -- char(10) 은 길이를 강제하지 않는다. users.student_number(V1)와 동일한 이유 · 동일한 제약이다.
+    CONSTRAINT ck_application_student_number
+        CHECK (student_number IS NULL OR student_number REGEXP '^[0-9]{10}$')
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

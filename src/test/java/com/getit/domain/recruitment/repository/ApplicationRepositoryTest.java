@@ -21,7 +21,7 @@ class ApplicationRepositoryTest {
   @DisplayName("userId 와 generationId 가 모두 일치해야 조회된다")
   void findsByUserIdAndGenerationIdOnlyWhenBothMatch() {
     applicationRepository.save(Application.createDraft(
-        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2));
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000"));
 
     assertThat(applicationRepository.findByUserIdAndGenerationId(1L, 9L)).isPresent();
     assertThat(applicationRepository.findByUserIdAndGenerationId(1L, 8L)).isEmpty();

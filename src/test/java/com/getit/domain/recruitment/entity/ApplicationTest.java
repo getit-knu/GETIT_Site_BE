@@ -11,7 +11,7 @@ class ApplicationTest {
   @DisplayName("임시 저장으로 생성하면 상태가 DRAFT 다")
   void createDraftStartsAsDraft() {
     Application application = Application.createDraft(
-        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2);
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
 
     assertThat(application.getUserId()).isEqualTo(1L);
     assertThat(application.getGenerationId()).isEqualTo(9L);
@@ -22,6 +22,7 @@ class ApplicationTest {
     assertThat(application.getCollegeId()).isNull();
     assertThat(application.getMajorId()).isNull();
     assertThat(application.getGrade()).isEqualTo(2);
+    assertThat(application.getStudentNumber()).isEqualTo("2021110000");
     assertThat(application.getSubmittedAt()).isNull();
   }
 }
