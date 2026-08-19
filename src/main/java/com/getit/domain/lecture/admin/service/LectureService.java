@@ -73,7 +73,7 @@ public class LectureService {
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
 
-    List<LectureFile> lectureFiles = lectureFileRepository.findAllByLectureId(lectureId);
+    List<LectureFile> lectureFiles = lectureFileRepository.findAllByLectureIdOrderByIdAsc(lectureId);
     Map<Long, FileInfo> fileInfoByFileId = fileQueryService
         .findAllByIds(lectureFiles.stream().map(LectureFile::getFileId).toList()).stream()
         .collect(Collectors.toMap(FileInfo::fileId, Function.identity()));
