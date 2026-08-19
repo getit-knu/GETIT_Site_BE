@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class CollegeControllerTest {
+class CollegeMajorControllerTest {
 
   private static final String COLLEGES_PATH = "/api/public/colleges";
   private static final String MAJORS_PATH = "/api/public/majors";

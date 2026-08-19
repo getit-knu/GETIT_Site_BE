@@ -2,7 +2,7 @@ package com.getit.domain.user.controller;
 
 import com.getit.domain.user.dto.CollegeResult;
 import com.getit.domain.user.dto.MajorResult;
-import com.getit.domain.user.service.CollegeService;
+import com.getit.domain.user.service.CollegeMajorService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,14 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
-public class CollegeController {
+public class CollegeMajorController {
 
-  private final CollegeService collegeService;
+  private final CollegeMajorService collegeMajorService;
 
   @Operation(summary = "단과대학 목록", description = "명세서 2.6")
   @GetMapping("/colleges")
   public ApiResponse<List<CollegeResult>> getColleges() {
-    return ApiResponse.success(collegeService.getColleges());
+    return ApiResponse.success(collegeMajorService.getColleges());
   }
 
   @Operation(summary = "전공 목록", description = "명세서 2.7")
@@ -32,6 +32,6 @@ public class CollegeController {
   public ApiResponse<List<MajorResult>> getMajors(
       @RequestParam(required = false) Long collegeId
   ) {
-    return ApiResponse.success(collegeService.getMajors(collegeId));
+    return ApiResponse.success(collegeMajorService.getMajors(collegeId));
   }
 }

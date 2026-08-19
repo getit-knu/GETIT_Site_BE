@@ -19,10 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
-class CollegeServiceTest {
+class CollegeMajorServiceTest {
 
   @Autowired
-  private CollegeService collegeService;
+  private CollegeMajorService collegeMajorService;
 
   @Autowired
   private CollegeRepository collegeRepository;
@@ -46,7 +46,7 @@ class CollegeServiceTest {
     @Test
     @DisplayName("등록 순서대로 전체 단과대학을 반환한다")
     void returnsAllColleges() {
-      List<CollegeResult> results = collegeService.getColleges();
+      List<CollegeResult> results = collegeMajorService.getColleges();
 
       assertThat(results).extracting(CollegeResult::name)
           .containsExactly("경영대학", "공과대학");
@@ -64,7 +64,7 @@ class CollegeServiceTest {
       majorRepository.save(Major.create(business.getId(), "경영정보학과"));
       majorRepository.save(Major.create(engineering.getId(), "컴퓨터공학과"));
 
-      List<MajorResult> results = collegeService.getMajors(business.getId());
+      List<MajorResult> results = collegeMajorService.getMajors(business.getId());
 
       assertThat(results).extracting(MajorResult::name)
           .containsExactly("경영학과", "경영정보학과");
@@ -76,7 +76,7 @@ class CollegeServiceTest {
       majorRepository.save(Major.create(business.getId(), "경영학과"));
       majorRepository.save(Major.create(engineering.getId(), "컴퓨터공학과"));
 
-      List<MajorResult> results = collegeService.getMajors(null);
+      List<MajorResult> results = collegeMajorService.getMajors(null);
 
       assertThat(results).hasSize(2);
     }
