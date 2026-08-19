@@ -1,4 +1,4 @@
-package com.getit.domain.lecture.service;
+package com.getit.domain.lecture.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,9 +7,9 @@ import static org.assertj.core.groups.Tuple.tuple;
 import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
-import com.getit.domain.lecture.dto.LectureRequest;
-import com.getit.domain.lecture.dto.LectureRequest.AssignmentPart;
-import com.getit.domain.lecture.dto.LectureResult;
+import com.getit.domain.lecture.admin.dto.LectureRequest;
+import com.getit.domain.lecture.admin.dto.LectureRequest.AssignmentPart;
+import com.getit.domain.lecture.admin.dto.LectureResult;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
