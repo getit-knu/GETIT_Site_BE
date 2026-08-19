@@ -147,7 +147,8 @@ class LectureServiceTest {
               null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
               List.of(999_999L), true, null),
           100L))
-          .isInstanceOf(BusinessException.class);
+          .isInstanceOf(BusinessException.class)
+          .hasMessageContaining("999999");
     }
 
     @Test
