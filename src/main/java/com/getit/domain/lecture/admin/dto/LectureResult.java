@@ -1,4 +1,4 @@
-package com.getit.domain.lecture.dto;
+package com.getit.domain.lecture.admin.dto;
 
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.lecture.entity.Assignment;

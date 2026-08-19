@@ -1,10 +1,10 @@
-package com.getit.domain.lecture.controller;
+package com.getit.domain.lecture.admin.controller;
 
 import com.getit.domain.auth.security.CustomUserDetails;
-import com.getit.domain.lecture.dto.LectureRequest;
-import com.getit.domain.lecture.dto.LectureResult;
+import com.getit.domain.lecture.admin.dto.LectureRequest;
+import com.getit.domain.lecture.admin.dto.LectureResult;
+import com.getit.domain.lecture.admin.service.LectureService;
 import com.getit.domain.lecture.entity.Lecture;
-import com.getit.domain.lecture.service.LectureService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

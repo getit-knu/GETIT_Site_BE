@@ -1,4 +1,4 @@
-package com.getit.domain.lecture.controller;
+package com.getit.domain.lecture.admin.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
-import com.getit.domain.lecture.dto.LectureRequest.Create;
+import com.getit.domain.lecture.admin.dto.LectureRequest.Create;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.setting.category.entity.SubCategory;

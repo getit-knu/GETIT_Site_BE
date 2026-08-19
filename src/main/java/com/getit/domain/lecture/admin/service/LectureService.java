@@ -1,11 +1,11 @@
-package com.getit.domain.lecture.service;
+package com.getit.domain.lecture.admin.service;
 
 import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.domain.file.service.FileConnectionService;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
-import com.getit.domain.lecture.dto.LectureRequest;
-import com.getit.domain.lecture.dto.LectureResult;
+import com.getit.domain.lecture.admin.dto.LectureRequest;
+import com.getit.domain.lecture.admin.dto.LectureResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.LectureFile;
