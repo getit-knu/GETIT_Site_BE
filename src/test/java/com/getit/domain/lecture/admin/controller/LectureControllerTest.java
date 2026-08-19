@@ -148,6 +148,34 @@ class LectureControllerTest {
     }
 
     @Test
+    @DisplayName("week가 0 이하면 400 이다")
+    void returns400WhenWeekNotPositive() throws Exception {
+      Create request = new Create(
+          null, trackId, subCategoryId, 0, "HTML/CSS 기초", null, null, null, null, null, true, null);
+
+      mockMvc.perform(post(LECTURES_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("durationMinutes가 0 이하면 400 이다")
+    void returns400WhenDurationMinutesNotPositive() throws Exception {
+      Create request = new Create(
+          null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, 0, null, true, null);
+
+      mockMvc.perform(post(LECTURES_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 트랙이면 404 이다")
     void returns404WhenTrackNotFound() throws Exception {
       Create request = new Create(
