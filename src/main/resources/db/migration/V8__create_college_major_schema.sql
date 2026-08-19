@@ -42,13 +42,15 @@ CREATE TABLE major
   COLLATE = utf8mb4_unicode_ci;
 
 
--- 명세서 2.6 예시 그대로. id 는 1부터 순서대로 채워진다(빈 테이블에 처음 넣는 행이라 확정적이다).
+-- 명세서 2.6 예시 그대로.
 INSERT INTO college (name, created_at, updated_at)
 VALUES ('경영대학', NOW(6), NOW(6)),
        ('공과대학', NOW(6), NOW(6)),
        ('IT융합대학', NOW(6), NOW(6));
 
--- 명세서 2.7 예시 그대로. college_id = 1 은 위에서 첫 번째로 넣은 '경영대학'이다.
+-- 명세서 2.7 예시 그대로. college_id 는 auto_increment 값을 가정하지 않고 이름으로 조회해서 넣는다 —
+-- 실제 전체 목록을 채우는 과정에서 college INSERT 순서가 바뀌어도 안전하도록 하기 위함이다 (PR #42 리뷰).
 INSERT INTO major (college_id, name, created_at, updated_at)
-VALUES (1, '경영학과', NOW(6), NOW(6)),
-       (1, '경영정보학과', NOW(6), NOW(6));
+SELECT id, '경영학과', NOW(6), NOW(6) FROM college WHERE name = '경영대학'
+UNION ALL
+SELECT id, '경영정보학과', NOW(6), NOW(6) FROM college WHERE name = '경영대학';
