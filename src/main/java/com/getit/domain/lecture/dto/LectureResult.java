@@ -26,13 +26,17 @@ public class LectureResult {
       String title,
       String description,
       LocalDateTime deadline,
+      long submittedCount,
+      long totalCount,
+      long feedbackDoneCount,
       boolean isPublished
   ) {
 
+    /** submittedCount·totalCount·feedbackDoneCount는 #27·#28 전까지 항상 0이다. */
     public static LectureCard of(Lecture lecture, Assignment assignment) {
       return new LectureCard(
           lecture.getId(), lecture.getWeek(), lecture.getTitle(), lecture.getDescription(),
-          assignment != null ? assignment.getDeadline() : null, lecture.isPublished());
+          assignment != null ? assignment.getDeadline() : null, 0, 0, 0, lecture.isPublished());
     }
   }
 
