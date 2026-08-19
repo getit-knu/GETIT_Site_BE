@@ -94,6 +94,31 @@ class SchemaMigrationTest {
     jdbc.update("delete from users where email = 'ck-probe@getit.com'");
   }
 
+  /**
+   * V8 의 college · major 시드가 실제로 들어갔는지 검증한다. (PR #42 리뷰)
+   *
+   * <p>{@code test} 프로파일은 Flyway 를 끄고 H2 를 쓰기 때문에, 일반 서비스 테스트에서
+   * college/major 개수를 세는 것만으로는 V8 의 INSERT 문이 실제로 동작하는지 알 수 없다 —
+   * 그 테스트가 통과해도 그건 테스트 코드가 직접 저장한 fixture 를 센 것일 뿐이다. 이 테스트만
+   * 유일하게 Flyway 를 켠 실제 MySQL 로 돈다.
+   */
+  @Test
+  @DisplayName("college · major 시드 데이터가 마이그레이션으로 채워졌다")
+  void collegeAndMajorSeedDataExists() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+
+    assertThat(jdbc.queryForList("select name from college order by id", String.class))
+        .containsExactly("경영대학", "공과대학", "IT융합대학");
+
+    // major.college_id 가 하드코딩된 auto_increment 값이 아니라 이름으로 조회해서 들어갔는지
+    // 함께 확인한다 — college INSERT 순서가 바뀌어도 안전해야 한다는 게 이 검증의 요점이다.
+    Long businessCollegeId = jdbc.queryForObject(
+        "select id from college where name = '경영대학'", Long.class);
+    assertThat(jdbc.queryForList(
+        "select name from major where college_id = ? order by id", String.class, businessCollegeId))
+        .containsExactly("경영학과", "경영정보학과");
+  }
+
   @Test
   @DisplayName("enum 컬럼이 네이티브 ENUM 이 아니라 varchar 다")
   void enumColumnsAreVarchar() {
