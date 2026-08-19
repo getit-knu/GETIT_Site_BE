@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LectureFileRepository extends JpaRepository<LectureFile, Long> {
 
-  List<LectureFile> findAllByLectureId(Long lectureId);
+  List<LectureFile> findAllByLectureIdOrderByIdAsc(Long lectureId);
 }

@@ -132,7 +132,7 @@ class LectureServiceTest {
               List.of(file.getId()), true, null),
           100L);
 
-      assertThat(lectureFileRepository.findAllByLectureId(lecture.getId()))
+      assertThat(lectureFileRepository.findAllByLectureIdOrderByIdAsc(lecture.getId()))
           .extracting("displayName", "fileId")
           .containsExactly(tuple("1주차자료.pdf", file.getId()));
       assertThat(fileAssetRepository.findById(file.getId())).get()
@@ -162,7 +162,7 @@ class LectureServiceTest {
               List.of(file.getId(), file.getId()), true, null),
           100L);
 
-      assertThat(lectureFileRepository.findAllByLectureId(lecture.getId())).hasSize(1);
+      assertThat(lectureFileRepository.findAllByLectureIdOrderByIdAsc(lecture.getId())).hasSize(1);
     }
 
     @Test
