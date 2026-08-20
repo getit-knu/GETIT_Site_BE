@@ -35,4 +35,14 @@ class ApplicationAnswerRepositoryTest {
   void returnsEmptyWhenNoAnswers() {
     assertThat(applicationAnswerRepository.findByApplicationId(999L)).isEmpty();
   }
+
+  @Test
+  @DisplayName("applicationId 와 questionId 가 모두 일치해야 조회된다")
+  void findsByApplicationIdAndQuestionIdOnlyWhenBothMatch() {
+    applicationAnswerRepository.save(ApplicationAnswer.create(1L, 10L, "지원 동기입니다.", null));
+
+    assertThat(applicationAnswerRepository.findByApplicationIdAndQuestionId(1L, 10L)).isPresent();
+    assertThat(applicationAnswerRepository.findByApplicationIdAndQuestionId(1L, 999L)).isEmpty();
+    assertThat(applicationAnswerRepository.findByApplicationIdAndQuestionId(999L, 10L)).isEmpty();
+  }
 }
