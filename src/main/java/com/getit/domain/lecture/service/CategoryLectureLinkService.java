@@ -1,9 +1,9 @@
-package com.getit.domain.setting.category.service;
+package com.getit.domain.lecture.service;
 
 import java.util.List;
 import java.util.Map;
 
-public interface CategoryUsageChecker {
+public interface CategoryLectureLinkService {
 
   long countLecturesByTrackId(Long trackId);
 
@@ -12,4 +12,6 @@ public interface CategoryUsageChecker {
   Map<Long, Long> countLecturesBySubCategoryIds(List<Long> subCategoryIds);
 
   void disconnectLecturesBySubCategoryIds(List<Long> subCategoryIds);
+
+  void disconnectLecturesByTrackId(Long trackId);
 }

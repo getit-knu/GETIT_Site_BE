@@ -1,0 +1,84 @@
+package com.getit.domain.lecture.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.getit.domain.lecture.entity.Lecture;
+import com.getit.domain.lecture.repository.LectureRepository;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+@SpringBootTest
+@Transactional
+class CategoryLectureLinkServiceImplTest {
+
+  @Autowired
+  private CategoryLectureLinkService categoryLectureLinkService;
+
+  @Autowired
+  private LectureRepository lectureRepository;
+
+  private Lecture save(Long trackId, Long subCategoryId) {
+    return lectureRepository.save(
+        Lecture.create(1, "제목", null, null, null, null, true, 9L, trackId, subCategoryId, 1L));
+  }
+
+  @Test
+  @DisplayName("트랙 id 로 강의 수를 센다")
+  void countsLecturesByTrackId() {
+    save(1L, 1L);
+    save(1L, 2L);
+    save(2L, null);
+
+    assertThat(categoryLectureLinkService.countLecturesByTrackId(1L)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("소분류 id 로 강의 수를 센다")
+  void countsLecturesBySubCategoryId() {
+    save(1L, 1L);
+
+    assertThat(categoryLectureLinkService.countLecturesBySubCategoryId(1L)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("배치 조회: 강의가 없는 id 는 0 을 반환한다")
+  void batchCountsFillZeroForUnusedId() {
+    save(1L, 1L);
+
+    Map<Long, Long> counts = categoryLectureLinkService.countLecturesBySubCategoryIds(List.of(1L, 2L));
+
+    assertThat(counts).isEqualTo(Map.of(1L, 1L, 2L, 0L));
+  }
+
+  @Test
+  @DisplayName("소분류 연결을 해제하면 트랙은 유지된 채 소분류만 비워진다")
+  void disconnectsSubCategoryOnly() {
+    Lecture lecture = save(1L, 1L);
+
+    categoryLectureLinkService.disconnectLecturesBySubCategoryIds(List.of(1L));
+
+    Lecture reloaded = lectureRepository.findById(lecture.getId()).orElseThrow();
+    assertThat(reloaded.getSubCategoryId()).isNull();
+    assertThat(reloaded.getTrackId()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("트랙 연결을 해제하면 트랙·소분류 둘 다 비워진다")
+  void disconnectsTrackAndSubCategory() {
+    Lecture withSubCategory = save(1L, 1L);
+    Lecture withoutSubCategory = save(1L, null);
+    Lecture otherTrack = save(2L, null);
+
+    categoryLectureLinkService.disconnectLecturesByTrackId(1L);
+
+    assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getTrackId()).isNull();
+    assertThat(lectureRepository.findById(withSubCategory.getId()).orElseThrow().getSubCategoryId()).isNull();
+    assertThat(lectureRepository.findById(withoutSubCategory.getId()).orElseThrow().getTrackId()).isNull();
+    assertThat(lectureRepository.findById(otherTrack.getId()).orElseThrow().getTrackId()).isEqualTo(2L);
+  }
+}

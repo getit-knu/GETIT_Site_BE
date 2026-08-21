@@ -1,5 +1,6 @@
 package com.getit.domain.setting.category.service;
 
+import com.getit.domain.lecture.service.CategoryLectureLinkService;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.SubCategoryNode;
 import com.getit.domain.setting.category.dto.CategoryTreeResult.TrackNode;
 import com.getit.domain.setting.category.entity.SubCategory;
@@ -23,7 +24,7 @@ public class CategoryService {
 
   private final TrackRepository trackRepository;
   private final SubCategoryRepository subCategoryRepository;
-  private final CategoryUsageChecker categoryUsageChecker;
+  private final CategoryLectureLinkService categoryLectureLinkService;
 
   @Transactional
   public Track createTrack(String name) {
@@ -48,8 +49,7 @@ public class CategoryService {
     List<SubCategory> subCategories = subCategoryRepository.findAllByTrackIdOrderByOrderAsc(id);
 
     if (force) {
-      List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
-      categoryUsageChecker.disconnectLecturesBySubCategoryIds(subCategoryIds);
+      categoryLectureLinkService.disconnectLecturesByTrackId(id);
     } else if (isTrackInUse(id, subCategories)) {
       throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
     }
@@ -59,11 +59,11 @@ public class CategoryService {
   }
 
   private boolean isTrackInUse(Long trackId, List<SubCategory> subCategories) {
-    if (categoryUsageChecker.countLecturesByTrackId(trackId) > 0) {
+    if (categoryLectureLinkService.countLecturesByTrackId(trackId) > 0) {
       return true;
     }
     List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
-    return categoryUsageChecker.countLecturesBySubCategoryIds(subCategoryIds).values().stream()
+    return categoryLectureLinkService.countLecturesBySubCategoryIds(subCategoryIds).values().stream()
         .anyMatch(count -> count > 0);
   }
 
@@ -98,8 +98,8 @@ public class CategoryService {
         .orElseThrow(() -> new BusinessException(CategoryErrorCode.SUBCATEGORY_NOT_FOUND));
 
     if (force) {
-      categoryUsageChecker.disconnectLecturesBySubCategoryIds(List.of(id));
-    } else if (categoryUsageChecker.countLecturesBySubCategoryId(id) > 0) {
+      categoryLectureLinkService.disconnectLecturesBySubCategoryIds(List.of(id));
+    } else if (categoryLectureLinkService.countLecturesBySubCategoryId(id) > 0) {
       throw new BusinessException(CategoryErrorCode.CATEGORY_IN_USE);
     }
 
@@ -121,7 +121,7 @@ public class CategoryService {
         .collect(Collectors.groupingBy(SubCategory::getTrackId, LinkedHashMap::new, Collectors.toList()));
 
     List<Long> subCategoryIds = subCategories.stream().map(SubCategory::getId).toList();
-    Map<Long, Long> lectureCounts = categoryUsageChecker.countLecturesBySubCategoryIds(subCategoryIds);
+    Map<Long, Long> lectureCounts = categoryLectureLinkService.countLecturesBySubCategoryIds(subCategoryIds);
 
     return tracks.stream()
         .map(track -> TrackNode.of(track, subCategoryNodesOf(track.getId(), subCategoriesByTrackId, lectureCounts)))
