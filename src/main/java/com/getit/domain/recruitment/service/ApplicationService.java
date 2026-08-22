@@ -1,10 +1,20 @@
 package com.getit.domain.recruitment.service;
 
+import com.getit.domain.recruitment.dto.ApplicationAnswerRequest;
 import com.getit.domain.recruitment.dto.ApplicationAnswerResult;
+import com.getit.domain.recruitment.dto.ApplicationDecisionResult;
+import com.getit.domain.recruitment.dto.ApplicationDraftRequest;
 import com.getit.domain.recruitment.dto.ApplicationFormQuestion;
 import com.getit.domain.recruitment.dto.ApplicationFormResult;
 import com.getit.domain.recruitment.dto.BasicInfo;
+import com.getit.domain.recruitment.dto.DraftSaveResult;
 import com.getit.domain.recruitment.dto.MyApplicationResult;
+import com.getit.domain.recruitment.dto.NextStep;
+import com.getit.domain.recruitment.dto.SubmitResult;
+import com.getit.domain.recruitment.entity.Application;
+import com.getit.domain.recruitment.entity.ApplicationAnswer;
+import com.getit.domain.recruitment.entity.ApplicationQuestion;
+import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
@@ -16,9 +26,13 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.UserAccount;
 import com.getit.domain.user.service.UserAccountService;
 import com.getit.global.exception.BusinessException;
+import com.getit.global.exception.CommonErrorCode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,11 +93,162 @@ public class ApplicationService {
         .orElse(null);
   }
 
+  /**
+   * 3.3. 임시 저장. 지원서가 없으면 새로 만들고(DRAFT), 있으면 덮어쓴다.
+   * 필수값 · 글자수 검증은 하지 않는다 — 검증은 제출(3.4) 시점에만 한다.
+   *
+   * <p>다만 서류 접수 기간인지는 확인한다 (PR #46 리뷰 지적 — 마감이 지나도 임시 저장이 계속
+   * 가능했던 문제). 활성 기수가 있어도 일정이 없거나 접수 기간이 아니면 저장할 수 없다.
+   */
+  @Transactional
+  public DraftSaveResult saveDraft(Long userId, ApplicationDraftRequest request) {
+    GenerationSummary activeGeneration = findActiveGeneration();
+    findOpenSchedule(activeGeneration.id());
+
+    Application application = upsertApplication(userId, activeGeneration.id(), request.basicInfo());
+    upsertAnswers(application.getId(), request.answers());
+
+    // application.getUpdatedAt() 은 이 트랜잭션이 커밋(flush)되기 전이라 아직 갱신되지 않았을 수
+    // 있다. "지금 저장한 시각"은 굳이 엔티티를 거치지 않고 바로 써도 의미가 같다.
+    LocalDateTime savedAt = LocalDateTime.now();
+    return new DraftSaveResult(application.getId(), application.getStatus(), savedAt);
+  }
+
+  /**
+   * 3.4. 제출. 검증 순서는 명세서 그대로: 활성 기수 → 서류 기간 → 기존 상태 → 기본 정보 →
+   * 필수 답변 → 글자수. {@code request} 가 없으면(본문 없이 제출) 이미 저장된 draft 값으로 검증한다.
+   */
+  @Transactional
+  public SubmitResult submit(Long userId, ApplicationDraftRequest request) {
+    GenerationSummary activeGeneration = generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
+    findOpenSchedule(activeGeneration.id());
+    LocalDateTime now = LocalDateTime.now();
+
+    Optional<Application> existing =
+        applicationRepository.findByUserIdAndGenerationId(userId, activeGeneration.id());
+    existing.ifPresent(this::assertDraft);
+
+    Application application;
+    if (request != null) {
+      application = upsertApplication(userId, activeGeneration.id(), request.basicInfo());
+      upsertAnswers(application.getId(), request.answers());
+    } else {
+      application = existing.orElseThrow(() -> new BusinessException(
+          CommonErrorCode.VALIDATION_FAILED, "제출할 지원서가 없습니다. 기본 정보와 답변을 함께 보내주세요."));
+    }
+
+    ApplicationSubmissionValidator.validateBasicInfo(application);
+
+    List<ApplicationQuestion> questions =
+        applicationQuestionRepository.findByGenerationId(activeGeneration.id());
+    List<ApplicationAnswer> answers = applicationAnswerRepository.findByApplicationId(application.getId());
+    ApplicationSubmissionValidator.validateRequiredAnswers(questions, answers);
+    ApplicationSubmissionValidator.validateAnswerLengths(questions, answers);
+
+    application.submit(now);
+    return new SubmitResult(application.getId(), application.getStatus(), now);
+  }
+
+  /**
+   * 3.5. 결과 조회. 활성 기수에 제출한(= DRAFT 가 아닌) 지원서가 없으면 조회할 결과가 없는 것이므로
+   * 404 로 처리한다.
+   */
+  public ApplicationDecisionResult getResult(Long userId) {
+    GenerationSummary activeGeneration = generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(
+            CommonErrorCode.RESOURCE_NOT_FOUND, "제출한 지원서가 없습니다."));
+
+    Application application = applicationRepository
+        .findByUserIdAndGenerationId(userId, activeGeneration.id())
+        .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
+        .orElseThrow(() -> new BusinessException(
+            CommonErrorCode.RESOURCE_NOT_FOUND, "제출한 지원서가 없습니다."));
+
+    RecruitmentSchedule schedule = findSchedule(activeGeneration.id());
+    boolean announced = application.getStatus() != ApplicationStatus.SUBMITTED;
+    NextStep nextStep = announced && application.getStatus() == ApplicationStatus.DOC_PASS
+        ? new NextStep(
+            "INTERVIEW",
+            "면접 일정은 개별 안내드립니다.",
+            schedule.getInterviewStartAt().toLocalDate(),
+            schedule.getInterviewEndAt().toLocalDate())
+        : null;
+
+    return new ApplicationDecisionResult(
+        activeGeneration.generationNo(),
+        application.getStatus(),
+        statusLabel(application.getStatus()),
+        schedule.getDocumentEndAt(),
+        schedule.getInterviewEndAt(),
+        nextStep
+    );
+  }
+
+  /** upsert(3.3 · 3.4 공용). 있으면 DRAFT 인지 확인 후 덮어쓰고, 없으면 새로 만든다. */
+  private Application upsertApplication(Long userId, Long generationId, BasicInfo basicInfo) {
+    return applicationRepository.findByUserIdAndGenerationId(userId, generationId)
+        .map(existing -> {
+          assertDraft(existing);
+          existing.updateDraft(
+              basicInfo.name(), basicInfo.email(), basicInfo.phoneNumber(),
+              basicInfo.collegeId(), basicInfo.majorId(), basicInfo.grade(),
+              basicInfo.studentNumber());
+          return existing;
+        })
+        .orElseGet(() -> applicationRepository.save(Application.createDraft(
+            userId, generationId, basicInfo.name(), basicInfo.email(), basicInfo.phoneNumber(),
+            basicInfo.collegeId(), basicInfo.majorId(), basicInfo.grade(), basicInfo.studentNumber())));
+  }
+
+  private void assertDraft(Application application) {
+    if (application.getStatus() != ApplicationStatus.DRAFT) {
+      throw new BusinessException(RecruitmentErrorCode.ALREADY_SUBMITTED);
+    }
+  }
+
+  /**
+   * 답변 upsert. 요청에 없는 질문의 기존 답변은 지우지 않는다 (이슈 #44 논의 필요 사항 참고).
+   *
+   * <p>PR #46 리뷰 지적으로 개선 — 답변마다 존재 여부를 조회하면 질문 수만큼 SELECT 가 나갔다
+   * ({@code findByApplicationIdAndQuestionId} 를 answers.size() 번 호출). 지원서에 달린 답변을
+   * 한 번만 조회해 questionId 로 묶어두고 그 맵으로 upsert 여부를 판단한다.
+   */
+  private void upsertAnswers(Long applicationId, List<ApplicationAnswerRequest> answers) {
+    if (answers == null) {
+      return;
+    }
+    Map<Long, ApplicationAnswer> existingByQuestionId =
+        applicationAnswerRepository.findByApplicationId(applicationId).stream()
+            .collect(Collectors.toMap(ApplicationAnswer::getQuestionId, Function.identity()));
+
+    for (ApplicationAnswerRequest answer : answers) {
+      ApplicationAnswer existing = existingByQuestionId.get(answer.questionId());
+      if (existing != null) {
+        existing.update(answer.answerText(), answer.selectedOptions());
+      } else {
+        applicationAnswerRepository.save(ApplicationAnswer.create(
+            applicationId, answer.questionId(), answer.answerText(), answer.selectedOptions()));
+      }
+    }
+  }
+
+  private String statusLabel(ApplicationStatus status) {
+    return switch (status) {
+      case DRAFT -> "임시 저장";
+      case SUBMITTED -> "심사 중";
+      case DOC_PASS -> "서류 합격";
+      case DOC_FAIL -> "서류 불합격";
+      case FINAL_PASS -> "최종 합격";
+      case FINAL_FAIL -> "최종 불합격";
+    };
+  }
+
   /** 로그인 사용자의 User 정보로 채운다. 값이 없으면 null (명세서 3.1). */
   private BasicInfo resolvePrefill(Long userId) {
     return userAccountService.findActiveById(userId)
         .map(this::toBasicInfo)
-        .orElseGet(() -> new BasicInfo(null, null, null, null, null, null));
+        .orElseGet(() -> new BasicInfo(null, null, null, null, null, null, null));
   }
 
   /**
@@ -91,12 +256,30 @@ public class ApplicationService {
    * grade 는 {@code User.studentYear} 에 대응한다 (이슈 #38 논의 필요 사항 참고).
    */
   private BasicInfo toBasicInfo(UserAccount account) {
-    return new BasicInfo(account.name(), account.email(), account.phoneNumber(), null, null, account.studentYear());
+    return new BasicInfo(
+        account.name(), account.email(), account.phoneNumber(),
+        null, null, account.studentYear(), account.studentNumber());
   }
 
   private RecruitmentSchedule findSchedule(Long generationId) {
     return recruitmentScheduleRepository.findByGenerationId(generationId)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.SCHEDULE_NOT_FOUND));
+  }
+
+  /**
+   * 서류 접수 기간(3.3 · 3.4 공용) 검증. 일정 자체가 없거나 접수 기간이 아니면 예외를 던진다.
+   * {@code submit} 은 반환된 일정을 쓰지 않지만(진행 중인 기간이라는 사실만 필요), {@code saveDraft}
+   * 와 시그니처를 맞추기 위해 그대로 {@code RecruitmentSchedule} 을 반환한다.
+   */
+  private RecruitmentSchedule findOpenSchedule(Long generationId) {
+    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(generationId)
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
+
+    LocalDateTime now = LocalDateTime.now();
+    if (now.isBefore(schedule.getDocumentStartAt()) || now.isAfter(schedule.getDocumentEndAt())) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
+    }
+    return schedule;
   }
 
   private GenerationSummary findActiveGeneration() {

@@ -28,9 +28,7 @@ import org.hibernate.type.SqlTypes;
  * <p>{@code studentNumber} 는 명세서 3.1 ~ 3.4 의 JSON 응답 · 요청 본문에는 나와 있지 않지만,
  * {@code User.studentNumber} 의 기존 주석("지원서 기본 정보에서 수집한다")과 PR #39 리뷰(학번이
  * 지원서에서 수집돼야 한다는 지적)에 따라 엔티티 · 스키마에는 먼저 반영한다. API 응답에 노출할지는
- * 3.3 ~ 3.5 구현 시 다시 확인한다.
- *
- * <p>이번 이슈(3.1 · 3.2)는 조회만 다뤄서 저장 · 제출 메서드는 아직 없다. 3.3 ~ 3.5 에서 추가한다.
+ * 이슈 #44 논의 필요 사항 참고.
  */
 @Entity
 @Table(name = "application", uniqueConstraints = {
@@ -137,5 +135,35 @@ public class Application extends BaseTimeEntity {
         .grade(grade)
         .studentNumber(studentNumber)
         .build();
+  }
+
+  /**
+   * 3.3 임시 저장. 기본 정보를 통째로 덮어쓴다.
+   *
+   * <p>{@code status != DRAFT} 일 때 호출해도 되는지는 서비스 레이어에서 막는다
+   * (409 ALREADY_SUBMITTED, 명세서 3.3) — 다른 검증과 마찬가지로 이 엔티티는 검증 없이 그대로 담는다.
+   */
+  public void updateDraft(
+      String name,
+      String email,
+      String phoneNumber,
+      Long collegeId,
+      Long majorId,
+      Integer grade,
+      String studentNumber
+  ) {
+    this.name = name;
+    this.email = email;
+    this.phoneNumber = phoneNumber;
+    this.collegeId = collegeId;
+    this.majorId = majorId;
+    this.grade = grade;
+    this.studentNumber = studentNumber;
+  }
+
+  /** 3.4 제출. 통과해야 할 검증은 전부 서비스 레이어에서 먼저 끝낸 뒤 호출된다. */
+  public void submit(LocalDateTime submittedAt) {
+    this.status = ApplicationStatus.SUBMITTED;
+    this.submittedAt = submittedAt;
   }
 }

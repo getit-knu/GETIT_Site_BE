@@ -20,7 +20,8 @@ import lombok.NoArgsConstructor;
  *
  * <p>{@code (applicationId, questionId)} 로 유일하다 — 질문 하나에 답변 하나다.
  * {@code answerText} 는 TEXT 질문, {@code selectedOptions} 는 CHOICE · CHECKBOX 질문에 쓰며
- * 응답한 질문 유형이 아닌 쪽은 null 이다. 저장 시 upsert 로직은 3.3 에서 추가한다.
+ * 응답한 질문 유형이 아닌 쪽은 null 이다. upsert(3.3)는 서비스 레이어가 이 답변이 이미 있는지
+ * 조회해서 있으면 {@link #update}, 없으면 {@link #create} 를 호출하는 방식으로 한다.
  */
 @Entity
 @Table(name = "application_answer", uniqueConstraints = {
@@ -72,5 +73,11 @@ public class ApplicationAnswer extends BaseTimeEntity {
         .answerText(answerText)
         .selectedOptions(selectedOptions)
         .build();
+  }
+
+  /** 3.3 임시 저장 upsert. 이미 있는 답변을 덮어쓸 때 쓴다. */
+  public void update(String answerText, List<String> selectedOptions) {
+    this.answerText = answerText;
+    this.selectedOptions = selectedOptions;
   }
 }
