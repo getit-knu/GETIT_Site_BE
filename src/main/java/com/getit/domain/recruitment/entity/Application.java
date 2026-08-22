@@ -166,4 +166,13 @@ public class Application extends BaseTimeEntity {
     this.status = ApplicationStatus.SUBMITTED;
     this.submittedAt = submittedAt;
   }
+
+  /**
+   * 7.4 서류 합불 처리. {@code SUBMITTED} 상태에서만 호출할 수 있는지는 서비스 레이어에서 막는다
+   * (다른 검증과 마찬가지로 이 엔티티는 검증 없이 그대로 담는다). {@code result} 는
+   * {@code DOC_PASS} · {@code DOC_FAIL} 만 허용하는지도 서비스 레이어 책임이다.
+   */
+  public void decideDocumentResult(ApplicationStatus result) {
+    this.status = result;
+  }
 }

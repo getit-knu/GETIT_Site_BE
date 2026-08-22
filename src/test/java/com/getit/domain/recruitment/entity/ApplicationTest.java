@@ -59,4 +59,16 @@ class ApplicationTest {
     assertThat(application.getStatus()).isEqualTo(ApplicationStatus.SUBMITTED);
     assertThat(application.getSubmittedAt()).isEqualTo(submittedAt);
   }
+
+  @Test
+  @DisplayName("decideDocumentResult 는 상태를 결과값으로 바꾼다")
+  void decideDocumentResultChangesStatus() {
+    Application application = Application.createDraft(
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
+    application.submit(LocalDateTime.now());
+
+    application.decideDocumentResult(ApplicationStatus.DOC_PASS);
+
+    assertThat(application.getStatus()).isEqualTo(ApplicationStatus.DOC_PASS);
+  }
 }
