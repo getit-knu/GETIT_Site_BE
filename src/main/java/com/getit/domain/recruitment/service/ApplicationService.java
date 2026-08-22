@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 /** 지원서 양식 조회 · 내 지원서 조회. (API 명세서 3.1 · 3.2) */
 @Service
@@ -97,10 +96,14 @@ public class ApplicationService {
   /**
    * 3.3. 임시 저장. 지원서가 없으면 새로 만들고(DRAFT), 있으면 덮어쓴다.
    * 필수값 · 글자수 검증은 하지 않는다 — 검증은 제출(3.4) 시점에만 한다.
+   *
+   * <p>다만 서류 접수 기간인지는 확인한다 (PR #46 리뷰 지적 — 마감이 지나도 임시 저장이 계속
+   * 가능했던 문제). 활성 기수가 있어도 일정이 없거나 접수 기간이 아니면 저장할 수 없다.
    */
   @Transactional
   public DraftSaveResult saveDraft(Long userId, ApplicationDraftRequest request) {
     GenerationSummary activeGeneration = findActiveGeneration();
+    findOpenSchedule(activeGeneration.id());
 
     Application application = upsertApplication(userId, activeGeneration.id(), request.basicInfo());
     upsertAnswers(application.getId(), request.answers());
@@ -119,13 +122,8 @@ public class ApplicationService {
   public SubmitResult submit(Long userId, ApplicationDraftRequest request) {
     GenerationSummary activeGeneration = generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
-    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
-        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
-
+    findOpenSchedule(activeGeneration.id());
     LocalDateTime now = LocalDateTime.now();
-    if (now.isBefore(schedule.getDocumentStartAt()) || now.isAfter(schedule.getDocumentEndAt())) {
-      throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
-    }
 
     Optional<Application> existing =
         applicationRepository.findByUserIdAndGenerationId(userId, activeGeneration.id());
@@ -140,13 +138,13 @@ public class ApplicationService {
           CommonErrorCode.VALIDATION_FAILED, "제출할 지원서가 없습니다. 기본 정보와 답변을 함께 보내주세요."));
     }
 
-    validateBasicInfo(application);
+    ApplicationSubmissionValidator.validateBasicInfo(application);
 
     List<ApplicationQuestion> questions =
         applicationQuestionRepository.findByGenerationId(activeGeneration.id());
     List<ApplicationAnswer> answers = applicationAnswerRepository.findByApplicationId(application.getId());
-    validateRequiredAnswers(questions, answers);
-    validateAnswerLengths(questions, answers);
+    ApplicationSubmissionValidator.validateRequiredAnswers(questions, answers);
+    ApplicationSubmissionValidator.validateAnswerLengths(questions, answers);
 
     application.submit(now);
     return new SubmitResult(application.getId(), application.getStatus(), now);
@@ -195,12 +193,12 @@ public class ApplicationService {
           existing.updateDraft(
               basicInfo.name(), basicInfo.email(), basicInfo.phoneNumber(),
               basicInfo.collegeId(), basicInfo.majorId(), basicInfo.grade(),
-              existing.getStudentNumber());
+              basicInfo.studentNumber());
           return existing;
         })
         .orElseGet(() -> applicationRepository.save(Application.createDraft(
             userId, generationId, basicInfo.name(), basicInfo.email(), basicInfo.phoneNumber(),
-            basicInfo.collegeId(), basicInfo.majorId(), basicInfo.grade(), null)));
+            basicInfo.collegeId(), basicInfo.majorId(), basicInfo.grade(), basicInfo.studentNumber())));
   }
 
   private void assertDraft(Application application) {
@@ -209,70 +207,28 @@ public class ApplicationService {
     }
   }
 
-  /** 답변 upsert. 요청에 없는 질문의 기존 답변은 지우지 않는다 (이슈 #44 논의 필요 사항 참고). */
+  /**
+   * 답변 upsert. 요청에 없는 질문의 기존 답변은 지우지 않는다 (이슈 #44 논의 필요 사항 참고).
+   *
+   * <p>PR #46 리뷰 지적으로 개선 — 답변마다 존재 여부를 조회하면 질문 수만큼 SELECT 가 나갔다
+   * ({@code findByApplicationIdAndQuestionId} 를 answers.size() 번 호출). 지원서에 달린 답변을
+   * 한 번만 조회해 questionId 로 묶어두고 그 맵으로 upsert 여부를 판단한다.
+   */
   private void upsertAnswers(Long applicationId, List<ApplicationAnswerRequest> answers) {
     if (answers == null) {
       return;
     }
+    Map<Long, ApplicationAnswer> existingByQuestionId =
+        applicationAnswerRepository.findByApplicationId(applicationId).stream()
+            .collect(Collectors.toMap(ApplicationAnswer::getQuestionId, Function.identity()));
+
     for (ApplicationAnswerRequest answer : answers) {
-      applicationAnswerRepository.findByApplicationIdAndQuestionId(applicationId, answer.questionId())
-          .ifPresentOrElse(
-              existing -> existing.update(answer.answerText(), answer.selectedOptions()),
-              () -> applicationAnswerRepository.save(ApplicationAnswer.create(
-                  applicationId, answer.questionId(), answer.answerText(), answer.selectedOptions())));
-    }
-  }
-
-  /** 명세서 3.4 검증 4단계: 기본 정보(이름 · 이메일 · 연락처 · 단과대학 · 전공 · 학년) 필수. */
-  private void validateBasicInfo(Application application) {
-    boolean missing = !StringUtils.hasText(application.getName())
-        || !StringUtils.hasText(application.getEmail())
-        || !StringUtils.hasText(application.getPhoneNumber())
-        || application.getCollegeId() == null
-        || application.getMajorId() == null
-        || application.getGrade() == null;
-    if (missing) {
-      throw new BusinessException(
-          CommonErrorCode.VALIDATION_FAILED, "이름 · 이메일 · 연락처 · 단과대학 · 전공 · 학년을 모두 입력해야 합니다.");
-    }
-  }
-
-  /** 명세서 3.4 검증 5단계: required = true 질문은 전부 응답해야 한다. */
-  private void validateRequiredAnswers(List<ApplicationQuestion> questions, List<ApplicationAnswer> answers) {
-    Map<Long, ApplicationAnswer> answersByQuestionId = answers.stream()
-        .collect(Collectors.toMap(ApplicationAnswer::getQuestionId, Function.identity()));
-
-    for (ApplicationQuestion question : questions) {
-      if (!question.isRequired()) {
-        continue;
-      }
-      ApplicationAnswer answer = answersByQuestionId.get(question.getId());
-      if (!isAnswered(answer)) {
-        throw new BusinessException(RecruitmentErrorCode.REQUIRED_ANSWER_MISSING);
-      }
-    }
-  }
-
-  private boolean isAnswered(ApplicationAnswer answer) {
-    if (answer == null) {
-      return false;
-    }
-    return StringUtils.hasText(answer.getAnswerText())
-        || (answer.getSelectedOptions() != null && !answer.getSelectedOptions().isEmpty());
-  }
-
-  /** 명세서 3.4 검증 6단계: 각 답변은 질문의 maxLength 이내여야 한다. */
-  private void validateAnswerLengths(List<ApplicationQuestion> questions, List<ApplicationAnswer> answers) {
-    Map<Long, ApplicationQuestion> questionsById = questions.stream()
-        .collect(Collectors.toMap(ApplicationQuestion::getId, Function.identity()));
-
-    for (ApplicationAnswer answer : answers) {
-      ApplicationQuestion question = questionsById.get(answer.getQuestionId());
-      if (question == null || question.getMaxLength() == null || answer.getAnswerText() == null) {
-        continue;
-      }
-      if (answer.getAnswerText().length() > question.getMaxLength()) {
-        throw new BusinessException(RecruitmentErrorCode.ANSWER_LENGTH_EXCEEDED);
+      ApplicationAnswer existing = existingByQuestionId.get(answer.questionId());
+      if (existing != null) {
+        existing.update(answer.answerText(), answer.selectedOptions());
+      } else {
+        applicationAnswerRepository.save(ApplicationAnswer.create(
+            applicationId, answer.questionId(), answer.answerText(), answer.selectedOptions()));
       }
     }
   }
@@ -292,7 +248,7 @@ public class ApplicationService {
   private BasicInfo resolvePrefill(Long userId) {
     return userAccountService.findActiveById(userId)
         .map(this::toBasicInfo)
-        .orElseGet(() -> new BasicInfo(null, null, null, null, null, null));
+        .orElseGet(() -> new BasicInfo(null, null, null, null, null, null, null));
   }
 
   /**
@@ -300,12 +256,30 @@ public class ApplicationService {
    * grade 는 {@code User.studentYear} 에 대응한다 (이슈 #38 논의 필요 사항 참고).
    */
   private BasicInfo toBasicInfo(UserAccount account) {
-    return new BasicInfo(account.name(), account.email(), account.phoneNumber(), null, null, account.studentYear());
+    return new BasicInfo(
+        account.name(), account.email(), account.phoneNumber(),
+        null, null, account.studentYear(), account.studentNumber());
   }
 
   private RecruitmentSchedule findSchedule(Long generationId) {
     return recruitmentScheduleRepository.findByGenerationId(generationId)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.SCHEDULE_NOT_FOUND));
+  }
+
+  /**
+   * 서류 접수 기간(3.3 · 3.4 공용) 검증. 일정 자체가 없거나 접수 기간이 아니면 예외를 던진다.
+   * {@code submit} 은 반환된 일정을 쓰지 않지만(진행 중인 기간이라는 사실만 필요), {@code saveDraft}
+   * 와 시그니처를 맞추기 위해 그대로 {@code RecruitmentSchedule} 을 반환한다.
+   */
+  private RecruitmentSchedule findOpenSchedule(Long generationId) {
+    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(generationId)
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
+
+    LocalDateTime now = LocalDateTime.now();
+    if (now.isBefore(schedule.getDocumentStartAt()) || now.isAfter(schedule.getDocumentEndAt())) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
+    }
+    return schedule;
   }
 
   private GenerationSummary findActiveGeneration() {

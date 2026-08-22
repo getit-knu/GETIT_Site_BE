@@ -34,7 +34,8 @@ public record MyApplicationResult(
             application.getPhoneNumber(),
             application.getCollegeId(),
             application.getMajorId(),
-            application.getGrade()
+            application.getGrade(),
+            application.getStudentNumber()
         ),
         answers,
         application.getUpdatedAt(),

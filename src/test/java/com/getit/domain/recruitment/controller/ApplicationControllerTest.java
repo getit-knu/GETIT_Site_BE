@@ -101,12 +101,22 @@ class ApplicationControllerTest {
         now.plusDays(10)));
   }
 
+  /** now 가 서류 접수 마감을 지난 일정. */
+  private void saveClosedSchedule() {
+    LocalDateTime now = LocalDateTime.now();
+    recruitmentScheduleRepository.save(RecruitmentSchedule.create(
+        activeGeneration.getId(),
+        now.minusDays(30), now.minusDays(1),
+        now.minusDays(30), now.minusDays(20),
+        now.minusDays(10)));
+  }
+
   private String guestToken() {
     return "Bearer " + jwtProvider.createAccessToken(1L, "guest@getit.com", Role.GUEST);
   }
 
   private String draftRequestJson(List<ApplicationAnswerRequest> answers) throws Exception {
-    BasicInfo basicInfo = new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2);
+    BasicInfo basicInfo = new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, "2021110000");
     return objectMapper.writeValueAsString(new ApplicationDraftRequest(basicInfo, answers));
   }
 
@@ -195,6 +205,8 @@ class ApplicationControllerTest {
     @Test
     @DisplayName("임시 저장한다")
     void savesDraft() throws Exception {
+      saveOpenSchedule();
+
       mockMvc.perform(put(DRAFT_PATH)
               .header("Authorization", guestToken())
               .contentType(MediaType.APPLICATION_JSON)
@@ -207,6 +219,7 @@ class ApplicationControllerTest {
     @Test
     @DisplayName("이미 제출된 지원서면 409 다")
     void returns409WhenAlreadySubmitted() throws Exception {
+      saveOpenSchedule();
       Application application = applicationRepository.save(Application.createDraft(
           1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, null));
       application.submit(LocalDateTime.now());
@@ -217,6 +230,19 @@ class ApplicationControllerTest {
               .content(draftRequestJson(null)))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("ALREADY_SUBMITTED"));
+    }
+
+    @Test
+    @DisplayName("서류 접수 기간이 아니면 422 다")
+    void returns422WhenDeadlinePassed() throws Exception {
+      saveClosedSchedule();
+
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(draftRequestJson(null)))
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_DEADLINE_PASSED"));
     }
   }
 

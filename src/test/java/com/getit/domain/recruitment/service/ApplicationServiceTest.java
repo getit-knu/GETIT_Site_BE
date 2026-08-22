@@ -85,7 +85,7 @@ class ApplicationServiceTest {
 
   private User saveUser() {
     User user = User.createGuest("google-sub-form", "hong@gmail.com", "홍길동", null);
-    user.updateApplicantInfo(null, null, null, 3, null);
+    user.updateApplicantInfo(null, null, null, 3, "2021110000");
     return userRepository.save(user);
   }
 
@@ -110,7 +110,7 @@ class ApplicationServiceTest {
   }
 
   private BasicInfo validBasicInfo() {
-    return new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2);
+    return new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, "2021110000");
   }
 
   private ApplicationQuestion saveRequiredTextQuestion(Integer maxLength) {
@@ -153,6 +153,7 @@ class ApplicationServiceTest {
       assertThat(form.basicInfoPrefill().grade()).isEqualTo(3);
       assertThat(form.basicInfoPrefill().collegeId()).isNull();
       assertThat(form.basicInfoPrefill().majorId()).isNull();
+      assertThat(form.basicInfoPrefill().studentNumber()).isEqualTo("2021110000");
     }
 
     @Test
@@ -246,6 +247,7 @@ class ApplicationServiceTest {
     @Test
     @DisplayName("지원서가 없으면 새로 생성한다")
     void createsNewApplication() {
+      saveOpenSchedule();
       ApplicationDraftRequest request = new ApplicationDraftRequest(validBasicInfo(), List.of(
           new ApplicationAnswerRequest(10L, "지원 동기입니다.", null)));
 
@@ -260,12 +262,25 @@ class ApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("학번을 저장한다")
+    void savesStudentNumber() {
+      saveOpenSchedule();
+
+      applicationService.saveDraft(1L, new ApplicationDraftRequest(validBasicInfo(), null));
+
+      Application saved = applicationRepository.findByUserIdAndGenerationId(1L, activeGeneration.getId())
+          .orElseThrow();
+      assertThat(saved.getStudentNumber()).isEqualTo("2021110000");
+    }
+
+    @Test
     @DisplayName("이미 있으면 기본 정보를 덮어쓰고 새로 만들지 않는다")
     void overwritesExistingApplication() {
+      saveOpenSchedule();
       DraftSaveResult first = applicationService.saveDraft(1L,
           new ApplicationDraftRequest(validBasicInfo(), null));
 
-      BasicInfo updated = new BasicInfo("홍길동", "hong2@gmail.com", "010-9999-8888", 2L, 22L, 3);
+      BasicInfo updated = new BasicInfo("홍길동", "hong2@gmail.com", "010-9999-8888", 2L, 22L, 3, "2022110000");
       DraftSaveResult second = applicationService.saveDraft(1L, new ApplicationDraftRequest(updated, null));
 
       assertThat(second.id()).isEqualTo(first.id());
@@ -273,11 +288,13 @@ class ApplicationServiceTest {
       Application saved = applicationRepository.findById(first.id()).orElseThrow();
       assertThat(saved.getEmail()).isEqualTo("hong2@gmail.com");
       assertThat(saved.getCollegeId()).isEqualTo(2L);
+      assertThat(saved.getStudentNumber()).isEqualTo("2022110000");
     }
 
     @Test
     @DisplayName("답변은 있으면 갱신하고 없으면 새로 만든다")
     void upsertsAnswers() {
+      saveOpenSchedule();
       applicationService.saveDraft(1L, new ApplicationDraftRequest(validBasicInfo(), List.of(
           new ApplicationAnswerRequest(10L, "원래 답변", null))));
 
@@ -296,6 +313,7 @@ class ApplicationServiceTest {
     @Test
     @DisplayName("이미 제출된 지원서면 예외가 발생한다")
     void throwsWhenAlreadySubmitted() {
+      saveOpenSchedule();
       Application application = applicationRepository.save(Application.createDraft(
           1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, null));
       application.submit(LocalDateTime.now());
@@ -318,6 +336,28 @@ class ApplicationServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("모집 일정이 없으면 예외가 발생한다")
+    void throwsWhenNoSchedule() {
+      assertThatThrownBy(() -> applicationService.saveDraft(1L,
+          new ApplicationDraftRequest(validBasicInfo(), null)))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_OPEN);
+    }
+
+    @Test
+    @DisplayName("서류 접수 기간이 아니면 예외가 발생한다")
+    void throwsWhenDeadlinePassed() {
+      saveClosedSchedule();
+
+      assertThatThrownBy(() -> applicationService.saveDraft(1L,
+          new ApplicationDraftRequest(validBasicInfo(), null)))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
     }
   }
 
@@ -417,12 +457,12 @@ class ApplicationServiceTest {
     void throwsWhenBasicInfoMissing() {
       saveOpenSchedule();
       saveRequiredTextQuestion(300);
-      BasicInfo incomplete = new BasicInfo("홍길동", "hong@gmail.com", null, 1L, 11L, 2);
+      BasicInfo incomplete = new BasicInfo("홍길동", "hong@gmail.com", null, 1L, 11L, 2, "2021110000");
 
       assertThatThrownBy(() -> applicationService.submit(1L, new ApplicationDraftRequest(incomplete, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+          .isEqualTo(RecruitmentErrorCode.BASIC_INFO_INCOMPLETE);
     }
 
     @Test
