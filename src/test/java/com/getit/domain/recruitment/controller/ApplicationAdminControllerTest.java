@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -122,6 +123,37 @@ class ApplicationAdminControllerTest {
           .andExpect(jsonPath("$.data.content[0].name").value("김철수"))
           .andExpect(jsonPath("$.data.totalElements").value(1));
     }
+
+    @Test
+    @DisplayName("generationId 로 필터링하면 비활성 기수도 조회할 수 있다")
+    void filtersByGenerationId() throws Exception {
+      submitted(1L, "홍길동");
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      Application other = applicationRepository.save(Application.createDraft(
+          2L, otherGeneration.getId(), "지난기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
+      other.submit(LocalDateTime.now());
+
+      mockMvc.perform(get(APPLICATIONS_PATH)
+              .header("Authorization", adminToken())
+              .param("generationId", String.valueOf(otherGeneration.getId())))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("지난기수"))
+          .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("submittedAt 이 같아도 id 로 안정적으로 정렬된다")
+    void stableSortWhenSubmittedAtTies() throws Exception {
+      LocalDateTime sameInstant = LocalDateTime.now();
+      Application first = submitted(1L, "가나다");
+      Application second = submitted(2L, "마바사");
+      ReflectionTestUtils.setField(first, "submittedAt", sameInstant);
+      ReflectionTestUtils.setField(second, "submittedAt", sameInstant);
+
+      mockMvc.perform(get(APPLICATIONS_PATH).header("Authorization", adminToken()).param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].id").value(second.getId()));
+    }
   }
 
   @Nested
@@ -148,6 +180,17 @@ class ApplicationAdminControllerTest {
     @DisplayName("없는 지원서면 404 다")
     void returns404WhenNotFound() throws Exception {
       mockMvc.perform(get(APPLICATIONS_PATH + "/999").header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태면 404 다")
+    void returns404WhenDraft() throws Exception {
+      Application application = draft(1L, "홍길동");
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + application.getId())
+              .header("Authorization", adminToken()))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
     }

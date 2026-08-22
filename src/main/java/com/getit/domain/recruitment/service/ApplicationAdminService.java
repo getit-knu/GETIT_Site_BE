@@ -30,17 +30,20 @@ public class ApplicationAdminService {
   private final GenerationQueryService generationQueryService;
 
   /**
-   * 7.1. 목록은 활성 기수 기준으로 조회한다 (6.8 getCriteria 등 다른 관리자 조회와 동일한 방식).
-   * status 필터가 없으면 아직 제출하지 않은(DRAFT) 지원서는 제외한다 — 임시 저장만 하고 제출하지
-   * 않은 지원자는 심사 대상이 아니기 때문이다.
+   * 7.1. {@code generationId} 가 없으면 활성 기수를 대상으로 한다 (PR #48 리뷰 지적 — 예전에는
+   * 항상 활성 기수만 조회할 수 있어서 7.2(상세, 기수 제한 없음)와 스코프가 달랐다. 관리자가
+   * 지난 기수 지원자 상세에 도달할 경로가 없던 문제라 목록에서도 기수를 지정할 수 있게 했다).
+   *
+   * <p>status 필터가 없으면 아직 제출하지 않은(DRAFT) 지원서는 제외한다 — 임시 저장만 하고
+   * 제출하지 않은 지원자는 심사 대상이 아니기 때문이다.
    */
-  public PageResponse<ApplicantSummary> listApplicants(ApplicationStatus status, Pageable pageable) {
-    GenerationSummary activeGeneration = findActiveGeneration();
+  public PageResponse<ApplicantSummary> listApplicants(Long generationId, ApplicationStatus status, Pageable pageable) {
+    Long targetGenerationId = generationId != null ? generationId : findActiveGeneration().id();
 
     Page<Application> applications = status != null
-        ? applicationRepository.findByGenerationIdAndStatus(activeGeneration.id(), status, pageable)
+        ? applicationRepository.findByGenerationIdAndStatus(targetGenerationId, status, pageable)
         : applicationRepository.findByGenerationIdAndStatusNot(
-            activeGeneration.id(), ApplicationStatus.DRAFT, pageable);
+            targetGenerationId, ApplicationStatus.DRAFT, pageable);
 
     return PageResponse.from(applications, ApplicantSummary::from);
   }
@@ -48,9 +51,15 @@ public class ApplicationAdminService {
   /**
    * 7.2. 상세 조회는 기수 제한 없이 id 로만 찾는다 — 지난 기수 지원자의 상세도 조회할 수 있어야
    * 하기 때문이다 (목록과 달리 "활성 기수만" 제한을 두지 않는다).
+   *
+   * <p>DRAFT 는 조회 대상에서 제외한다 (PR #48 리뷰 지적 — 지원자가 작성 중 저장만 해도 관리자가
+   * 미완성 답변을 그대로 읽을 수 있었다). {@link com.getit.domain.recruitment.service.ApplicationService#getResult}
+   * 가 DRAFT 를 "제출한 지원서 없음"으로 취급하는 것과 같은 방식으로, 없는 지원서와 동일하게 404 로
+   * 처리한다.
    */
   public ApplicantDetailResult getApplicantDetail(Long applicationId) {
     Application application = applicationRepository.findById(applicationId)
+        .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
 
     List<ApplicationAnswerResult> answers =

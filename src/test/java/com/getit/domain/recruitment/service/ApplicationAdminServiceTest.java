@@ -73,7 +73,7 @@ class ApplicationAdminServiceTest {
       draft(2L, "김철수");
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, PageRequest.of(0, 20));
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("홍길동");
       assertThat(result.totalElements()).isEqualTo(1);
@@ -86,32 +86,47 @@ class ApplicationAdminServiceTest {
       draft(2L, "김철수");
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(ApplicationStatus.DRAFT, PageRequest.of(0, 20));
+          applicationAdminService.listApplicants(null, ApplicationStatus.DRAFT, PageRequest.of(0, 20));
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("김철수");
     }
 
     @Test
-    @DisplayName("다른 기수의 지원자는 포함하지 않는다")
-    void excludesOtherGeneration() {
+    @DisplayName("generationId 가 없으면 활성 기수만 조회하고 다른 기수는 포함하지 않는다")
+    void excludesOtherGenerationWhenNoGenerationIdGiven() {
       submitted(1L, "홍길동");
       Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
       applicationRepository.save(Application.createDraft(
           2L, otherGeneration.getId(), "지난 기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, PageRequest.of(0, 20));
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("홍길동");
     }
 
     @Test
-    @DisplayName("활성 기수가 없으면 예외가 발생한다")
+    @DisplayName("generationId 를 지정하면 해당 기수(비활성 포함) 지원자를 조회한다")
+    void filtersByExplicitGenerationId() {
+      submitted(1L, "홍길동");
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      Application otherGenApplication = applicationRepository.save(Application.createDraft(
+          2L, otherGeneration.getId(), "지난 기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
+      otherGenApplication.submit(LocalDateTime.now());
+
+      PageResponse<ApplicantSummary> result =
+          applicationAdminService.listApplicants(otherGeneration.getId(), null, PageRequest.of(0, 20));
+
+      assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("지난 기수");
+    }
+
+    @Test
+    @DisplayName("generationId 가 없고 활성 기수도 없으면 예외가 발생한다")
     void throwsWhenNoActiveGeneration() {
       activeGeneration.deactivate();
       generationRepository.flush();
 
-      assertThatThrownBy(() -> applicationAdminService.listApplicants(null, PageRequest.of(0, 20)))
+      assertThatThrownBy(() -> applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
@@ -154,6 +169,17 @@ class ApplicationAdminServiceTest {
     @DisplayName("없는 지원서면 예외가 발생한다")
     void throwsWhenNotFound() {
       assertThatThrownBy(() -> applicationAdminService.getApplicantDetail(999L))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태의 지원서는 조회할 수 없다")
+    void throwsWhenDraft() {
+      Application application = draft(1L, "홍길동");
+
+      assertThatThrownBy(() -> applicationAdminService.getApplicantDetail(application.getId()))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
