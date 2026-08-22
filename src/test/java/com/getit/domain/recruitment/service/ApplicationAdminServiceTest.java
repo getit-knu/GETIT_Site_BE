@@ -134,7 +134,7 @@ class ApplicationAdminServiceTest {
       assertThat(result.id()).isEqualTo(application.getId());
       assertThat(result.status()).isEqualTo(ApplicationStatus.SUBMITTED);
       assertThat(result.basicInfo().name()).isEqualTo("홍길동");
-      assertThat(result.studentNumber()).isEqualTo("2021110000");
+      assertThat(result.basicInfo().studentNumber()).isEqualTo("2021110000");
       assertThat(result.answers()).hasSize(1);
       assertThat(result.submittedAt()).isNotNull();
     }
