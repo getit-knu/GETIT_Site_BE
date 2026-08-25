@@ -38,7 +38,7 @@ public class Assignment extends BaseTimeEntity {
   private LocalDateTime deadline;
 
   @Convert(converter = SubmissionTypeSetConverter.class)
-  @Column(name = "allowed_types", nullable = false, length = 20)
+  @Column(name = "allowed_types", nullable = false, length = 100)
   private Set<SubmissionType> allowedTypes;
 
   @Column(name = "link_placeholder", length = 255)

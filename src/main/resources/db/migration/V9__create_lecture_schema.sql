@@ -52,7 +52,7 @@ CREATE TABLE assignment
     title            varchar(255) NOT NULL,
     description      TEXT         DEFAULT NULL,
     deadline         datetime(6)  NOT NULL,
-    allowed_types    varchar(20)  NOT NULL,
+    allowed_types    varchar(100) NOT NULL,
     link_placeholder varchar(255) DEFAULT NULL,
 
     created_at       datetime(6)  NOT NULL,
