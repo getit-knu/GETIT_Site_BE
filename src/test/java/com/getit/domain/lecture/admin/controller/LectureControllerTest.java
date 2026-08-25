@@ -1,7 +1,9 @@
 package com.getit.domain.lecture.admin.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,7 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 8.1~8.3 /api/admin/lectures */
+/** 8.1~8.5 /api/admin/lectures */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -252,6 +254,110 @@ class LectureControllerTest {
       mockMvc.perform(get(LECTURES_PATH + "/999999").header("Authorization", adminToken()))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("LECTURE_NOT_FOUND"));
+    }
+  }
+
+  @Nested
+  @DisplayName("PUT " + LECTURES_PATH + "/{id}")
+  class UpdateLecture {
+
+    private LectureRequest.Update updateRequest() {
+      return new LectureRequest.Update(
+          null, trackId, subCategoryId, 2, "HTML/CSS 심화", "## 수정된 구성",
+          "https://youtube.com/watch?v=xyz789", "https://docs.getit.com/web-advanced", 90,
+          null, false, null);
+    }
+
+    @Test
+    @DisplayName("수정에 성공하면 200과 수정된 강의 정보를 반환한다")
+    void updatesLecture() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(put(LECTURES_PATH + "/" + lecture.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest())))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.title").value("HTML/CSS 심화"))
+          .andExpect(jsonPath("$.data.week").value(2))
+          .andExpect(jsonPath("$.data.isPublished").value(false));
+    }
+
+    @Test
+    @DisplayName("없는 강의 id면 404 이다")
+    void returns404WhenNotFound() throws Exception {
+      mockMvc.perform(put(LECTURES_PATH + "/999999")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest())))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("LECTURE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("title이 비어 있으면 400 이다")
+    void returns400WhenTitleBlank() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+      LectureRequest.Update request = new LectureRequest.Update(
+          null, trackId, subCategoryId, 1, "", null, null, null, null, null, true, null);
+
+      mockMvc.perform(put(LECTURES_PATH + "/" + lecture.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(put(LECTURES_PATH + "/" + lecture.getId())
+              .header("Authorization", memberToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest())))
+          .andExpect(status().isForbidden());
+    }
+  }
+
+  @Nested
+  @DisplayName("DELETE " + LECTURES_PATH + "/{id}")
+  class DeleteLecture {
+
+    @Test
+    @DisplayName("삭제에 성공하면 204 이다")
+    void deletesLecture() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(delete(LECTURES_PATH + "/" + lecture.getId()).header("Authorization", adminToken()))
+          .andExpect(status().isNoContent());
+
+      mockMvc.perform(get(LECTURES_PATH + "/" + lecture.getId()).header("Authorization", adminToken()))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("없는 강의 id면 404 이다")
+    void returns404WhenNotFound() throws Exception {
+      mockMvc.perform(delete(LECTURES_PATH + "/999999").header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("LECTURE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(delete(LECTURES_PATH + "/" + lecture.getId()).header("Authorization", memberToken()))
+          .andExpect(status().isForbidden());
     }
   }
 }
