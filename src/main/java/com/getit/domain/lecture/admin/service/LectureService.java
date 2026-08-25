@@ -21,9 +21,11 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -77,7 +79,15 @@ public class LectureService {
     Map<Long, FileInfo> fileInfoByFileId = fileQueryService
         .findAllByIds(lectureFiles.stream().map(LectureFile::getFileId).toList()).stream()
         .collect(Collectors.toMap(FileInfo::fileId, Function.identity()));
-    List<LectureResult.FileItem> files = lectureFiles.stream()
+    Map<Boolean, List<LectureFile>> lectureFilesByFileInfoFound = lectureFiles.stream()
+        .collect(Collectors.partitioningBy(lectureFile -> fileInfoByFileId.containsKey(lectureFile.getFileId())));
+
+    List<LectureFile> missingLectureFiles = lectureFilesByFileInfoFound.get(false);
+    if (!missingLectureFiles.isEmpty()) {
+      log.warn("강의자료 파일 조회 실패. lectureId={}, fileIds={}", lectureId,
+          missingLectureFiles.stream().map(LectureFile::getFileId).toList());
+    }
+    List<LectureResult.FileItem> files = lectureFilesByFileInfoFound.get(true).stream()
         .map(lectureFile -> LectureResult.FileItem.of(
             lectureFile.getDisplayName(), fileInfoByFileId.get(lectureFile.getFileId())))
         .toList();

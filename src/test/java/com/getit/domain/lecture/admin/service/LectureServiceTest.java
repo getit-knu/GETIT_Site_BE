@@ -11,6 +11,7 @@ import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureRequest.AssignmentPart;
 import com.getit.domain.lecture.admin.dto.LectureResult;
 import com.getit.domain.lecture.entity.Lecture;
+import com.getit.domain.lecture.entity.LectureFile;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.LectureFileRepository;
@@ -214,6 +215,17 @@ class LectureServiceTest {
       assertThatThrownBy(() -> lectureService.getLecture(999_999L))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.LECTURE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("연결된 파일 조회 실패 시 목록에서 제외하고 예외를 발생시키지 않는다")
+    void excludesFileWhenFileNotFound() {
+      Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
+      lectureFileRepository.save(LectureFile.create("삭제된파일.pdf", lecture.getId(), 999_999L));
+
+      LectureResult.DetailResult detail = lectureService.getLecture(lecture.getId());
+
+      assertThat(detail.files()).isEmpty();
     }
   }
 }
