@@ -6,6 +6,7 @@ import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.global.config.JpaAuditingConfig;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @DataJpaTest
 @Import(JpaAuditingConfig.class)
@@ -138,6 +140,105 @@ class ApplicationRepositoryTest {
           999L, ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
 
       assertThat(updated).isZero();
+    }
+  }
+
+  @Nested
+  @DisplayName("findByGenerationIdAndStatus (7.6, Sort)")
+  class FindByGenerationIdAndStatusSorted {
+
+    @Test
+    @DisplayName("페이징 없이 정렬 기준대로 전체 조회한다")
+    void findsAllMatchingSorted() {
+      Application first = draft(1L, 9L, "홍길동");
+      first.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application second = draft(2L, 9L, "김철수");
+      second.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+      draft(3L, 9L, "이영희");
+      submitted(4L, 8L, "다른 기수");
+
+      List<Application> result = applicationRepository.findByGenerationIdAndStatus(
+          9L, ApplicationStatus.SUBMITTED, Sort.by(Sort.Direction.DESC, "submittedAt"));
+
+      assertThat(result).extracting(Application::getName).containsExactly("김철수", "홍길동");
+    }
+  }
+
+  @Nested
+  @DisplayName("findByGenerationIdAndStatusNot (7.6, Sort)")
+  class FindByGenerationIdAndStatusNotSorted {
+
+    @Test
+    @DisplayName("DRAFT 를 제외하고 정렬 기준대로 전체 조회한다")
+    void excludesDraftSorted() {
+      submitted(1L, 9L, "홍길동");
+      draft(2L, 9L, "김철수");
+      submitted(3L, 8L, "다른 기수");
+
+      List<Application> result = applicationRepository.findByGenerationIdAndStatusNot(
+          9L, ApplicationStatus.DRAFT, Sort.by(Sort.Direction.DESC, "id"));
+
+      assertThat(result).extracting(Application::getName).containsExactly("홍길동");
+    }
+  }
+
+  @Nested
+  @DisplayName("findNextIdByGenerationIdAndStatus · findPreviousIdByGenerationIdAndStatus (7.5)")
+  class FindAdjacentIds {
+
+    @Test
+    @DisplayName("다음은 정렬 기준(submittedAt desc, id desc)에서 현재 바로 뒤 id 를 반환한다")
+    void findsNextId() {
+      Application oldest = draft(1L, 9L, "홍길동");
+      oldest.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application middle = draft(2L, 9L, "김철수");
+      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+
+      List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
+          9L, ApplicationStatus.SUBMITTED, middle.getSubmittedAt(), middle.getId(), PageRequest.of(0, 1));
+
+      assertThat(next).containsExactly(oldest.getId());
+    }
+
+    @Test
+    @DisplayName("이전은 정렬 기준에서 현재 바로 앞 id 를 반환한다")
+    void findsPreviousId() {
+      Application middle = draft(1L, 9L, "홍길동");
+      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+      Application newest = draft(2L, 9L, "김철수");
+      newest.submit(LocalDateTime.of(2026, 9, 1, 12, 0));
+
+      List<Long> previous = applicationRepository.findPreviousIdByGenerationIdAndStatus(
+          9L, ApplicationStatus.SUBMITTED, middle.getSubmittedAt(), middle.getId(), PageRequest.of(0, 1));
+
+      assertThat(previous).containsExactly(newest.getId());
+    }
+
+    @Test
+    @DisplayName("submittedAt 이 같으면 id 로 tie-break 한다")
+    void tieBreaksById() {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      Application lowerId = draft(1L, 9L, "홍길동");
+      lowerId.submit(tie);
+      Application higherId = draft(2L, 9L, "김철수");
+      higherId.submit(tie);
+
+      List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
+          9L, ApplicationStatus.SUBMITTED, higherId.getSubmittedAt(), higherId.getId(), PageRequest.of(0, 1));
+
+      assertThat(next).containsExactly(lowerId.getId());
+    }
+
+    @Test
+    @DisplayName("더 이상 없으면 빈 리스트를 반환한다")
+    void returnsEmptyWhenNoMore() {
+      Application only = draft(1L, 9L, "홍길동");
+      only.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+
+      List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
+          9L, ApplicationStatus.SUBMITTED, only.getSubmittedAt(), only.getId(), PageRequest.of(0, 1));
+
+      assertThat(next).isEmpty();
     }
   }
 }
