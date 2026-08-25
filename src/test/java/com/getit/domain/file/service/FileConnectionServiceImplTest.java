@@ -10,7 +10,6 @@ import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,39 +35,6 @@ class FileConnectionServiceImplTest {
     FileAsset file = uploadedFile();
     ReflectionTestUtils.setField(file, "id", id);
     return file;
-  }
-
-  @Test
-  @DisplayName("connect: CONNECTED로 전이")
-  void connectsFile() {
-    FileAsset file = uploadedFile();
-    when(fileAssetRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(file));
-
-    fileConnectionService.connect(1L);
-
-    assertThat(file.getStatus()).isEqualTo(FileStatus.CONNECTED);
-  }
-
-  @Test
-  @DisplayName("disconnect: PENDING으로 전이")
-  void disconnectsFile() {
-    FileAsset file = uploadedFile();
-    file.connect();
-    when(fileAssetRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(file));
-
-    fileConnectionService.disconnect(1L);
-
-    assertThat(file.getStatus()).isEqualTo(FileStatus.PENDING);
-  }
-
-  @Test
-  @DisplayName("존재하지 않는 파일 연결: 예외 발생")
-  void throwsWhenConnectingMissingFile() {
-    when(fileAssetRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> fileConnectionService.connect(1L))
-        .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND);
   }
 
   @Test

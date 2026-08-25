@@ -19,12 +19,6 @@ public class FileConnectionServiceImpl implements FileConnectionService {
   private final FileAssetRepository fileAssetRepository;
 
   @Override
-  public void connect(Long fileId) { findFile(fileId).connect(); }
-
-  @Override
-  public void disconnect(Long fileId) { findFile(fileId).disconnect(); }
-
-  @Override
   public void connectAll(List<Long> fileIds) {
     if (fileIds == null || fileIds.isEmpty()) {
       return;
@@ -55,11 +49,6 @@ public class FileConnectionServiceImpl implements FileConnectionService {
     validateAllFound(distinctFileIds, files);
 
     files.forEach(FileAsset::disconnect);
-  }
-
-  private FileAsset findFile(Long fileId) {
-    return fileAssetRepository.findByIdAndDeletedAtIsNull(fileId)
-        .orElseThrow(() -> new BusinessException(FileErrorCode.FILE_NOT_FOUND));
   }
 
   private void validateAllFound(List<Long> requestedFileIds, List<FileAsset> foundFiles) {
