@@ -1,5 +1,6 @@
 package com.getit.domain.recruitment.service;
 
+import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
 import com.getit.domain.recruitment.dto.ApplicationAnswerResult;
@@ -18,6 +19,7 @@ import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
 import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
+import com.getit.domain.user.util.ExcelExporter;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
@@ -29,10 +31,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 관리자 지원자 목록·상세 조회 · 서류 평가 저장 · 합불 처리. (API 명세서 7.1 · 7.2 · 7.3 · 7.4) */
+/**
+ * 관리자 지원자 목록·상세 조회 · 서류 평가 저장 · 합불 처리 · 순차탐색 · 엑셀 다운로드.
+ * (API 명세서 7.1 · 7.2 · 7.3 · 7.4 · 7.5 · 7.6)
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -53,7 +59,7 @@ public class ApplicationAdminService {
    * 제출하지 않은 지원자는 심사 대상이 아니기 때문이다.
    */
   public PageResponse<ApplicantSummary> listApplicants(Long generationId, ApplicationStatus status, Pageable pageable) {
-    Long targetGenerationId = generationId != null ? generationId : findActiveGeneration().id();
+    Long targetGenerationId = resolveGenerationId(generationId);
 
     Page<Application> applications = status != null
         ? applicationRepository.findByGenerationIdAndStatus(targetGenerationId, status, pageable)
@@ -127,6 +133,60 @@ public class ApplicationAdminService {
     }
 
     return new DocumentDecisionResult(applicationId, result);
+  }
+
+  /**
+   * 7.5. 7.1 목록과 동일한 필터 · 정렬 기준(제출일시 내림차순, id 보조 정렬)으로 나열했을 때
+   * 현재 지원서의 앞뒤 지원서 id 를 반환한다. 그 목록에 없으면(필터가 안 맞는 경우 등) 둘 다 null 이다
+   * — "탐색할 게 없다"는 에러가 아니므로 예외로 처리하지 않는다.
+   */
+  public AdjacentApplicantResult getAdjacentApplicants(
+      Long applicationId, Long generationId, ApplicationStatus status
+  ) {
+    if (!applicationRepository.existsById(applicationId)) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+
+    List<Long> orderedIds = findOrdered(resolveGenerationId(generationId), status).stream()
+        .map(Application::getId)
+        .toList();
+
+    int index = orderedIds.indexOf(applicationId);
+    Long previousId = index > 0 ? orderedIds.get(index - 1) : null;
+    Long nextId = index >= 0 && index < orderedIds.size() - 1 ? orderedIds.get(index + 1) : null;
+
+    return new AdjacentApplicantResult(previousId, nextId);
+  }
+
+  /**
+   * 7.6. 7.1 목록과 동일한 필터로 페이징 없이 전체를 한 시트에 담는다. {@code ApiResponse}
+   * envelope 을 쓰지 않는다 — 바이너리(XLSX) 응답이라 JSON 으로 감쌀 수 없다.
+   */
+  public byte[] exportApplicantsExcel(Long generationId, ApplicationStatus status) {
+    List<Application> applications = findOrdered(resolveGenerationId(generationId), status);
+
+    List<String> headers = List.of("이름", "학번", "상태", "제출일시");
+    List<List<Object>> rows = applications.stream()
+        .map(application -> List.<Object>of(
+            application.getName(),
+            application.getStudentNumber() != null ? application.getStudentNumber() : "",
+            application.getStatus().name(),
+            application.getSubmittedAt() != null ? application.getSubmittedAt().toString() : ""))
+        .toList();
+
+    return ExcelExporter.toXlsx("지원자 목록", headers, rows);
+  }
+
+  /** 7.5 순차탐색 · 7.6 엑셀 다운로드 공용. 7.1 목록과 동일한 필터 · 정렬 기준으로 페이징 없이 전체 조회한다. */
+  private List<Application> findOrdered(Long generationId, ApplicationStatus status) {
+    Sort sort = Sort.by(Sort.Direction.DESC, "submittedAt", "id");
+    return status != null
+        ? applicationRepository.findByGenerationIdAndStatus(generationId, status, sort)
+        : applicationRepository.findByGenerationIdAndStatusNot(generationId, ApplicationStatus.DRAFT, sort);
+  }
+
+  private Long resolveGenerationId(Long generationId) {
+    return generationId != null ? generationId : findActiveGeneration().id();
   }
 
   /** 7.2 상세 · 7.3 채점 공용. DRAFT 는 심사 대상이 아니므로 없는 지원서와 동일하게 404 로 처리한다. */

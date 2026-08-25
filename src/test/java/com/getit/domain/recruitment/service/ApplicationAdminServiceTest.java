@@ -3,6 +3,7 @@ package com.getit.domain.recruitment.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
@@ -21,8 +22,13 @@ import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -72,6 +78,12 @@ class ApplicationAdminServiceTest {
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
     application.submit(LocalDateTime.now());
+    return application;
+  }
+
+  private Application submittedAt(Long userId, String name, LocalDateTime submittedAt) {
+    Application application = draft(userId, name);
+    application.submit(submittedAt);
     return application;
   }
 
@@ -377,6 +389,105 @@ class ApplicationAdminServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("getAdjacentApplicants")
+  class GetAdjacentApplicants {
+
+    @Test
+    @DisplayName("제출일시 내림차순 기준으로 이전 · 다음 지원서 id 를 반환한다")
+    void returnsPreviousAndNext() {
+      Application oldest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application middle = submittedAt(2L, "김철수", LocalDateTime.of(2026, 9, 1, 11, 0));
+      Application newest = submittedAt(3L, "이영희", LocalDateTime.of(2026, 9, 1, 12, 0));
+
+      AdjacentApplicantResult result =
+          applicationAdminService.getAdjacentApplicants(middle.getId(), null, null);
+
+      assertThat(result.previousApplicationId()).isEqualTo(newest.getId());
+      assertThat(result.nextApplicationId()).isEqualTo(oldest.getId());
+    }
+
+    @Test
+    @DisplayName("가장 최근(맨 앞) 지원서는 이전이 없다")
+    void firstHasNoPrevious() {
+      Application newest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 12, 0));
+      submittedAt(2L, "김철수", LocalDateTime.of(2026, 9, 1, 10, 0));
+
+      AdjacentApplicantResult result =
+          applicationAdminService.getAdjacentApplicants(newest.getId(), null, null);
+
+      assertThat(result.previousApplicationId()).isNull();
+      assertThat(result.nextApplicationId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("가장 오래된(맨 뒤) 지원서는 다음이 없다")
+    void lastHasNoNext() {
+      submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 12, 0));
+      Application oldest = submittedAt(2L, "김철수", LocalDateTime.of(2026, 9, 1, 10, 0));
+
+      AdjacentApplicantResult result =
+          applicationAdminService.getAdjacentApplicants(oldest.getId(), null, null);
+
+      assertThat(result.previousApplicationId()).isNotNull();
+      assertThat(result.nextApplicationId()).isNull();
+    }
+
+    @Test
+    @DisplayName("필터에 맞지 않는 지원서는 이전 · 다음 모두 null 이다")
+    void bothNullWhenNotInFilteredList() {
+      Application draftApplication = draft(1L, "홍길동");
+
+      AdjacentApplicantResult result =
+          applicationAdminService.getAdjacentApplicants(draftApplication.getId(), null, null);
+
+      assertThat(result.previousApplicationId()).isNull();
+      assertThat(result.nextApplicationId()).isNull();
+    }
+
+    @Test
+    @DisplayName("없는 지원서면 예외가 발생한다")
+    void throwsWhenNotFound() {
+      assertThatThrownBy(() -> applicationAdminService.getAdjacentApplicants(999L, null, null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("exportApplicantsExcel")
+  class ExportApplicantsExcel {
+
+    @Test
+    @DisplayName("DRAFT 를 제외한 지원자를 엑셀로 내보낸다")
+    void exportsApplicantsExcludingDraft() throws IOException {
+      submitted(1L, "홍길동");
+      draft(2L, "김철수");
+
+      byte[] excel = applicationAdminService.exportApplicantsExcel(null, null);
+
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        assertThat(sheet.getLastRowNum()).isEqualTo(1);
+        Row dataRow = sheet.getRow(1);
+        assertThat(dataRow.getCell(0).getStringCellValue()).isEqualTo("홍길동");
+      }
+    }
+
+    @Test
+    @DisplayName("활성 기수가 없고 generationId 도 없으면 예외가 발생한다")
+    void throwsWhenNoActiveGeneration() {
+      activeGeneration.deactivate();
+      generationRepository.flush();
+
+      assertThatThrownBy(() -> applicationAdminService.exportApplicantsExcel(null, null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
     }
   }
 }

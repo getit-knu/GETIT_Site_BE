@@ -1,5 +1,6 @@
 package com.getit.domain.recruitment.controller;
 
+import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
@@ -17,6 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -72,5 +76,29 @@ public class ApplicationAdminController {
       @Valid @RequestBody DocumentDecisionRequest request
   ) {
     return ApiResponse.success(applicationAdminService.decide(id, request.passed()));
+  }
+
+  @Operation(summary = "지원자 순차탐색(이전 · 다음)", description = "명세서 7.5")
+  @GetMapping("/{id}/adjacent")
+  public ApiResponse<AdjacentApplicantResult> getAdjacentApplicants(
+      @PathVariable Long id,
+      @RequestParam(required = false) Long generationId,
+      @RequestParam(required = false) ApplicationStatus status
+  ) {
+    return ApiResponse.success(applicationAdminService.getAdjacentApplicants(id, generationId, status));
+  }
+
+  /** 바이너리(XLSX) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. */
+  @Operation(summary = "지원자 목록 엑셀 다운로드", description = "명세서 7.6")
+  @GetMapping(value = "/excel")
+  public ResponseEntity<byte[]> downloadExcel(
+      @RequestParam(required = false) Long generationId,
+      @RequestParam(required = false) ApplicationStatus status
+  ) {
+    byte[] excel = applicationAdminService.exportApplicantsExcel(generationId, status);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=applicants.xlsx")
+        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        .body(excel);
   }
 }
