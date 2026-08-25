@@ -192,7 +192,7 @@ public class LectureService {
     Set<Long> existingFileIds = existingFiles.stream().map(LectureFile::getFileId).collect(Collectors.toSet());
     Set<Long> requestedFileIds = fileIds == null
         ? Set.of()
-        : fileIds.stream().distinct().collect(Collectors.toSet());
+        : fileIds.stream().collect(Collectors.toSet());
 
     List<LectureFile> filesToRemove = existingFiles.stream()
         .filter(lectureFile -> !requestedFileIds.contains(lectureFile.getFileId()))
