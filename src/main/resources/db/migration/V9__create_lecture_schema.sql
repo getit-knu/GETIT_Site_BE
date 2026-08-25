@@ -39,7 +39,7 @@ CREATE TABLE lecture_file
     updated_at   datetime(6)  NOT NULL,
 
     PRIMARY KEY (id),
-    KEY idx_lecture_file_lecture_id (lecture_id)
+    CONSTRAINT uk_lecture_file_lecture_id_file_id UNIQUE (lecture_id, file_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

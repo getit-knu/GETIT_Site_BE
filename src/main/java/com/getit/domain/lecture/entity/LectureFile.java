@@ -7,13 +7,19 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "lecture_file")
+@Table(
+  name = "lecture_file",
+  uniqueConstraints = {
+    @UniqueConstraint(name = "uk_lecture_file_lecture_id_file_id", columnNames = {"lecture_id", "file_id"})
+  }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LectureFile extends BaseTimeEntity {
