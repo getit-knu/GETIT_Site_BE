@@ -141,10 +141,10 @@ public class LectureService {
     }
 
     fileConnectionService.connectAll(distinctFileIds);
-    for (Long fileId : distinctFileIds) {
-      FileInfo fileInfo = fileInfoByFileId.get(fileId);
-      lectureFileRepository.save(LectureFile.create(fileInfo.originalName(), lectureId, fileId));
-    }
+    List<LectureFile> lectureFiles = distinctFileIds.stream()
+        .map(fileId -> LectureFile.create(fileInfoByFileId.get(fileId).originalName(), lectureId, fileId))
+        .toList();
+    lectureFileRepository.saveAll(lectureFiles);
   }
 
   private void createAssignment(Long lectureId, LectureRequest.AssignmentPart assignment) {
