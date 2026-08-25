@@ -140,9 +140,9 @@ public class LectureService {
       throw new BusinessException(FileErrorCode.FILE_NOT_FOUND, "파일을 찾을 수 없습니다: " + missingFileIds);
     }
 
+    fileConnectionService.connectAll(distinctFileIds);
     for (Long fileId : distinctFileIds) {
       FileInfo fileInfo = fileInfoByFileId.get(fileId);
-      fileConnectionService.connect(fileId);
       lectureFileRepository.save(LectureFile.create(fileInfo.originalName(), lectureId, fileId));
     }
   }
