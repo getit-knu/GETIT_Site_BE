@@ -21,7 +21,9 @@ public enum RecruitmentErrorCode implements ErrorCode {
   REQUIRED_ANSWER_MISSING(HttpStatus.BAD_REQUEST, "필수 질문에 답변하지 않았습니다."),
   ANSWER_LENGTH_EXCEEDED(HttpStatus.BAD_REQUEST, "답변이 글자 수 제한을 초과했습니다."),
   BASIC_INFO_INCOMPLETE(HttpStatus.BAD_REQUEST, "이름 · 이메일 · 연락처 · 단과대학 · 전공 · 학년을 모두 입력해야 합니다."),
-  APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "지원서를 찾을 수 없습니다.");
+  APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "지원서를 찾을 수 없습니다."),
+  SCORE_EXCEEDS_MAX(HttpStatus.BAD_REQUEST, "점수가 평가 기준의 배점을 초과했습니다."),
+  APPLICATION_NOT_SUBMITTED(HttpStatus.CONFLICT, "제출된 지원서만 합불 처리할 수 있습니다.");
 
   private final HttpStatus status;
   private final String message;

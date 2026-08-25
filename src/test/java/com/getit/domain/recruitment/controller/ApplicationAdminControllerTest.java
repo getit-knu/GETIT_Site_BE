@@ -1,18 +1,27 @@
 package com.getit.domain.recruitment.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
+import com.getit.domain.recruitment.dto.EvaluationScoreItem;
+import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
+import com.getit.domain.recruitment.entity.EvaluationCriterion;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
+import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.entity.Role;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +56,12 @@ class ApplicationAdminControllerTest {
 
   @Autowired
   private ApplicationAnswerRepository applicationAnswerRepository;
+
+  @Autowired
+  private EvaluationCriterionRepository evaluationCriterionRepository;
+
+  @Autowired
+  private ObjectMapper objectMapper;
 
   private Generation activeGeneration;
 
@@ -193,6 +209,95 @@ class ApplicationAdminControllerTest {
               .header("Authorization", adminToken()))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
+    }
+  }
+
+  @Nested
+  @DisplayName("PUT " + APPLICATIONS_PATH + "/{id}/scores")
+  class SaveScores {
+
+    private String scoresRequestJson(Long criterionId, int score) throws Exception {
+      return objectMapper.writeValueAsString(
+          new EvaluationScoreSaveRequest(List.of(new EvaluationScoreItem(criterionId, score))));
+    }
+
+    @Test
+    @DisplayName("점수를 저장한다")
+    void savesScores() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 1, "전공 적합성", "가이드 라인", 60));
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(scoresRequestJson(criterion.getId(), 45)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.totalScore").value(45))
+          .andExpect(jsonPath("$.data.scores[0].score").value(45));
+    }
+
+    @Test
+    @DisplayName("배점을 초과하면 400 이다")
+    void returns400WhenScoreExceedsMax() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 1, "전공 적합성", "가이드 라인", 60));
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(scoresRequestJson(criterion.getId(), 61)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("SCORE_EXCEEDS_MAX"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 기준이면 404 다")
+    void returns404WhenCriterionNotFound() throws Exception {
+      Application application = submitted(1L, "홍길동");
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(scoresRequestJson(999L, 10)))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("CRITERION_NOT_FOUND"));
+    }
+  }
+
+  @Nested
+  @DisplayName("PATCH " + APPLICATIONS_PATH + "/{id}/decision")
+  class Decide {
+
+    private String decisionRequestJson(boolean passed) throws Exception {
+      return objectMapper.writeValueAsString(new DocumentDecisionRequest(passed));
+    }
+
+    @Test
+    @DisplayName("합불을 결정한다")
+    void decides() throws Exception {
+      Application application = submitted(1L, "홍길동");
+
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("DOC_PASS"));
+    }
+
+    @Test
+    @DisplayName("SUBMITTED 가 아니면 409 다")
+    void returns409WhenNotSubmitted() throws Exception {
+      Application application = draft(1L, "홍길동");
+
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
     }
   }
 }
