@@ -201,7 +201,7 @@ public class LectureService {
         .filter(fileId -> !existingFileIds.contains(fileId))
         .toList();
 
-    filesToRemove.forEach(lectureFile -> fileConnectionService.disconnect(lectureFile.getFileId()));
+    fileConnectionService.disconnectAll(filesToRemove.stream().map(LectureFile::getFileId).toList());
     lectureFileRepository.deleteAll(filesToRemove);
 
     connectFiles(lectureId, fileIdsToAdd);
