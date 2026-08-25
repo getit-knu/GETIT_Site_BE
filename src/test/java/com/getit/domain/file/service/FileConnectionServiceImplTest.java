@@ -1,7 +1,8 @@
 package com.getit.domain.file.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.getit.domain.file.entity.FileAsset;
@@ -38,7 +39,7 @@ class FileConnectionServiceImplTest {
   }
 
   @Test
-  @DisplayName("connectAll: 전부 CONNECTED로 전이")
+  @DisplayName("connectAll: 배치 쿼리로 전부 CONNECTED 처리한다")
   void connectsAllFiles() {
     FileAsset file1 = uploadedFile(1L);
     FileAsset file2 = uploadedFile(2L);
@@ -47,8 +48,7 @@ class FileConnectionServiceImplTest {
 
     fileConnectionService.connectAll(List.of(1L, 2L));
 
-    assertThat(file1.getStatus()).isEqualTo(FileStatus.CONNECTED);
-    assertThat(file2.getStatus()).isEqualTo(FileStatus.CONNECTED);
+    verify(fileAssetRepository).updateStatusByIdIn(List.of(1L, 2L), FileStatus.CONNECTED);
   }
 
   @Test
@@ -64,6 +64,7 @@ class FileConnectionServiceImplTest {
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_ALREADY_CONNECTED)
         .hasMessageContaining("2");
+    verify(fileAssetRepository, never()).updateStatusByIdIn(List.of(1L, 2L), FileStatus.CONNECTED);
   }
 
   @Test
@@ -80,7 +81,7 @@ class FileConnectionServiceImplTest {
   }
 
   @Test
-  @DisplayName("disconnectAll: 전부 PENDING으로 전이")
+  @DisplayName("disconnectAll: 배치 쿼리로 전부 PENDING 처리한다")
   void disconnectsAllFiles() {
     FileAsset file1 = uploadedFile(1L);
     file1.connect();
@@ -91,8 +92,7 @@ class FileConnectionServiceImplTest {
 
     fileConnectionService.disconnectAll(List.of(1L, 2L));
 
-    assertThat(file1.getStatus()).isEqualTo(FileStatus.PENDING);
-    assertThat(file2.getStatus()).isEqualTo(FileStatus.PENDING);
+    verify(fileAssetRepository).updateStatusByIdIn(List.of(1L, 2L), FileStatus.PENDING);
   }
 
   @Test
@@ -107,5 +107,6 @@ class FileConnectionServiceImplTest {
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND)
         .hasMessageContaining("2");
+    verify(fileAssetRepository, never()).updateStatusByIdIn(List.of(1L, 2L), FileStatus.PENDING);
   }
 }
