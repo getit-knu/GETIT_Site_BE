@@ -46,6 +46,17 @@ class LectureRepositoryTest {
     }
 
     @Test
+    @DisplayName("같은 week 의 강의는 id 오름차순으로 반환한다")
+    void ordersBySameWeekById() {
+      Lecture firstSaved = save(1, 9L, 1L, 1L);
+      Lecture secondSaved = save(1, 9L, 1L, 1L);
+
+      assertThat(lectureRepository.findAllByFilters(9L, null, null))
+          .extracting(Lecture::getId)
+          .containsExactly(firstSaved.getId(), secondSaved.getId());
+    }
+
+    @Test
     @DisplayName("트랙 id 로 필터링한다")
     void filtersByTrackId() {
       save(1, 9L, 1L, 1L);

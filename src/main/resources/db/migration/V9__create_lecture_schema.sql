@@ -19,7 +19,10 @@ CREATE TABLE lecture
     updated_at        datetime(6)  NOT NULL,
     deleted_at        datetime(6)  DEFAULT NULL,
 
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    KEY idx_lecture_generation_id (generation_id),
+    KEY idx_lecture_track_id (track_id),
+    KEY idx_lecture_sub_category_id (sub_category_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -35,7 +38,8 @@ CREATE TABLE lecture_file
     created_at   datetime(6)  NOT NULL,
     updated_at   datetime(6)  NOT NULL,
 
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    KEY idx_lecture_file_lecture_id (lecture_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

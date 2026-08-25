@@ -18,7 +18,7 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
         and l.deletedAt is null
         and (:trackId is null or l.trackId = :trackId)
         and (:subCategoryId is null or l.subCategoryId = :subCategoryId)
-      order by l.week asc
+      order by l.week asc, l.id asc
       """)
   List<Lecture> findAllByFilters(
       @Param("generationId") Long generationId,
