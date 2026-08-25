@@ -114,7 +114,8 @@ public class LectureService {
     lecture.update(
         request.week(), request.title(), request.description(), request.youtubeUrl(),
         request.materialUrl(), request.durationMinutes(), request.isPublishedOrDefault(),
-        generationId, request.trackId(), request.subCategoryId());
+        generationId, request.trackId(), request.subCategoryId()
+    );
 
     updateFiles(lectureId, request.fileIds());
     updateAssignment(lectureId, request.assignment());
