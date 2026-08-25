@@ -16,7 +16,7 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
 
   List<FileAsset> findAllByIdIn(List<Long> ids);
 
-  @Modifying(clearAutomatically = true)
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update FileAsset f set f.status = :status where f.id in :ids")
   void updateStatusByIdIn(@Param("ids") List<Long> ids, @Param("status") FileStatus status);
 }
