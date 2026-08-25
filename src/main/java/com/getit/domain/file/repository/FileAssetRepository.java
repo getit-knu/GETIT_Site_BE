@@ -1,10 +1,13 @@
 package com.getit.domain.file.repository;
 
 import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.entity.FileStatus;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
 
@@ -12,4 +15,8 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
   List<FileAsset> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
   List<FileAsset> findAllByIdIn(List<Long> ids);
+
+  @Modifying(clearAutomatically = true)
+  @Query("update FileAsset f set f.status = :status where f.id in :ids")
+  void updateStatusByIdIn(@Param("ids") List<Long> ids, @Param("status") FileStatus status);
 }
