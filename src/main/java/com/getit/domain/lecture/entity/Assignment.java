@@ -78,4 +78,18 @@ public class Assignment extends BaseTimeEntity {
         .linkPlaceholder(linkPlaceholder)
         .build();
   }
+
+  public void update(
+      String title,
+      String description,
+      LocalDateTime deadline,
+      Set<SubmissionType> allowedTypes,
+      String linkPlaceholder
+  ) {
+    this.title = title;
+    this.description = description;
+    this.deadline = deadline;
+    this.allowedTypes = allowedTypes;
+    this.linkPlaceholder = linkPlaceholder;
+  }
 }
