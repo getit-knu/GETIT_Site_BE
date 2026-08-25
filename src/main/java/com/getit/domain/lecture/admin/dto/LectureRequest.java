@@ -1,6 +1,7 @@
 package com.getit.domain.lecture.admin.dto;
 
 import com.getit.domain.lecture.entity.SubmissionType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -24,7 +25,7 @@ public class LectureRequest {
       @Min(1) Integer durationMinutes,
       List<Long> fileIds,
       Boolean isPublished,
-      AssignmentPart assignment
+      @Valid AssignmentPart assignment
   ) {
 
     public boolean isPublishedOrDefault() { return Boolean.TRUE.equals(isPublished); }

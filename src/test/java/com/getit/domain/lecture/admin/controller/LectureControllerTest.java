@@ -7,8 +7,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureRequest.Create;
 import com.getit.domain.lecture.entity.Lecture;
+import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
@@ -17,6 +19,8 @@ import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.entity.Role;
+import java.time.LocalDateTime;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -166,6 +170,23 @@ class LectureControllerTest {
     void returns400WhenDurationMinutesNotPositive() throws Exception {
       Create request = new Create(
           null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, 0, null, true, null);
+
+      mockMvc.perform(post(LECTURES_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("assignment.title이 비어 있으면 400 이다")
+    void returns400WhenAssignmentTitleBlank() throws Exception {
+      LectureRequest.AssignmentPart assignmentPart = new LectureRequest.AssignmentPart(
+          "", "설명", LocalDateTime.of(2026, 6, 19, 23, 59, 59), Set.of(SubmissionType.LINK), null);
+      Create request = new Create(
+          null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+          null, true, assignmentPart);
 
       mockMvc.perform(post(LECTURES_PATH)
               .header("Authorization", adminToken())
