@@ -40,7 +40,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 7.1~7.2 /api/admin/recruitment/applications */
+/** 7.1~7.6 /api/admin/recruitment/applications */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -181,6 +181,20 @@ class ApplicationAdminControllerTest {
       mockMvc.perform(get(APPLICATIONS_PATH).header("Authorization", adminToken()).param("size", "1"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].id").value(second.getId()));
+    }
+
+    @Test
+    @DisplayName("?sort= 로 다른 정렬을 요청해도 무시하고 강제된 순서로 응답한다")
+    void ignoresClientSuppliedSort() throws Exception {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      submittedAt(1L, "가나다", tie);
+      Application higherId = submittedAt(2L, "다바가", tie);
+
+      mockMvc.perform(get(APPLICATIONS_PATH)
+              .header("Authorization", adminToken())
+              .param("sort", "name,asc"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].id").value(higherId.getId()));
     }
   }
 
@@ -364,6 +378,32 @@ class ApplicationAdminControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.previousApplicationId").value(newest.getId()))
           .andExpect(jsonPath("$.data.nextApplicationId").value(oldest.getId()));
+    }
+
+    @Test
+    @DisplayName("submittedAt 이 같으면 id 내림차순으로 tie-break 한다")
+    void tieBreaksById() throws Exception {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      Application oldest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application lowerId = submittedAt(2L, "김철수", tie);
+      Application higherId = submittedAt(3L, "이영희", tie);
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + lowerId.getId() + "/adjacent")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.previousApplicationId").value(higherId.getId()))
+          .andExpect(jsonPath("$.data.nextApplicationId").value(oldest.getId()));
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태면 404 다")
+    void returns404WhenDraft() throws Exception {
+      Application application = draft(1L, "홍길동");
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + application.getId() + "/adjacent")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
     }
 
     @Test

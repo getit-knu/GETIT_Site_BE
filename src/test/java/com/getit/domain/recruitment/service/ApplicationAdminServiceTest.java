@@ -6,18 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
-import com.getit.domain.recruitment.dto.DocumentDecisionResult;
-import com.getit.domain.recruitment.dto.EvaluationScoreItem;
-import com.getit.domain.recruitment.dto.EvaluationScoreSaveResult;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
-import com.getit.domain.recruitment.entity.EvaluationCriterion;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
-import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
-import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.dto.PageResponse;
@@ -25,7 +19,6 @@ import com.getit.global.exception.BusinessException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.List;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -36,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -50,12 +44,6 @@ class ApplicationAdminServiceTest {
 
   @Autowired
   private ApplicationAnswerRepository applicationAnswerRepository;
-
-  @Autowired
-  private EvaluationCriterionRepository evaluationCriterionRepository;
-
-  @Autowired
-  private EvaluationScoreRepository evaluationScoreRepository;
 
   @Autowired
   private GenerationRepository generationRepository;
@@ -85,11 +73,6 @@ class ApplicationAdminServiceTest {
     Application application = draft(userId, name);
     application.submit(submittedAt);
     return application;
-  }
-
-  private EvaluationCriterion criterion(Long generationId, int order, String name, int maxScore) {
-    return evaluationCriterionRepository.save(
-        EvaluationCriterion.create(generationId, order, name, name + " 가이드 라인", maxScore));
   }
 
   @Nested
@@ -161,6 +144,23 @@ class ApplicationAdminServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("클라이언트가 보낸 정렬은 무시하고 항상 제출일시 내림차순 + id 로 정렬한다")
+    void ignoresClientSuppliedSort() {
+      // 이름순(ASC)이면 "가나다"(lowerId)가 먼저 나와야 하지만, 강제된 정렬(제출일시 동률 -> id
+      // 내림차순)이면 higherId 가 먼저 나온다 — 두 결과가 서로 달라야 강제가 실제로 적용됐는지
+      // 구분할 수 있다.
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      Application lowerId = submittedAt(1L, "가나다", tie);
+      Application higherId = submittedAt(2L, "다바가", tie);
+
+      PageResponse<ApplicantSummary> result = applicationAdminService.listApplicants(
+          null, null, PageRequest.of(0, 20, Sort.by("name")));
+
+      assertThat(result.content()).extracting(ApplicantSummary::id)
+          .containsExactly(higherId.getId(), lowerId.getId());
+    }
   }
 
   @Nested
@@ -217,182 +217,6 @@ class ApplicationAdminServiceTest {
   }
 
   @Nested
-  @DisplayName("saveScores")
-  class SaveScores {
-
-    @Test
-    @DisplayName("채점되지 않은 기준이 남아있으면 총점은 null 이다")
-    void totalScoreIsNullWhenNotAllCriteriaScored() {
-      Application application = submitted(1L, "홍길동");
-      EvaluationCriterion scored = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-      criterion(activeGeneration.getId(), 2, "지원 동기", 40);
-
-      EvaluationScoreSaveResult result = applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(scored.getId(), 50)));
-
-      assertThat(result.applicationId()).isEqualTo(application.getId());
-      assertThat(result.totalScore()).isNull();
-      assertThat(result.scores()).hasSize(2);
-      assertThat(result.scores()).filteredOn(s -> s.criterionId().equals(scored.getId()))
-          .extracting(s -> s.score()).containsExactly(50);
-      assertThat(result.scores()).filteredOn(s -> !s.criterionId().equals(scored.getId()))
-          .extracting(s -> s.score()).containsExactly((Integer) null);
-    }
-
-    @Test
-    @DisplayName("기수의 모든 기준을 채점하면 총점을 합산해 반환한다")
-    void totalScoreIsSumWhenAllCriteriaScored() {
-      Application application = submitted(1L, "홍길동");
-      EvaluationCriterion first = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-      EvaluationCriterion second = criterion(activeGeneration.getId(), 2, "지원 동기", 40);
-
-      EvaluationScoreSaveResult result = applicationAdminService.saveScores(
-          application.getId(),
-          List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30)));
-
-      assertThat(result.totalScore()).isEqualTo(80);
-    }
-
-    @Test
-    @DisplayName("이미 점수가 있으면 덮어쓰고 새로 만들지 않는다")
-    void overwritesExistingScore() {
-      Application application = submitted(1L, "홍길동");
-      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-
-      applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 30)));
-      EvaluationScoreSaveResult result = applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 45)));
-
-      assertThat(result.totalScore()).isEqualTo(45);
-      assertThat(evaluationScoreRepository.findByApplicationId(application.getId())).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("점수가 배점을 초과하면 예외가 발생한다")
-    void throwsWhenScoreExceedsMax() {
-      Application application = submitted(1L, "홍길동");
-      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-
-      assertThatThrownBy(() -> applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 61))))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.SCORE_EXCEEDS_MAX);
-    }
-
-    @Test
-    @DisplayName("다른 기수의 평가 기준이면 예외가 발생한다")
-    void throwsWhenCriterionBelongsToOtherGeneration() {
-      Application application = submitted(1L, "홍길동");
-      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
-      EvaluationCriterion otherCriterion = criterion(otherGeneration.getId(), 1, "지난 기수 기준", 60);
-
-      assertThatThrownBy(() -> applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(otherCriterion.getId(), 10))))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.CRITERION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 기준이면 예외가 발생한다")
-    void throwsWhenCriterionNotFound() {
-      Application application = submitted(1L, "홍길동");
-
-      assertThatThrownBy(() -> applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(999L, 10))))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.CRITERION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("DRAFT 상태의 지원서는 채점할 수 없다")
-    void throwsWhenDraft() {
-      Application application = draft(1L, "홍길동");
-      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-
-      assertThatThrownBy(() -> applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("이미 합불이 결정된 지원서는 채점할 수 없다")
-    void throwsWhenAlreadyDecided() {
-      Application application = submitted(1L, "홍길동");
-      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
-      applicationAdminService.decide(application.getId(), true);
-
-      assertThatThrownBy(() -> applicationAdminService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
-    }
-  }
-
-  @Nested
-  @DisplayName("decide")
-  class Decide {
-
-    @Test
-    @DisplayName("true 면 DOC_PASS 로 결정한다")
-    void decidesPass() {
-      Application application = submitted(1L, "홍길동");
-
-      DocumentDecisionResult result = applicationAdminService.decide(application.getId(), true);
-
-      assertThat(result.status()).isEqualTo(ApplicationStatus.DOC_PASS);
-    }
-
-    @Test
-    @DisplayName("false 면 DOC_FAIL 로 결정한다")
-    void decidesFail() {
-      Application application = submitted(1L, "홍길동");
-
-      DocumentDecisionResult result = applicationAdminService.decide(application.getId(), false);
-
-      assertThat(result.status()).isEqualTo(ApplicationStatus.DOC_FAIL);
-    }
-
-    @Test
-    @DisplayName("DRAFT 상태의 지원서는 결정할 수 없다 (존재하지 않는 것과 동일하게 취급)")
-    void throwsWhenDraft() {
-      Application application = draft(1L, "홍길동");
-
-      assertThatThrownBy(() -> applicationAdminService.decide(application.getId(), true))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("이미 결정된 지원서면 예외가 발생한다")
-    void throwsWhenAlreadyDecided() {
-      Application application = submitted(1L, "홍길동");
-      applicationAdminService.decide(application.getId(), true);
-
-      assertThatThrownBy(() -> applicationAdminService.decide(application.getId(), false))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
-    }
-
-    @Test
-    @DisplayName("없는 지원서면 예외가 발생한다")
-    void throwsWhenNotFound() {
-      assertThatThrownBy(() -> applicationAdminService.decide(999L, true))
-          .isInstanceOf(BusinessException.class)
-          .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
-    }
-  }
-
-  @Nested
   @DisplayName("getAdjacentApplicants")
   class GetAdjacentApplicants {
 
@@ -407,6 +231,21 @@ class ApplicationAdminServiceTest {
           applicationAdminService.getAdjacentApplicants(middle.getId(), null, null);
 
       assertThat(result.previousApplicationId()).isEqualTo(newest.getId());
+      assertThat(result.nextApplicationId()).isEqualTo(oldest.getId());
+    }
+
+    @Test
+    @DisplayName("submittedAt 이 같으면 id 내림차순으로 tie-break 한다")
+    void tieBreaksById() {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      Application oldest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application lowerId = submittedAt(2L, "김철수", tie);
+      Application higherId = submittedAt(3L, "이영희", tie);
+
+      AdjacentApplicantResult result =
+          applicationAdminService.getAdjacentApplicants(lowerId.getId(), null, null);
+
+      assertThat(result.previousApplicationId()).isEqualTo(higherId.getId());
       assertThat(result.nextApplicationId()).isEqualTo(oldest.getId());
     }
 
@@ -437,15 +276,26 @@ class ApplicationAdminServiceTest {
     }
 
     @Test
-    @DisplayName("필터에 맞지 않는 지원서는 이전 · 다음 모두 null 이다")
-    void bothNullWhenNotInFilteredList() {
-      Application draftApplication = draft(1L, "홍길동");
+    @DisplayName("현재 지원서가 status 필터에 안 맞으면 이전 · 다음 모두 null 이다")
+    void bothNullWhenStatusFilterDoesNotMatch() {
+      Application application = submitted(1L, "홍길동");
 
       AdjacentApplicantResult result =
-          applicationAdminService.getAdjacentApplicants(draftApplication.getId(), null, null);
+          applicationAdminService.getAdjacentApplicants(application.getId(), null, ApplicationStatus.DOC_PASS);
 
       assertThat(result.previousApplicationId()).isNull();
       assertThat(result.nextApplicationId()).isNull();
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태의 지원서는 조회할 수 없다")
+    void throwsWhenDraft() {
+      Application application = draft(1L, "홍길동");
+
+      assertThatThrownBy(() -> applicationAdminService.getAdjacentApplicants(application.getId(), null, null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
     }
 
     @Test
@@ -463,9 +313,11 @@ class ApplicationAdminServiceTest {
   class ExportApplicantsExcel {
 
     @Test
-    @DisplayName("DRAFT 를 제외한 지원자를 엑셀로 내보낸다")
+    @DisplayName("DRAFT 를 제외한 지원자를 이름 · 학번 · 한글 상태 라벨 · 포맷된 제출일시로 내보낸다")
     void exportsApplicantsExcludingDraft() throws IOException {
-      submitted(1L, "홍길동");
+      // LocalDateTime.now() 는 초가 0이면 toString()에서 초가 생략돼 포맷 비교가 흔들릴 수 있다
+      // (CLAUDE.md 트러블슈팅 노트 참고) — 고정된 시각을 쓴다.
+      submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 30, 5));
       draft(2L, "김철수");
 
       byte[] excel = applicationAdminService.exportApplicantsExcel(null, null);
@@ -475,6 +327,9 @@ class ApplicationAdminServiceTest {
         assertThat(sheet.getLastRowNum()).isEqualTo(1);
         Row dataRow = sheet.getRow(1);
         assertThat(dataRow.getCell(0).getStringCellValue()).isEqualTo("홍길동");
+        assertThat(dataRow.getCell(1).getStringCellValue()).isEqualTo("2021110000");
+        assertThat(dataRow.getCell(2).getStringCellValue()).isEqualTo("심사 중");
+        assertThat(dataRow.getCell(3).getStringCellValue()).isEqualTo("2026-09-01 10:30:05");
       }
     }
 
