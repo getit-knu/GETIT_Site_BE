@@ -13,7 +13,9 @@ public enum UserErrorCode implements ErrorCode {
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
   GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "조를 찾을 수 없습니다."),
   DUPLICATE_GROUP_NAME(HttpStatus.CONFLICT, "같은 기수 안에 이미 같은 이름의 조가 있습니다."),
-  ALREADY_IN_GROUP(HttpStatus.CONFLICT, "이미 다른 조에 속한 사용자입니다.");
+  ALREADY_IN_GROUP(HttpStatus.CONFLICT, "이미 다른 조에 속한 사용자입니다."),
+  GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "기수를 찾을 수 없습니다."),
+  ACTIVE_GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "진행 중인 기수가 없습니다.");
 
   private final HttpStatus status;
   private final String message;
