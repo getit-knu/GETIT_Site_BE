@@ -209,8 +209,8 @@ class ApplicationAdminServiceTest {
   class SaveScores {
 
     @Test
-    @DisplayName("점수를 새로 저장하고 총점 · 미채점 기준을 함께 반환한다")
-    void savesNewScores() {
+    @DisplayName("채점되지 않은 기준이 남아있으면 총점은 null 이다")
+    void totalScoreIsNullWhenNotAllCriteriaScored() {
       Application application = submitted(1L, "홍길동");
       EvaluationCriterion scored = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
       criterion(activeGeneration.getId(), 2, "지원 동기", 40);
@@ -219,12 +219,26 @@ class ApplicationAdminServiceTest {
           application.getId(), List.of(new EvaluationScoreItem(scored.getId(), 50)));
 
       assertThat(result.applicationId()).isEqualTo(application.getId());
-      assertThat(result.totalScore()).isEqualTo(50);
+      assertThat(result.totalScore()).isNull();
       assertThat(result.scores()).hasSize(2);
       assertThat(result.scores()).filteredOn(s -> s.criterionId().equals(scored.getId()))
           .extracting(s -> s.score()).containsExactly(50);
       assertThat(result.scores()).filteredOn(s -> !s.criterionId().equals(scored.getId()))
           .extracting(s -> s.score()).containsExactly((Integer) null);
+    }
+
+    @Test
+    @DisplayName("기수의 모든 기준을 채점하면 총점을 합산해 반환한다")
+    void totalScoreIsSumWhenAllCriteriaScored() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion first = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      EvaluationCriterion second = criterion(activeGeneration.getId(), 2, "지원 동기", 40);
+
+      EvaluationScoreSaveResult result = applicationAdminService.saveScores(
+          application.getId(),
+          List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30)));
+
+      assertThat(result.totalScore()).isEqualTo(80);
     }
 
     @Test
@@ -293,6 +307,20 @@ class ApplicationAdminServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("이미 합불이 결정된 지원서는 채점할 수 없다")
+    void throwsWhenAlreadyDecided() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      applicationAdminService.decide(application.getId(), true);
+
+      assertThatThrownBy(() -> applicationAdminService.saveScores(
+          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+    }
   }
 
   @Nested
@@ -320,14 +348,14 @@ class ApplicationAdminServiceTest {
     }
 
     @Test
-    @DisplayName("SUBMITTED 가 아니면 예외가 발생한다")
-    void throwsWhenNotSubmitted() {
+    @DisplayName("DRAFT 상태의 지원서는 결정할 수 없다 (존재하지 않는 것과 동일하게 취급)")
+    void throwsWhenDraft() {
       Application application = draft(1L, "홍길동");
 
       assertThatThrownBy(() -> applicationAdminService.decide(application.getId(), true))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
     }
 
     @Test

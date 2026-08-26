@@ -13,6 +13,7 @@ import com.getit.domain.recruitment.dto.EvaluationScoreItem;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
+import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.entity.EvaluationCriterion;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
@@ -264,6 +265,23 @@ class ApplicationAdminControllerTest {
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("CRITERION_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("이미 합불이 결정된 지원서는 409 다")
+    void returns409WhenAlreadyDecided() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 1, "전공 적합성", "가이드 라인", 60));
+      applicationRepository.updateStatusIfCurrentStatus(
+          application.getId(), ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(scoresRequestJson(criterion.getId(), 10)))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
+    }
   }
 
   @Nested
@@ -288,14 +306,32 @@ class ApplicationAdminControllerTest {
     }
 
     @Test
-    @DisplayName("SUBMITTED 가 아니면 409 다")
-    void returns409WhenNotSubmitted() throws Exception {
+    @DisplayName("DRAFT 상태면 404 다 (존재하지 않는 것과 동일하게 취급)")
+    void returns404WhenDraft() throws Exception {
       Application application = draft(1L, "홍길동");
 
       mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
               .header("Authorization", adminToken())
               .contentType(MediaType.APPLICATION_JSON)
               .content(decisionRequestJson(true)))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("이미 결정된 지원서를 다시 결정하려 하면 409 다")
+    void returns409WhenAlreadyDecided() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isOk());
+
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(false)))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
     }
