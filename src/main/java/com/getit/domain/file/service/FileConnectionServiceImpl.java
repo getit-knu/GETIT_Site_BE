@@ -25,7 +25,7 @@ public class FileConnectionServiceImpl implements FileConnectionService {
       return;
     }
     List<Long> distinctFileIds = fileIds.stream().distinct().toList();
-    List<FileAsset> files = fileAssetRepository.findAllByIdInAndDeletedAtIsNull(distinctFileIds);
+    List<FileAsset> files = fileAssetRepository.findAllByIdInAndDeletedAtIsNullForUpdate(distinctFileIds);
     validateAllFound(distinctFileIds, files);
 
     List<Long> alreadyConnectedFileIds = files.stream()
