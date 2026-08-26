@@ -43,7 +43,7 @@ class FileConnectionServiceImplTest {
   void connectsAllFiles() {
     FileAsset file1 = uploadedFile(1L);
     FileAsset file2 = uploadedFile(2L);
-    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNull(List.of(1L, 2L)))
+    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNullForUpdate(List.of(1L, 2L)))
         .thenReturn(List.of(file1, file2));
 
     fileConnectionService.connectAll(List.of(1L, 2L));
@@ -57,7 +57,7 @@ class FileConnectionServiceImplTest {
     FileAsset file1 = uploadedFile(1L);
     FileAsset alreadyConnected = uploadedFile(2L);
     alreadyConnected.connect();
-    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNull(List.of(1L, 2L)))
+    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNullForUpdate(List.of(1L, 2L)))
         .thenReturn(List.of(file1, alreadyConnected));
 
     assertThatThrownBy(() -> fileConnectionService.connectAll(List.of(1L, 2L)))
@@ -71,7 +71,7 @@ class FileConnectionServiceImplTest {
   @DisplayName("connectAll: 존재하지 않는 파일이 섞여 있으면 예외 발생")
   void throwsWhenConnectingAllWithMissingFile() {
     FileAsset file1 = uploadedFile(1L);
-    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNull(List.of(1L, 2L)))
+    when(fileAssetRepository.findAllByIdInAndDeletedAtIsNullForUpdate(List.of(1L, 2L)))
         .thenReturn(List.of(file1));
 
     assertThatThrownBy(() -> fileConnectionService.connectAll(List.of(1L, 2L)))
