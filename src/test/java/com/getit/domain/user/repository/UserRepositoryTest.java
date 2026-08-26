@@ -138,4 +138,28 @@ class UserRepositoryTest {
         .extracting(User::getEmail)
         .containsExactly("i@getit.com");
   }
+
+  @Test
+  @DisplayName("특정 기수의 활성 사용자 전체를 조 배정 여부와 무관하게 조회한다")
+  void findsAllActiveUsersByGenerationNoRegardlessOfGroup() {
+    User grouped = userRepository.save(guest("google-sub-13", "m@getit.com"));
+    grouped.promoteToMember(9);
+    grouped.assignToGroup(1L);
+
+    User unassigned = userRepository.save(guest("google-sub-14", "n@getit.com"));
+    unassigned.promoteToMember(9);
+
+    User otherGeneration = userRepository.save(guest("google-sub-15", "o@getit.com"));
+    otherGeneration.promoteToMember(8);
+
+    User withdrawnMember = userRepository.save(guest("google-sub-16", "p@getit.com"));
+    withdrawnMember.promoteToMember(9);
+    withdrawnMember.withdraw();
+
+    userRepository.flush();
+
+    assertThat(userRepository.findByGenerationNoAndStatus(9, UserStatus.ACTIVE))
+        .extracting(User::getEmail)
+        .containsExactlyInAnyOrder("m@getit.com", "n@getit.com");
+  }
 }
