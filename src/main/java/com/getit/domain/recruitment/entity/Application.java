@@ -166,4 +166,17 @@ public class Application extends BaseTimeEntity {
     this.status = ApplicationStatus.SUBMITTED;
     this.submittedAt = submittedAt;
   }
+
+  /**
+   * 7.4 서류 합불 처리. {@code SUBMITTED} 상태에서만 호출할 수 있는지는 서비스 레이어에서 막는다
+   * (다른 검증과 마찬가지로 이 엔티티는 검증 없이 그대로 담는다).
+   *
+   * <p>PR #51 리뷰 지적으로 {@code ApplicationStatus} 를 그대로 받던 시그니처를 좁혔다 — {@code submit()}
+   * 처럼 상태값을 인자로 받지 않아야 잘못된 상태(예: DRAFT, FINAL_PASS)로 되돌리는 호출부 실수 자체가
+   * 불가능해진다. "허용 값 검증은 서비스 책임"은 배점처럼 값의 범위에 적용할 때나 맞고, 상태 전이는
+   * 엔티티가 타입으로 막는 게 맞다는 리뷰 의견을 따랐다.
+   */
+  public void decideDocumentResult(boolean passed) {
+    this.status = passed ? ApplicationStatus.DOC_PASS : ApplicationStatus.DOC_FAIL;
+  }
 }

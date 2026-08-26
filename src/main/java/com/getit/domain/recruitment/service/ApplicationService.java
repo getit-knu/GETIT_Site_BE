@@ -178,7 +178,7 @@ public class ApplicationService {
     return new ApplicationDecisionResult(
         activeGeneration.generationNo(),
         application.getStatus(),
-        statusLabel(application.getStatus()),
+        application.getStatus().label(),
         schedule.getDocumentEndAt(),
         schedule.getInterviewEndAt(),
         nextStep
@@ -233,16 +233,7 @@ public class ApplicationService {
     }
   }
 
-  private String statusLabel(ApplicationStatus status) {
-    return switch (status) {
-      case DRAFT -> "임시 저장";
-      case SUBMITTED -> "심사 중";
-      case DOC_PASS -> "서류 합격";
-      case DOC_FAIL -> "서류 불합격";
-      case FINAL_PASS -> "최종 합격";
-      case FINAL_FAIL -> "최종 불합격";
-    };
-  }
+  // 한글 라벨 매핑은 ApplicationStatus.label() 로 옮겼다 (7.6 엑셀 다운로드와 공유, PR #54 리뷰 지적).
 
   /** 로그인 사용자의 User 정보로 채운다. 값이 없으면 null (명세서 3.1). */
   private BasicInfo resolvePrefill(Long userId) {

@@ -59,4 +59,28 @@ class ApplicationTest {
     assertThat(application.getStatus()).isEqualTo(ApplicationStatus.SUBMITTED);
     assertThat(application.getSubmittedAt()).isEqualTo(submittedAt);
   }
+
+  @Test
+  @DisplayName("decideDocumentResult(true) 는 상태를 DOC_PASS 로 바꾼다")
+  void decideDocumentResultTruePassesToDocPass() {
+    Application application = Application.createDraft(
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
+    application.submit(LocalDateTime.now());
+
+    application.decideDocumentResult(true);
+
+    assertThat(application.getStatus()).isEqualTo(ApplicationStatus.DOC_PASS);
+  }
+
+  @Test
+  @DisplayName("decideDocumentResult(false) 는 상태를 DOC_FAIL 로 바꾼다")
+  void decideDocumentResultFalseFailsToDocFail() {
+    Application application = Application.createDraft(
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
+    application.submit(LocalDateTime.now());
+
+    application.decideDocumentResult(false);
+
+    assertThat(application.getStatus()).isEqualTo(ApplicationStatus.DOC_FAIL);
+  }
 }
