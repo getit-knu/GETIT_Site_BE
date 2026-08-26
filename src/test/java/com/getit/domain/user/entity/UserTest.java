@@ -125,6 +125,31 @@ class UserTest {
   }
 
   @Nested
+  @DisplayName("updateRole · updateGenerationNo")
+  class UpdateRoleAndGenerationNo {
+
+    @Test
+    @DisplayName("권한을 변경한다")
+    void updatesRole() {
+      User user = createGuest();
+
+      user.updateRole(Role.ADMIN);
+
+      assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+    }
+
+    @Test
+    @DisplayName("소속 기수를 변경한다")
+    void updatesGenerationNo() {
+      User user = createGuest();
+
+      user.updateGenerationNo(9);
+
+      assertThat(user.getGenerationNo()).isEqualTo(9);
+    }
+  }
+
+  @Nested
   @DisplayName("withdraw · activate")
   class WithdrawAndActivate {
 

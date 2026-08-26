@@ -172,6 +172,16 @@ public class User extends SoftDeletableEntity {
     this.groupId = null;
   }
 
+  /** 권한 변경. (9.2 PUT /admin/users/{id}) */
+  public void updateRole(Role role) {
+    this.role = role;
+  }
+
+  /** 소속 기수 변경. (9.2 PUT /admin/users/{id}) */
+  public void updateGenerationNo(Integer generationNo) {
+    this.generationNo = generationNo;
+  }
+
   /**
    * 탈퇴 처리. (9.3 DELETE /admin/users/{id})
    * 지원서 · 과제 제출 · Q&A 이력을 보존해야 하므로 행을 지우지 않고 soft delete 한다.
