@@ -8,11 +8,14 @@ import com.getit.domain.user.entity.User;
 import com.getit.domain.user.entity.UserStatus;
 import com.getit.global.config.JpaAuditingConfig;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 /**
  * 엔티티 매핑과 제약이 실제 DB 스키마로 반영되는지 검증한다.
@@ -161,5 +164,85 @@ class UserRepositoryTest {
     assertThat(userRepository.findByGenerationNoAndStatus(9, UserStatus.ACTIVE))
         .extracting(User::getEmail)
         .containsExactlyInAnyOrder("m@getit.com", "n@getit.com");
+  }
+
+  @Nested
+  @DisplayName("searchUsers")
+  class SearchUsers {
+
+    private Page<User> search(String keyword, Role role, Integer generationNo, Long groupId, boolean unassignedOnly) {
+      return userRepository.searchUsers(
+          keyword, role, generationNo, groupId, unassignedOnly, PageRequest.of(0, 20));
+    }
+
+    @Test
+    @DisplayName("이름 또는 이메일에 keyword 가 포함된 사용자를 대소문자 구분 없이 찾는다")
+    void filtersByKeyword() {
+      userRepository.save(User.createGuest("google-20", "kim@getit.com", "김부원", "url"));
+      userRepository.save(User.createGuest("google-21", "MATCH@getit.com", "이회원", "url"));
+      userRepository.save(User.createGuest("google-22", "c@getit.com", "박학생", "url"));
+
+      assertThat(search("김", null, null, null, false).getContent())
+          .extracting(User::getName).containsExactly("김부원");
+      assertThat(search("match", null, null, null, false).getContent())
+          .extracting(User::getEmail).containsExactly("MATCH@getit.com");
+    }
+
+    @Test
+    @DisplayName("role 로 필터링한다")
+    void filtersByRole() {
+      User admin = userRepository.save(User.createGuest("google-23", "d@getit.com", "운영진", "url"));
+      admin.updateRole(Role.ADMIN);
+      userRepository.save(User.createGuest("google-24", "e@getit.com", "게스트", "url"));
+
+      assertThat(search(null, Role.ADMIN, null, null, false).getContent())
+          .extracting(User::getEmail).containsExactly("d@getit.com");
+    }
+
+    @Test
+    @DisplayName("generationNo 로 필터링한다")
+    void filtersByGenerationNo() {
+      User user9 = userRepository.save(User.createGuest("google-25", "f@getit.com", "9기", "url"));
+      user9.promoteToMember(9);
+      User user8 = userRepository.save(User.createGuest("google-26", "g@getit.com", "8기", "url"));
+      user8.promoteToMember(8);
+
+      assertThat(search(null, null, 9, null, false).getContent())
+          .extracting(User::getEmail).containsExactly("f@getit.com");
+    }
+
+    @Test
+    @DisplayName("groupId 로 특정 조만 필터링한다")
+    void filtersByGroupId() {
+      User grouped = userRepository.save(User.createGuest("google-27", "h@getit.com", "1조원", "url"));
+      grouped.assignToGroup(1L);
+      User otherGrouped = userRepository.save(User.createGuest("google-28", "i@getit.com", "2조원", "url"));
+      otherGrouped.assignToGroup(2L);
+
+      assertThat(search(null, null, null, 1L, false).getContent())
+          .extracting(User::getEmail).containsExactly("h@getit.com");
+    }
+
+    @Test
+    @DisplayName("unassignedOnly 면 미배정 사용자만 조회한다")
+    void filtersUnassignedOnly() {
+      User grouped = userRepository.save(User.createGuest("google-29", "j@getit.com", "조원", "url"));
+      grouped.assignToGroup(1L);
+      userRepository.save(User.createGuest("google-30", "k@getit.com", "미배정", "url"));
+
+      assertThat(search(null, null, null, null, true).getContent())
+          .extracting(User::getEmail).containsExactly("k@getit.com");
+    }
+
+    @Test
+    @DisplayName("필터가 전혀 없으면 전체를 페이지네이션으로 반환한다")
+    void returnsAllWhenNoFilter() {
+      userRepository.save(User.createGuest("google-31", "l2@getit.com", "부원1", "url"));
+      userRepository.save(User.createGuest("google-32", "m2@getit.com", "부원2", "url"));
+
+      Page<User> page = search(null, null, null, null, false);
+
+      assertThat(page.getTotalElements()).isEqualTo(2);
+    }
   }
 }
