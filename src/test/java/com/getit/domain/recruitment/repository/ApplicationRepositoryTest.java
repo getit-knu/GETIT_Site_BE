@@ -98,4 +98,46 @@ class ApplicationRepositoryTest {
       assertThat(page.getContent()).extracting(Application::getName).containsExactly("홍길동");
     }
   }
+
+  @Nested
+  @DisplayName("updateStatusIfCurrentStatus (7.4)")
+  class UpdateStatusIfCurrentStatus {
+
+    @Test
+    @DisplayName("현재 상태가 requiredStatus 와 일치하면 갱신하고 1을 반환한다")
+    void updatesWhenStatusMatches() {
+      Application application = submitted(1L, 9L, "홍길동");
+
+      int updated = applicationRepository.updateStatusIfCurrentStatus(
+          application.getId(), ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
+
+      assertThat(updated).isEqualTo(1);
+      assertThat(applicationRepository.findById(application.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.DOC_PASS);
+    }
+
+    @Test
+    @DisplayName("현재 상태가 requiredStatus 와 다르면 갱신하지 않고 0을 반환한다 (동시 결정 방지)")
+    void doesNotUpdateWhenStatusDiffers() {
+      Application application = submitted(1L, 9L, "홍길동");
+      applicationRepository.updateStatusIfCurrentStatus(
+          application.getId(), ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
+
+      int secondUpdate = applicationRepository.updateStatusIfCurrentStatus(
+          application.getId(), ApplicationStatus.DOC_FAIL, ApplicationStatus.SUBMITTED);
+
+      assertThat(secondUpdate).isZero();
+      assertThat(applicationRepository.findById(application.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.DOC_PASS);
+    }
+
+    @Test
+    @DisplayName("없는 id 면 0을 반환한다")
+    void returnsZeroWhenNotFound() {
+      int updated = applicationRepository.updateStatusIfCurrentStatus(
+          999L, ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
+
+      assertThat(updated).isZero();
+    }
+  }
 }
