@@ -1,8 +1,10 @@
 package com.getit.domain.recruitment.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,8 +23,11 @@ import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.entity.Role;
+import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,7 +40,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 7.1~7.2 /api/admin/recruitment/applications */
+/** 7.1~7.6 /api/admin/recruitment/applications */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -86,6 +91,12 @@ class ApplicationAdminControllerTest {
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
     application.submit(LocalDateTime.now());
+    return application;
+  }
+
+  private Application submittedAt(Long userId, String name, LocalDateTime submittedAt) {
+    Application application = draft(userId, name);
+    application.submit(submittedAt);
     return application;
   }
 
@@ -170,6 +181,20 @@ class ApplicationAdminControllerTest {
       mockMvc.perform(get(APPLICATIONS_PATH).header("Authorization", adminToken()).param("size", "1"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].id").value(second.getId()));
+    }
+
+    @Test
+    @DisplayName("?sort= 로 다른 정렬을 요청해도 무시하고 강제된 순서로 응답한다")
+    void ignoresClientSuppliedSort() throws Exception {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      submittedAt(1L, "가나다", tie);
+      Application higherId = submittedAt(2L, "다바가", tie);
+
+      mockMvc.perform(get(APPLICATIONS_PATH)
+              .header("Authorization", adminToken())
+              .param("sort", "name,asc"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].id").value(higherId.getId()));
     }
   }
 
@@ -334,6 +359,83 @@ class ApplicationAdminControllerTest {
               .content(decisionRequestJson(false)))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
+    }
+  }
+
+  @Nested
+  @DisplayName("GET " + APPLICATIONS_PATH + "/{id}/adjacent")
+  class GetAdjacentApplicants {
+
+    @Test
+    @DisplayName("이전 · 다음 지원서 id 를 반환한다")
+    void returnsPreviousAndNext() throws Exception {
+      Application oldest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application middle = submittedAt(2L, "김철수", LocalDateTime.of(2026, 9, 1, 11, 0));
+      Application newest = submittedAt(3L, "이영희", LocalDateTime.of(2026, 9, 1, 12, 0));
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + middle.getId() + "/adjacent")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.previousApplicationId").value(newest.getId()))
+          .andExpect(jsonPath("$.data.nextApplicationId").value(oldest.getId()));
+    }
+
+    @Test
+    @DisplayName("submittedAt 이 같으면 id 내림차순으로 tie-break 한다")
+    void tieBreaksById() throws Exception {
+      LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
+      Application oldest = submittedAt(1L, "홍길동", LocalDateTime.of(2026, 9, 1, 10, 0));
+      Application lowerId = submittedAt(2L, "김철수", tie);
+      Application higherId = submittedAt(3L, "이영희", tie);
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + lowerId.getId() + "/adjacent")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.previousApplicationId").value(higherId.getId()))
+          .andExpect(jsonPath("$.data.nextApplicationId").value(oldest.getId()));
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태면 404 다")
+    void returns404WhenDraft() throws Exception {
+      Application application = draft(1L, "홍길동");
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + application.getId() + "/adjacent")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("없는 지원서면 404 다")
+    void returns404WhenNotFound() throws Exception {
+      mockMvc.perform(get(APPLICATIONS_PATH + "/999/adjacent").header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_FOUND"));
+    }
+  }
+
+  @Nested
+  @DisplayName("GET " + APPLICATIONS_PATH + "/excel")
+  class DownloadExcel {
+
+    @Test
+    @DisplayName("지원자 목록을 엑셀 파일로 반환한다")
+    void downloadsExcel() throws Exception {
+      submitted(1L, "홍길동");
+      draft(2L, "김철수");
+
+      byte[] excel = mockMvc.perform(get(APPLICATIONS_PATH + "/excel").header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(header().string(
+              "Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+          .andReturn().getResponse().getContentAsByteArray();
+
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        assertThat(sheet.getLastRowNum()).isEqualTo(1);
+        assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("홍길동");
+      }
     }
   }
 }
