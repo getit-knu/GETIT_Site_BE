@@ -55,7 +55,9 @@ class UserPromotionServiceTest {
 
   @BeforeEach
   void setUpGeneration() {
-    generation = generationRepository.save(Generation.create(9, 2026));
+    generation = Generation.create(9, 2026);
+    generation.activate();
+    generation = generationRepository.save(generation);
   }
 
   private User guest(String providerId, String email) {
@@ -187,6 +189,28 @@ class UserPromotionServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 generationId 면 예외가 발생한다")
+    void throwsWhenGenerationNotActive() {
+      Generation inactiveGeneration = generationRepository.save(Generation.create(8, 2025));
+
+      assertThatThrownBy(() -> userPromotionService.promote(inactiveGeneration.getId(), null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 없으면 예외가 발생한다")
+    void throwsWhenNoActiveGeneration() {
+      generation.deactivate();
+
+      assertThatThrownBy(() -> userPromotionService.promote(generation.getId(), null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.ACTIVE_GENERATION_NOT_FOUND);
     }
   }
 }

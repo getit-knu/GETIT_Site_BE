@@ -216,7 +216,9 @@ class UserAdminControllerTest {
     @Test
     @DisplayName("기수의 FINAL_PASS 지원자를 일괄 승격한다")
     void promotesFinalPassApplicants() throws Exception {
-      Generation generation = generationRepository.save(Generation.create(9, 2026));
+      Generation generation = Generation.create(9, 2026);
+      generation.activate();
+      generation = generationRepository.save(generation);
       User applicant = guest("google-9", "i@getit.com", "지원자");
       Application application = applicationRepository.save(Application.createDraft(
           applicant.getId(), generation.getId(), "지원자", "app@getit.com", "010-1234-5678",
@@ -238,9 +240,26 @@ class UserAdminControllerTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 기수면 404 다")
-    void returns404WhenGenerationNotFound() throws Exception {
+    @DisplayName("활성 기수가 없으면 404 다")
+    void returns404WhenNoActiveGeneration() throws Exception {
       String body = objectMapper.writeValueAsString(new PromoteRequest(999L, null));
+
+      mockMvc.perform(post(USERS_PATH + "/promote")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("ACTIVE_GENERATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("요청한 기수가 활성 기수와 다르면 404 다")
+    void returns404WhenGenerationNotActive() throws Exception {
+      Generation activeGeneration = Generation.create(9, 2026);
+      activeGeneration.activate();
+      generationRepository.save(activeGeneration);
+      Generation inactiveGeneration = generationRepository.save(Generation.create(8, 2025));
+      String body = objectMapper.writeValueAsString(new PromoteRequest(inactiveGeneration.getId(), null));
 
       mockMvc.perform(post(USERS_PATH + "/promote")
               .header("Authorization", adminToken())
