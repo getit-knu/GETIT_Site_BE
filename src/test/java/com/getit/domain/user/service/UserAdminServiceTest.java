@@ -3,6 +3,8 @@ package com.getit.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.setting.generation.entity.Generation;
+import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
@@ -13,6 +15,7 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,17 @@ class UserAdminServiceTest {
 
   @Autowired
   private GroupRepository groupRepository;
+
+  @Autowired
+  private GenerationRepository generationRepository;
+
+  /** 9.2 의 groupId·generationNo 정합성 검증이 실제 Generation 행을 요구하므로 미리 만들어둔다. */
+  private Generation generation9;
+
+  @BeforeEach
+  void setUpGeneration() {
+    generation9 = generationRepository.save(Generation.create(9, 2026));
+  }
 
   private User guest(String providerId, String email, String name) {
     return userRepository.save(User.createGuest(providerId, email, name, "https://cdn.getit.com/1.png"));
@@ -114,8 +128,9 @@ class UserAdminServiceTest {
     @Test
     @DisplayName("groupId 를 보내면 조가 배정되고 응답에 group 이 채워진다")
     void updatesGroup() {
-      Group group = groupRepository.save(Group.create(1L, "1조"));
+      Group group = groupRepository.save(Group.create(generation9.getId(), "1조"));
       User user = guest("google-8", "h@getit.com", "부원");
+      user.promoteToMember(9);
 
       UserSummary result = userAdminService.updateUser(user.getId(), 999L, null, group.getId(), null);
 
@@ -144,6 +159,49 @@ class UserAdminServiceTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 generationNo 면 예외가 발생한다")
+    void throwsWhenGenerationNotFound() {
+      User user = guest("google-16", "q@getit.com", "부원");
+
+      assertThatThrownBy(() -> userAdminService.updateUser(user.getId(), 999L, null, null, 999))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("조의 소속 기수와 사용자의 기수가 다르면 예외가 발생한다")
+    void throwsWhenGroupGenerationMismatch() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group group = groupRepository.save(Group.create(otherGeneration.getId(), "1조"));
+      User user = guest("google-17", "r@getit.com", "부원");
+      user.promoteToMember(9);
+
+      assertThatThrownBy(() -> userAdminService.updateUser(user.getId(), 999L, null, group.getId(), null))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_GENERATION_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("이미 조에 속한 사용자의 generationNo 만 바꾸면 조 기수와 어긋나 예외가 발생한다")
+    void throwsWhenChangingGenerationNoBreaksExistingGroupMembership() {
+      Group group = groupRepository.save(Group.create(generation9.getId(), "1조"));
+      User user = guest("google-18", "s@getit.com", "부원");
+      user.promoteToMember(9);
+      user.assignToGroup(group.getId());
+      generationRepository.save(Generation.create(8, 2025));
+
+      assertThatThrownBy(() -> userAdminService.updateUser(user.getId(), 999L, null, null, 8))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_GENERATION_MISMATCH);
+
+      // 실패한 요청은 반영되지 않아야 한다.
+      assertThat(user.getGenerationNo()).isEqualTo(9);
+    }
+
+    @Test
     @DisplayName("없는 사용자면 예외가 발생한다")
     void throwsWhenUserNotFound() {
       assertThatThrownBy(() -> userAdminService.updateUser(999L, 999L, Role.MEMBER, null, null))
@@ -162,7 +220,7 @@ class UserAdminServiceTest {
           admin.getId(), admin.getId(), Role.MEMBER, null, null))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(CommonErrorCode.FORBIDDEN);
+          .isEqualTo(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN);
 
       assertThat(admin.getRole()).isEqualTo(Role.ADMIN);
     }

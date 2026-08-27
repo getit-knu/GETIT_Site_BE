@@ -1,5 +1,7 @@
 package com.getit.domain.user.service;
 
+import com.getit.domain.setting.generation.dto.GenerationSummary;
+import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.GroupSummary;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.entity.Group;
@@ -33,6 +35,7 @@ public class UserAdminService {
 
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
+  private final GenerationQueryService generationQueryService;
 
   /**
    * 9.1. {@code groupId} 는 세 가지 상태를 표현한다 — 미전달(필터 없음) · {@code "none"}(미배정만) ·
@@ -66,11 +69,16 @@ public class UserAdminService {
 
     if (role != null) {
       validateNotSelfAdminRevocation(user, targetUserId, currentUserId, role);
+    }
+    if (groupId != null || generationNo != null) {
+      validateGroupGenerationConsistency(user, groupId, generationNo);
+    }
+
+    if (role != null) {
       user.updateRole(role);
     }
     if (groupId != null) {
-      Group group = findGroup(groupId);
-      user.assignToGroup(group.getId());
+      user.assignToGroup(groupId);
     }
     if (generationNo != null) {
       user.updateGenerationNo(generationNo);
@@ -83,6 +91,28 @@ public class UserAdminService {
     return UserSummary.from(user, group);
   }
 
+  /**
+   * 변경 후 사용자가 속하게 될 조와 기수가 서로 다른 기수를 가리키면 안 된다. 검증 없이
+   * 허용하면, 9.6 조회(조의 기수와 사용자의 generationNo 가 같아야 조원 명단에 나타남)에서
+   * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
+   * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
+   */
+  private void validateGroupGenerationConsistency(User user, Long groupId, Integer generationNo) {
+    Integer effectiveGenerationNo = generationNo != null ? generationNo : user.getGenerationNo();
+    Long effectiveGroupId = groupId != null ? groupId : user.getGroupId();
+
+    if (generationNo != null) {
+      findGenerationByNo(generationNo);
+    }
+    if (effectiveGroupId != null) {
+      Group group = findGroup(effectiveGroupId);
+      GenerationSummary groupGeneration = findGeneration(group.getGenerationId());
+      if (!groupGeneration.generationNo().equals(effectiveGenerationNo)) {
+        throw new BusinessException(UserErrorCode.GROUP_GENERATION_MISMATCH);
+      }
+    }
+  }
+
   /** 9.3. 지원서 · 과제 제출 · Q&A 이력 보존을 위해 soft delete 한다. */
   @Transactional
   public void deleteUser(Long userId) {
@@ -93,7 +123,7 @@ public class UserAdminService {
     boolean isSelf = targetUserId.equals(currentUserId);
     boolean losesAdmin = user.getRole() == Role.ADMIN && newRole != Role.ADMIN;
     if (isSelf && losesAdmin) {
-      throw new BusinessException(CommonErrorCode.FORBIDDEN, "자기 자신의 ADMIN 권한은 해제할 수 없습니다.");
+      throw new BusinessException(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN);
     }
   }
 
@@ -133,5 +163,15 @@ public class UserAdminService {
   private Group findGroup(Long groupId) {
     return groupRepository.findById(groupId)
         .orElseThrow(() -> new BusinessException(UserErrorCode.GROUP_NOT_FOUND));
+  }
+
+  private GenerationSummary findGeneration(Long generationId) {
+    return generationQueryService.findById(generationId)
+        .orElseThrow(() -> new BusinessException(UserErrorCode.GENERATION_NOT_FOUND));
+  }
+
+  private GenerationSummary findGenerationByNo(Integer generationNo) {
+    return generationQueryService.findByGenerationNo(generationNo)
+        .orElseThrow(() -> new BusinessException(UserErrorCode.GENERATION_NOT_FOUND));
   }
 }

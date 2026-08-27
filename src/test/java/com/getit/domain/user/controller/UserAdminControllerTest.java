@@ -148,7 +148,7 @@ class UserAdminControllerTest {
               .contentType(MediaType.APPLICATION_JSON)
               .content(body))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+          .andExpect(jsonPath("$.error.code").value("CANNOT_REMOVE_OWN_ADMIN"));
     }
 
     @Test
