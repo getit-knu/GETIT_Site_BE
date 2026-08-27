@@ -189,6 +189,23 @@ class ApplicationEvaluationServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SCORABLE);
     }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 채점할 수 없다 (존재하지 않는 것과 동일하게 취급)")
+    void throwsWhenGenerationInactive() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application application = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
+      application.submit(LocalDateTime.now());
+      EvaluationCriterion criterion = criterion(otherGeneration.getId(), 1, "전공 적합성", 60);
+
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
+          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
   }
 
   @Nested

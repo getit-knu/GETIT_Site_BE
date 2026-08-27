@@ -111,14 +111,14 @@ public class ApplicationEvaluationService {
   }
 
   /**
-   * 7.3 채점 전용. DRAFT 는 없는 지원서처럼 404 로 처리하고(PR #52 리뷰 지적 — 예전엔 decide 가
-   * 이 확인 없이 findById 를 직접 써서, DRAFT 지원서의 존재가 409 로 노출됐다), SUBMITTED 만
-   * 허용한다. {@code APPLICATION_NOT_SUBMITTED} 는 decide(7.4) 전용 코드라 여기서 재사용하면
-   * "제출됨 또는 서류합격 상태만 결정 가능"이라는 메시지가 채점 거부 이유와 모순된다 — 채점
-   * 전용 코드({@code APPLICATION_NOT_SCORABLE})를 따로 쓴다 (PR #69 Copilot 리뷰 지적).
+   * 7.3 채점 전용. 활성 기수로 스코프한다 — {@code findDecidableApplication} 과 같은 이유다
+   * (decide 뿐 아니라 saveScores 도 id 로만 조회해 같은 문제가 있어 함께 반영, PR #69 리뷰).
+   * DRAFT 는 404, SUBMITTED 만 허용하고 나머지는 {@code APPLICATION_NOT_SCORABLE} 로 409 처리한다.
    */
   private Application findSubmittedApplication(Long applicationId) {
-    Application application = applicationRepository.findById(applicationId)
+    GenerationSummary activeGeneration = findActiveGeneration();
+    Application application = applicationRepository
+        .findByIdAndGenerationId(applicationId, activeGeneration.id())
         .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
     if (application.getStatus() != ApplicationStatus.SUBMITTED) {
