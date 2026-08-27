@@ -187,6 +187,21 @@ class GroupControllerTest {
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("GROUP_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 조면 404 다")
+    void returns404WhenGroupBelongsToInactiveGeneration() throws Exception {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group otherGroup = groupRepository.save(Group.create(otherGeneration.getId(), "지난 기수 조"));
+      String body = objectMapper.writeValueAsString(new GroupRenameRequest("A조"));
+
+      mockMvc.perform(put(GROUPS_PATH + "/" + otherGroup.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("GROUP_NOT_FOUND"));
+    }
   }
 
   @Nested

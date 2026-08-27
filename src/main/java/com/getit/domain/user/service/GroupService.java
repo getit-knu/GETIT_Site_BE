@@ -188,8 +188,18 @@ public class GroupService {
     return userRepository.findByGroupIdAndStatus(groupId, UserStatus.ACTIVE).size();
   }
 
+  /**
+   * 9.8~9.11(이름 변경 · 삭제 · 조원 변경)이 조를 찾을 때 쓴다. 활성 기수로 스코프한다 —
+   * id만으로 찾으면 과거 기수의 조 id를 알기만 해도 이름 변경 · 삭제 · 조원 변경이 가능해진다
+   * (PR #60 Copilot 리뷰 지적, 처음엔 9.7이 임의 기수 조 생성을 허용하는 것과 비일관적이라고
+   * 판단해 보류했으나, 팀 논의 후 반영하기로 결정했다 — 생성(9.7)은 그대로 임의 기수를
+   * 허용하고, 생성된 조에 대한 수정만 활성 기수로 제한한다). 다른 기수의 조는 존재해도
+   * GROUP_NOT_FOUND 로 처리한다.
+   */
   private Group findGroup(Long groupId) {
-    return groupRepository.findById(groupId)
+    GenerationSummary active = generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(UserErrorCode.ACTIVE_GENERATION_NOT_FOUND));
+    return groupRepository.findByIdAndGenerationId(groupId, active.id())
         .orElseThrow(() -> new BusinessException(UserErrorCode.GROUP_NOT_FOUND));
   }
 

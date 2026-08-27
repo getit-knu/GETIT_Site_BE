@@ -71,4 +71,13 @@ class GroupRepositoryTest {
     assertThatThrownBy(() -> groupRepository.saveAndFlush(Group.create(1L, "1조")))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
+
+  @Test
+  @DisplayName("id 와 기수가 모두 일치해야 조회된다")
+  void findsByIdAndGenerationIdOnlyWhenBothMatch() {
+    Group group = groupRepository.save(Group.create(1L, "1조"));
+
+    assertThat(groupRepository.findByIdAndGenerationId(group.getId(), 1L)).isPresent();
+    assertThat(groupRepository.findByIdAndGenerationId(group.getId(), 2L)).isEmpty();
+  }
 }

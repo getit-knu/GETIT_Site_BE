@@ -182,6 +182,31 @@ class GroupServiceTest {
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.DUPLICATE_GROUP_NAME);
     }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 조를 수정하면 예외가 발생한다")
+    void throwsWhenGroupBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group otherGroup = groupRepository.save(Group.create(otherGeneration.getId(), "지난 기수 조"));
+
+      assertThatThrownBy(() -> groupService.renameGroup(otherGroup.getId(), "새 이름"))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 없으면 예외가 발생한다")
+    void throwsWhenNoActiveGeneration() {
+      GroupResult created = groupService.createGroup(activeGeneration.getId(), "1조");
+      activeGeneration.deactivate();
+      generationRepository.flush();
+
+      assertThatThrownBy(() -> groupService.renameGroup(created.id(), "새 이름"))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.ACTIVE_GENERATION_NOT_FOUND);
+    }
   }
 
   @Nested
@@ -205,6 +230,18 @@ class GroupServiceTest {
     @DisplayName("없는 조를 삭제하면 예외가 발생한다")
     void throwsWhenGroupNotFound() {
       assertThatThrownBy(() -> groupService.deleteGroup(999L))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 조를 삭제하면 예외가 발생한다")
+    void throwsWhenGroupBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group otherGroup = groupRepository.save(Group.create(otherGeneration.getId(), "지난 기수 조"));
+
+      assertThatThrownBy(() -> groupService.deleteGroup(otherGroup.getId()))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
@@ -318,6 +355,19 @@ class GroupServiceTest {
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 조에 추가하면 예외가 발생한다")
+    void throwsWhenGroupBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group otherGroup = groupRepository.save(Group.create(otherGeneration.getId(), "지난 기수 조"));
+      User user = member("google-16", "l@getit.com", "경영학과");
+
+      assertThatThrownBy(() -> groupService.addMembers(otherGroup.getId(), List.of(user.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
+    }
   }
 
   @Nested
@@ -361,6 +411,18 @@ class GroupServiceTest {
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
 
       assertThat(user.getGroupId()).isEqualTo(otherGroup.getId());
+    }
+
+    @Test
+    @DisplayName("활성 기수가 아닌 조에서 빼려 하면 예외가 발생한다")
+    void throwsWhenGroupBelongsToInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Group otherGroup = groupRepository.save(Group.create(otherGeneration.getId(), "지난 기수 조"));
+
+      assertThatThrownBy(() -> groupService.removeMember(otherGroup.getId(), 999L))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
     }
   }
 }
