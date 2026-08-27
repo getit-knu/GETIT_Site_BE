@@ -63,8 +63,12 @@ class SubmissionServiceTest {
   }
 
   private Long uploadFile() {
+    return uploadFileBy(USER_ID);
+  }
+
+  private Long uploadFileBy(Long uploaderId) {
     return fileAssetRepository.save(
-        FileAsset.upload("key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", USER_ID)).getId();
+        FileAsset.upload("key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", uploaderId)).getId();
   }
 
   @Nested
@@ -82,6 +86,17 @@ class SubmissionServiceTest {
       assertThat(result.fileName()).isEqualTo("과제.zip");
       assertThat(fileAssetRepository.findById(fileId)).get()
           .extracting(FileAsset::getStatus).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("본인이 업로드하지 않은 파일이면 예외가 발생한다")
+    void throwsWhenFileNotOwnedByRequester() {
+      Long otherUsersFileId = uploadFileBy(999L);
+
+      assertThatThrownBy(() -> submissionService.submit(
+          fileAssignmentId, new SubmissionRequest.Submit(otherUsersFileId, null, null), USER_ID))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.NOT_RESOURCE_OWNER);
     }
 
     @Test
@@ -198,6 +213,19 @@ class SubmissionServiceTest {
           999_999L, new SubmissionRequest.Submit(null, "https://github.com/user/repo", null), USER_ID))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.SUBMISSION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("본인이 업로드하지 않은 파일로 재제출하면 예외가 발생한다")
+    void throwsWhenResubmitFileNotOwnedByRequester() {
+      SubmissionResult.Detail submitted = submissionService.submit(
+          bothAssignmentId, new SubmissionRequest.Submit(null, "https://github.com/user/repo", null), USER_ID);
+      Long otherUsersFileId = uploadFileBy(999L);
+
+      assertThatThrownBy(() -> submissionService.resubmit(
+          submitted.id(), new SubmissionRequest.Submit(otherUsersFileId, null, null), USER_ID))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.NOT_RESOURCE_OWNER);
     }
   }
 }
