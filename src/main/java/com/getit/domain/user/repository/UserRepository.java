@@ -76,4 +76,28 @@ public interface UserRepository extends JpaRepository<User, Long> {
   @Modifying(clearAutomatically = true)
   @Query("update User u set u.groupId = :groupId where u.id in :userIds and u.groupId is null")
   int assignToGroupIfUnassigned(@Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
+
+  /**
+   * {@code requiredRole} 인 행만 원자적으로 승격한다. (9.4)
+   *
+   * <p>"GUEST · 탈퇴 여부 확인 후 승격"을 자바에서 두 단계로 하면, 그 사이에 다른 요청이 같은
+   * 사용자의 권한을 바꾸거나 탈퇴시킬 수 있다(PR #69 Copilot 리뷰 지적 — {@code User} 에 낙관적
+   * 잠금이 없어서 더욱 그렇다). 조건과 반영을 UPDATE 하나로 묶고, 반영 행 수로 성공 여부를
+   * 판단한다({@code assignToGroupIfUnassigned} 와 동일한 패턴).
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("update User u set u.role = :newRole, u.generationNo = :generationNo, "
+      + "u.phoneNumber = :phoneNumber, u.college = :college, u.major = :major, "
+      + "u.studentYear = :studentYear, u.studentNumber = :studentNumber "
+      + "where u.id = :userId and u.role = :requiredRole and u.deletedAt is null")
+  int promoteIfEligible(
+      @Param("userId") Long userId,
+      @Param("newRole") Role newRole,
+      @Param("requiredRole") Role requiredRole,
+      @Param("generationNo") Integer generationNo,
+      @Param("phoneNumber") String phoneNumber,
+      @Param("college") String college,
+      @Param("major") String major,
+      @Param("studentYear") Integer studentYear,
+      @Param("studentNumber") String studentNumber);
 }

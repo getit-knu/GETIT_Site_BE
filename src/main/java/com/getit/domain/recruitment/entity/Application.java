@@ -179,4 +179,13 @@ public class Application extends BaseTimeEntity {
   public void decideDocumentResult(boolean passed) {
     this.status = passed ? ApplicationStatus.DOC_PASS : ApplicationStatus.DOC_FAIL;
   }
+
+  /**
+   * 7.4 확장 — 최종 합불 처리. {@code DOC_PASS} 상태에서만 호출할 수 있는지는 서비스 레이어에서
+   * 막는다. {@link #decideDocumentResult} 와 같은 이유로 상태값을 인자로 받지 않는다 — 서류 단계용
+   * 메서드와 최종 단계용 메서드를 분리해 잘못된 단계에서 잘못된 전이로 부르는 실수를 타입으로 막는다.
+   */
+  public void decideFinalResult(boolean passed) {
+    this.status = passed ? ApplicationStatus.FINAL_PASS : ApplicationStatus.FINAL_FAIL;
+  }
 }

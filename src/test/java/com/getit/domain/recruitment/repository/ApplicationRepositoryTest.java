@@ -183,6 +183,106 @@ class ApplicationRepositoryTest {
   }
 
   @Nested
+  @DisplayName("findByGenerationIdAndStatus (9.4, 목록)")
+  class FindByGenerationIdAndStatusList {
+
+    @Test
+    @DisplayName("기수와 상태가 일치하는 지원서만 페이징 없이 조회한다")
+    void findsMatchingApplications() {
+      Application finalPass = submitted(1L, 9L, "홍길동");
+      finalPass.decideDocumentResult(true);
+      finalPass.decideFinalResult(true);
+      Application docPass = submitted(2L, 9L, "김철수");
+      docPass.decideDocumentResult(true);
+      Application otherGeneration = submitted(3L, 8L, "다른 기수");
+      otherGeneration.decideDocumentResult(true);
+      otherGeneration.decideFinalResult(true);
+
+      List<Application> result = applicationRepository.findByGenerationIdAndStatus(9L, ApplicationStatus.FINAL_PASS);
+
+      assertThat(result).extracting(Application::getName).containsExactly("홍길동");
+    }
+  }
+
+  @Nested
+  @DisplayName("findByIdInAndGenerationIdAndStatus (9.4, applicationIds 지정)")
+  class FindByIdInAndGenerationIdAndStatus {
+
+    @Test
+    @DisplayName("id · 기수 · 상태가 모두 일치하는 것만 남긴다")
+    void filtersByAllConditions() {
+      Application finalPass = submitted(1L, 9L, "홍길동");
+      finalPass.decideDocumentResult(true);
+      finalPass.decideFinalResult(true);
+      Application docPass = submitted(2L, 9L, "김철수"); // FINAL_PASS 아님
+      docPass.decideDocumentResult(true);
+      Application otherGeneration = submitted(3L, 8L, "다른 기수");
+      otherGeneration.decideDocumentResult(true);
+      otherGeneration.decideFinalResult(true);
+
+      List<Application> result = applicationRepository.findByIdInAndGenerationIdAndStatus(
+          List.of(finalPass.getId(), docPass.getId(), otherGeneration.getId(), 999L),
+          9L, ApplicationStatus.FINAL_PASS);
+
+      assertThat(result).extracting(Application::getId).containsExactly(finalPass.getId());
+    }
+  }
+
+  @Nested
+  @DisplayName("updateStatusIfCurrentStatusIn (7.4 일괄 처리)")
+  class UpdateStatusIfCurrentStatusIn {
+
+    @Test
+    @DisplayName("requiredStatus 인 것만 갱신하고 반영된 행 수를 반환한다")
+    void updatesOnlyMatchingRows() {
+      Application submitted1 = submitted(1L, 9L, "홍길동");
+      Application submitted2 = submitted(2L, 9L, "김철수");
+      Application docPass = submitted(3L, 9L, "이영희");
+      docPass.decideDocumentResult(true);
+
+      int updated = applicationRepository.updateStatusIfCurrentStatusIn(
+          List.of(submitted1.getId(), submitted2.getId(), docPass.getId()),
+          ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED, 9L);
+
+      assertThat(updated).isEqualTo(2);
+      assertThat(applicationRepository.findById(submitted1.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.DOC_PASS);
+      assertThat(applicationRepository.findById(submitted2.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.DOC_PASS);
+      // 이미 DOC_PASS 였던 건 대상이 아니었으므로 그대로다.
+      assertThat(applicationRepository.findById(docPass.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.DOC_PASS);
+    }
+
+    @Test
+    @DisplayName("다른 기수의 지원서는 id·상태가 일치해도 갱신하지 않는다")
+    void doesNotUpdateApplicationInOtherGeneration() {
+      Application otherGeneration = submitted(1L, 8L, "다른 기수");
+
+      int updated = applicationRepository.updateStatusIfCurrentStatusIn(
+          List.of(otherGeneration.getId()), ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED, 9L);
+
+      assertThat(updated).isZero();
+      assertThat(applicationRepository.findById(otherGeneration.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.SUBMITTED);
+    }
+  }
+
+  @Nested
+  @DisplayName("findByIdAndGenerationId (7.4 decide)")
+  class FindByIdAndGenerationId {
+
+    @Test
+    @DisplayName("id 와 기수가 모두 일치해야 조회된다")
+    void findsByIdAndGenerationIdOnlyWhenBothMatch() {
+      Application application = submitted(1L, 9L, "홍길동");
+
+      assertThat(applicationRepository.findByIdAndGenerationId(application.getId(), 9L)).isPresent();
+      assertThat(applicationRepository.findByIdAndGenerationId(application.getId(), 8L)).isEmpty();
+    }
+  }
+
+  @Nested
   @DisplayName("findNextIdByGenerationIdAndStatus · findPreviousIdByGenerationIdAndStatus (7.5)")
   class FindAdjacentIds {
 
