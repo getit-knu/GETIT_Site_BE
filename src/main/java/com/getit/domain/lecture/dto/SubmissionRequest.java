@@ -4,5 +4,7 @@ import jakarta.validation.constraints.Size;
 
 public class SubmissionRequest {
 
-  public record Submit(Long fileId, @Size(max = 512) String linkUrl, String comment) { }
+  public record Submit(
+      Long fileId, @Size(max = 512) String linkUrl, @Size(max = 2000) String comment
+  ) { }
 }
