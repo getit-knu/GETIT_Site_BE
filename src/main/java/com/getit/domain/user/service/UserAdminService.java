@@ -10,8 +10,10 @@ import com.getit.domain.user.entity.User;
 import com.getit.domain.user.exception.UserErrorCode;
 import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
+import com.getit.domain.user.util.ExcelExporter;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,10 @@ public class UserAdminService {
 
   /** 9.1 groupId 쿼리 파라미터에서 미배정자만 조회할 때 쓰는 값. */
   private static final String UNASSIGNED_GROUP_FILTER = "none";
+
+  private static final List<String> EXCEL_HEADERS =
+      List.of("이름", "이메일", "연락처", "단과대학", "전공", "학년", "권한", "기수", "그룹", "가입일", "상태");
+  private static final DateTimeFormatter EXCEL_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
@@ -67,6 +73,40 @@ public class UserAdminService {
     boolean hasIdOrder = pageable.getSort().stream().anyMatch(order -> order.getProperty().equals("id"));
     Sort sort = hasIdOrder ? pageable.getSort() : pageable.getSort().and(Sort.by(Sort.Direction.ASC, "id"));
     return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+  }
+
+  /** 9.5. 9.1 과 동일한 필터로 페이징 없이 전체를 한 시트에 담는다 (7.6 과 같은 이유). */
+  public byte[] exportUsersExcel(String keyword, Role role, String groupId, Integer generationNo) {
+    boolean unassignedOnly = UNASSIGNED_GROUP_FILTER.equalsIgnoreCase(groupId);
+    Long targetGroupId = parseGroupId(groupId, unassignedOnly);
+
+    Page<User> users = userRepository.searchUsers(
+        blankToNull(keyword), role, generationNo, targetGroupId, unassignedOnly,
+        Pageable.unpaged(Sort.by(Sort.Direction.ASC, "id")));
+
+    Map<Long, GroupSummary> groupsById = loadGroups(users.getContent());
+
+    List<List<Object>> rows = users.getContent().stream()
+        .map(user -> toExcelRow(user, groupsById.get(user.getGroupId())))
+        .toList();
+
+    return ExcelExporter.toXlsx("사용자 목록", EXCEL_HEADERS, rows);
+  }
+
+  private List<Object> toExcelRow(User user, GroupSummary group) {
+    return List.<Object>of(
+        user.getName(),
+        user.getEmail(),
+        user.getPhoneNumber() != null ? user.getPhoneNumber() : "",
+        user.getCollege() != null ? user.getCollege() : "",
+        user.getMajor() != null ? user.getMajor() : "",
+        user.getStudentYear() != null ? user.getStudentYear() : "",
+        user.getRole().getLabel(),
+        user.getGenerationNo() != null ? user.getGenerationNo() : "",
+        group != null ? group.name() : "",
+        user.getCreatedAt() != null ? user.getCreatedAt().format(EXCEL_DATE_FORMAT) : "",
+        user.getStatus().getLabel()
+    );
   }
 
   /**

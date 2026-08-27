@@ -14,6 +14,11 @@ import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -312,6 +317,45 @@ class UserAdminServiceTest {
           .isEqualTo(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN);
 
       assertThat(admin.isDeleted()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("exportUsersExcel")
+  class ExportUsersExcel {
+
+    @Test
+    @DisplayName("9.1 과 동일한 필터로 사용자 전체를 엑셀로 내보낸다")
+    void exportsUsersMatchingFilter() throws IOException {
+      User target = guest("google-23", "x@getit.com", "김부원");
+      target.promoteToMember(9);
+      Group group = groupRepository.save(Group.create(generation9.getId(), "1조"));
+      target.assignToGroup(group.getId());
+      guest("google-24", "y@getit.com", "이회원");
+
+      byte[] excel = userAdminService.exportUsersExcel("김", null, null, null);
+
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        assertThat(sheet.getLastRowNum()).isEqualTo(1);
+        Row dataRow = sheet.getRow(1);
+        assertThat(dataRow.getCell(0).getStringCellValue()).isEqualTo("김부원");
+        assertThat(dataRow.getCell(6).getStringCellValue()).isEqualTo("부원"); // 권한 라벨
+        assertThat(dataRow.getCell(7).getNumericCellValue()).isEqualTo(9); // 기수
+        assertThat(dataRow.getCell(8).getStringCellValue()).isEqualTo("1조"); // 그룹
+        assertThat(dataRow.getCell(10).getStringCellValue()).isEqualTo("활동"); // 상태 라벨
+      }
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 헤더만 있는 시트를 반환한다")
+    void returnsHeaderOnlyWhenNoMatch() throws IOException {
+      byte[] excel = userAdminService.exportUsersExcel(null, Role.ADMIN, null, null);
+
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        assertThat(sheet.getLastRowNum()).isZero();
+      }
     }
   }
 }
