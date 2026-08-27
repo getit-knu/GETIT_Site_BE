@@ -12,7 +12,6 @@ import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
-import com.getit.global.exception.CommonErrorCode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +19,9 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,14 @@ public class UserAdminService {
 
   /**
    * 9.1. {@code groupId} 는 세 가지 상태를 표현한다 — 미전달(필터 없음) · {@code "none"}(미배정만) ·
-   * 숫자(특정 조). 숫자가 아니면 {@code INVALID_REQUEST} 를 던진다.
+   * 숫자(특정 조). 숫자가 아니면 {@code INVALID_GROUP_FILTER} 를 던진다.
+   *
+   * <p>{@code pageable} 에 {@code id} 정렬을 tie-breaker 로 추가한다 — 클라이언트가 요청한
+   * 정렬 기준(예: 이름순)만으로는 같은 값을 가진 행이 여럿일 때 순서가 실행 계획에 따라
+   * 달라질 수 있어, 페이지 사이에 사용자가 추가되면 같은 사용자가 중복되거나 누락될 수 있다
+   * (PR #62 Copilot 리뷰 지적 — {@code ApplicationAdminService} 와 동일한 이유). 다만 7.1과
+   * 달리 여기는 클라이언트의 정렬 기준 자체를 강제로 덮어쓰지 않는다 — 9.1은 7.5(순차탐색)처럼
+   * "목록과 같은 순서여야 하는" 다른 API와 엮여있지 않기 때문이다.
    */
   public PageResponse<UserSummary> listUsers(
       String keyword, Role role, String groupId, Integer generationNo, Pageable pageable
@@ -48,11 +56,17 @@ public class UserAdminService {
     Long targetGroupId = parseGroupId(groupId, unassignedOnly);
 
     Page<User> users = userRepository.searchUsers(
-        blankToNull(keyword), role, generationNo, targetGroupId, unassignedOnly, pageable);
+        blankToNull(keyword), role, generationNo, targetGroupId, unassignedOnly, withIdTiebreaker(pageable));
 
     Map<Long, GroupSummary> groupsById = loadGroups(users.getContent());
 
     return PageResponse.from(users, user -> UserSummary.from(user, groupsById.get(user.getGroupId())));
+  }
+
+  private Pageable withIdTiebreaker(Pageable pageable) {
+    boolean hasIdOrder = pageable.getSort().stream().anyMatch(order -> order.getProperty().equals("id"));
+    Sort sort = hasIdOrder ? pageable.getSort() : pageable.getSort().and(Sort.by(Sort.Direction.ASC, "id"));
+    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
   }
 
   /**
@@ -134,7 +148,7 @@ public class UserAdminService {
     try {
       return Long.valueOf(groupId);
     } catch (NumberFormatException e) {
-      throw new BusinessException(CommonErrorCode.INVALID_REQUEST, "groupId 는 숫자 또는 'none' 이어야 합니다.");
+      throw new BusinessException(UserErrorCode.INVALID_GROUP_FILTER);
     }
   }
 

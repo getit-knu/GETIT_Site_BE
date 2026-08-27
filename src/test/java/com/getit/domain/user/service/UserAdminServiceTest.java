@@ -14,7 +14,6 @@ import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
-import com.getit.global.exception.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -106,7 +105,30 @@ class UserAdminServiceTest {
           null, null, "abc", null, PageRequest.of(0, 20)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(CommonErrorCode.INVALID_REQUEST);
+          .isEqualTo(UserErrorCode.INVALID_GROUP_FILTER);
+    }
+
+    @Test
+    @DisplayName("정렬 기준이 같으면 id 를 tie-breaker 로 추가해 페이지 결과가 안정적이다")
+    void addsIdAsTiebreakerForStableOrdering() {
+      // generationNo 가 전부 같아서 이 필드로만 정렬하면 순서가 실행 계획에 따라 달라질 수 있다.
+      User first = guest("google-19", "t@getit.com", "부원");
+      first.promoteToMember(9);
+      User second = guest("google-20", "u@getit.com", "부원");
+      second.promoteToMember(9);
+      User third = guest("google-21", "v@getit.com", "부원");
+      third.promoteToMember(9);
+
+      PageResponse<UserSummary> firstPage = userAdminService.listUsers(
+          null, null, null, 9, PageRequest.of(0, 2));
+      PageResponse<UserSummary> secondPage = userAdminService.listUsers(
+          null, null, null, 9, PageRequest.of(1, 2));
+
+      // id 오름차순 tie-breaker 덕분에 두 페이지 사이에 겹치는 사용자가 없어야 한다.
+      assertThat(firstPage.content()).extracting(UserSummary::id)
+          .doesNotContainAnyElementsOf(secondPage.content().stream().map(UserSummary::id).toList());
+      assertThat(firstPage.content()).hasSize(2);
+      assertThat(secondPage.content()).hasSize(1);
     }
   }
 
