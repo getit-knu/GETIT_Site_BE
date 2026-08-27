@@ -18,6 +18,8 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -99,6 +101,35 @@ public class LectureService {
     return LectureResult.DetailResult.of(lecture, files, assignment);
   }
 
+  @Transactional
+  public LectureResult.DetailResult updateLecture(Long lectureId, LectureRequest.Update request) {
+    Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
+
+    Long generationId = request.generationId() != null
+        ? resolveGenerationId(request.generationId())
+        : lecture.getGenerationId();
+    validateCategory(request.trackId(), request.subCategoryId());
+
+    lecture.update(
+        request.week(), request.title(), request.description(), request.youtubeUrl(),
+        request.materialUrl(), request.durationMinutes(), request.isPublishedOrDefault(),
+        generationId, request.trackId(), request.subCategoryId()
+    );
+
+    updateFiles(lectureId, request.fileIds());
+    updateAssignment(lectureId, request.assignment());
+
+    return getLecture(lectureId);
+  }
+
+  @Transactional
+  public void deleteLecture(Long lectureId) {
+    Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
+    lecture.delete();
+  }
+
   private Long resolveGenerationId(Long requestedGenerationId) {
     if (requestedGenerationId == null) {
       return generationQueryService.findActive()
@@ -154,5 +185,40 @@ public class LectureService {
     assignmentRepository.save(Assignment.create(
         lectureId, assignment.title(), assignment.description(), assignment.deadline(),
         assignment.allowedTypes(), assignment.linkPlaceholder()));
+  }
+
+  private void updateFiles(Long lectureId, List<Long> fileIds) {
+    List<LectureFile> existingFiles = lectureFileRepository.findAllByLectureIdOrderByIdAsc(lectureId);
+    Set<Long> existingFileIds = existingFiles.stream().map(LectureFile::getFileId).collect(Collectors.toSet());
+    Set<Long> requestedFileIds = fileIds == null
+        ? Set.of()
+        : fileIds.stream().collect(Collectors.toSet());
+
+    List<LectureFile> filesToRemove = existingFiles.stream()
+        .filter(lectureFile -> !requestedFileIds.contains(lectureFile.getFileId()))
+        .toList();
+    List<Long> fileIdsToAdd = requestedFileIds.stream()
+        .filter(fileId -> !existingFileIds.contains(fileId))
+        .toList();
+
+    fileConnectionService.disconnectAll(filesToRemove.stream().map(LectureFile::getFileId).toList());
+    lectureFileRepository.deleteAll(filesToRemove);
+
+    connectFiles(lectureId, fileIdsToAdd);
+  }
+
+  private void updateAssignment(Long lectureId, LectureRequest.AssignmentPart assignmentPart) {
+    Optional<Assignment> existing = assignmentRepository.findByLectureId(lectureId);
+    if (assignmentPart == null) {
+      existing.ifPresent(assignmentRepository::delete);
+      return;
+    }
+    if (existing.isPresent()) {
+      existing.get().update(
+          assignmentPart.title(), assignmentPart.description(), assignmentPart.deadline(),
+          assignmentPart.allowedTypes(), assignmentPart.linkPlaceholder());
+      return;
+    }
+    createAssignment(lectureId, assignmentPart);
   }
 }

@@ -12,9 +12,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,5 +56,21 @@ public class LectureController {
   @GetMapping("/{id}")
   public ApiResponse<LectureResult.DetailResult> getLecture(@PathVariable Long id) {
     return ApiResponse.success(lectureService.getLecture(id));
+  }
+
+  @Operation(summary = "강의 수정", description = "명세서 8.4")
+  @PutMapping("/{id}")
+  public ApiResponse<LectureResult.DetailResult> updateLecture(
+      @PathVariable Long id,
+      @Valid @RequestBody LectureRequest.Update request
+  ) {
+    return ApiResponse.success(lectureService.updateLecture(id, request));
+  }
+
+  @Operation(summary = "강의 삭제", description = "명세서 8.5")
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteLecture(@PathVariable Long id) {
+    lectureService.deleteLecture(id);
   }
 }

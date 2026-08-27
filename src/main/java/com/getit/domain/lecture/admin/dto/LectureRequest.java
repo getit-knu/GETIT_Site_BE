@@ -31,6 +31,24 @@ public class LectureRequest {
     public boolean isPublishedOrDefault() { return Boolean.TRUE.equals(isPublished); }
   }
 
+  public record Update(
+      Long generationId,
+      @NotNull Long trackId,
+      Long subCategoryId,
+      @NotNull @Min(1) Integer week,
+      @NotBlank @Size(max = 255) String title,
+      String description,
+      @Size(max = 512) String youtubeUrl,
+      @Size(max = 512) String materialUrl,
+      @Min(1) Integer durationMinutes,
+      List<Long> fileIds,
+      Boolean isPublished,
+      @Valid AssignmentPart assignment
+  ) {
+
+    public boolean isPublishedOrDefault() { return Boolean.TRUE.equals(isPublished); }
+  }
+
   public record AssignmentPart(
       @NotBlank @Size(max = 255) String title,
       @NotBlank String description,

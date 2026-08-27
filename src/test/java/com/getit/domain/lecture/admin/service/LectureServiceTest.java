@@ -77,6 +77,15 @@ class LectureServiceTest {
         null, true, null);
   }
 
+  private LectureRequest.Update updateRequest(
+      Long trackId, Long subCategoryId, List<Long> fileIds, AssignmentPart assignmentPart
+  ) {
+    return new LectureRequest.Update(
+        null, trackId, subCategoryId, 2, "HTML/CSS 심화", "## 수정된 구성",
+        "https://youtube.com/watch?v=xyz789", "https://docs.getit.com/web-advanced", 90,
+        fileIds, false, assignmentPart);
+  }
+
   @Nested
   class CreateLecture {
 
@@ -226,6 +235,172 @@ class LectureServiceTest {
       LectureResult.DetailResult detail = lectureService.getLecture(lecture.getId());
 
       assertThat(detail.files()).isEmpty();
+    }
+  }
+
+  @Nested
+  class UpdateLecture {
+
+    @Test
+    @DisplayName("필드를 수정한다")
+    void updatesFields() {
+      Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
+
+      LectureResult.DetailResult detail = lectureService.updateLecture(
+          lecture.getId(), updateRequest(trackId, subCategoryId, null, null));
+
+      assertThat(detail.week()).isEqualTo(2);
+      assertThat(detail.title()).isEqualTo("HTML/CSS 심화");
+      assertThat(detail.isPublished()).isFalse();
+    }
+
+    @Test
+    @DisplayName("없는 강의 id 면 예외가 발생한다")
+    void throwsWhenLectureNotFound() {
+      assertThatThrownBy(() -> lectureService.updateLecture(
+          999_999L, updateRequest(trackId, subCategoryId, null, null)))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.LECTURE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 트랙으로 수정하면 예외가 발생한다")
+    void throwsWhenTrackNotFound() {
+      Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
+
+      assertThatThrownBy(() -> lectureService.updateLecture(
+          lecture.getId(), updateRequest(999_999L, null, null, null)))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.TRACK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("fileIds 를 전체교체한다 - 빠진 파일은 연결 해제, 새 파일만 연결한다")
+    void replacesFilesEntirely() {
+      FileAsset keptFile = fileAssetRepository.save(
+          FileAsset.upload("key/1", "유지파일.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+      FileAsset removedFile = fileAssetRepository.save(
+          FileAsset.upload("key/2", "삭제될파일.pdf", "https://cdn/key/2", 1024L, "application/pdf", 100L));
+      FileAsset addedFile = fileAssetRepository.save(
+          FileAsset.upload("key/3", "새파일.pdf", "https://cdn/key/3", 1024L, "application/pdf", 100L));
+
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              List.of(keptFile.getId(), removedFile.getId()), true, null),
+          100L);
+
+      lectureService.updateLecture(
+          lecture.getId(),
+          updateRequest(trackId, subCategoryId, List.of(keptFile.getId(), addedFile.getId()), null));
+
+      assertThat(lectureFileRepository.findAllByLectureIdOrderByIdAsc(lecture.getId()))
+          .extracting(LectureFile::getFileId)
+          .containsExactlyInAnyOrder(keptFile.getId(), addedFile.getId());
+      assertThat(fileAssetRepository.findById(removedFile.getId())).get()
+          .extracting(FileAsset::getStatus).isEqualTo(FileStatus.PENDING);
+      assertThat(fileAssetRepository.findById(keptFile.getId())).get()
+          .extracting(FileAsset::getStatus).isEqualTo(FileStatus.CONNECTED);
+      assertThat(fileAssetRepository.findById(addedFile.getId())).get()
+          .extracting(FileAsset::getStatus).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("과제가 없다가 새로 생기면 생성된다")
+    void createsAssignmentWhenAbsent() {
+      Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
+      LocalDateTime deadline = LocalDateTime.of(2026, 7, 1, 23, 59, 59);
+      AssignmentPart assignmentPart = new AssignmentPart(
+          "과제", "설명", deadline, Set.of(SubmissionType.FILE), null);
+
+      LectureResult.DetailResult detail = lectureService.updateLecture(
+          lecture.getId(), updateRequest(trackId, subCategoryId, null, assignmentPart));
+
+      assertThat(detail.assignment()).isNotNull();
+      assertThat(detail.assignment().deadline()).isEqualTo(deadline);
+    }
+
+    @Test
+    @DisplayName("있던 과제가 요청에서 빠지면 삭제된다")
+    void deletesAssignmentWhenMissingFromRequest() {
+      LocalDateTime deadline = LocalDateTime.of(2026, 7, 1, 23, 59, 59);
+      AssignmentPart assignmentPart = new AssignmentPart(
+          "과제", "설명", deadline, Set.of(SubmissionType.FILE), null);
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              null, true, assignmentPart),
+          100L);
+
+      LectureResult.DetailResult detail = lectureService.updateLecture(
+          lecture.getId(), updateRequest(trackId, subCategoryId, null, null));
+
+      assertThat(detail.assignment()).isNull();
+    }
+
+    @Test
+    @DisplayName("과제가 둘 다 있으면 필드가 갱신된다")
+    void updatesAssignmentWhenBothPresent() {
+      LocalDateTime originalDeadline = LocalDateTime.of(2026, 7, 1, 23, 59, 59);
+      AssignmentPart originalAssignment = new AssignmentPart(
+          "과제", "설명", originalDeadline, Set.of(SubmissionType.FILE), null);
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              null, true, originalAssignment),
+          100L);
+
+      LocalDateTime newDeadline = LocalDateTime.of(2026, 8, 1, 23, 59, 59);
+      AssignmentPart newAssignment = new AssignmentPart(
+          "새 과제", "새 설명", newDeadline, Set.of(SubmissionType.LINK), "URL 입력");
+
+      LectureResult.DetailResult detail = lectureService.updateLecture(
+          lecture.getId(), updateRequest(trackId, subCategoryId, null, newAssignment));
+
+      assertThat(detail.assignment().title()).isEqualTo("새 과제");
+      assertThat(detail.assignment().deadline()).isEqualTo(newDeadline);
+      assertThat(detail.assignment().allowedTypes()).containsExactly(SubmissionType.LINK);
+    }
+  }
+
+  @Nested
+  class DeleteLecture {
+
+    @Test
+    @DisplayName("soft delete 되어 조회되지 않는다")
+    void softDeletesLecture() {
+      Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
+
+      lectureService.deleteLecture(lecture.getId());
+
+      assertThatThrownBy(() -> lectureService.getLecture(lecture.getId()))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.LECTURE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("연결된 파일은 연결 해제하지 않는다 (이력 보존)")
+    void doesNotDisconnectFiles() {
+      FileAsset file = fileAssetRepository.save(
+          FileAsset.upload("key/1", "자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              List.of(file.getId()), true, null),
+          100L);
+
+      lectureService.deleteLecture(lecture.getId());
+
+      assertThat(fileAssetRepository.findById(file.getId())).get()
+          .extracting(FileAsset::getStatus).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("없는 강의 id 면 예외가 발생한다")
+    void throwsWhenLectureNotFound() {
+      assertThatThrownBy(() -> lectureService.deleteLecture(999_999L))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.LECTURE_NOT_FOUND);
     }
   }
 }
