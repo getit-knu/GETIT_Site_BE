@@ -85,3 +85,6 @@ getit:
     oauth2-redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth/callback}
     # 로컬은 http 라 false. dev · prod 에서 true 로 덮어쓴다
     refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:false}
+    # 프론트와 백엔드가 같은 등록 도메인이면 Lax (예: getit.co.kr ↔ api.getit.co.kr).
+    # 서로 다른 사이트면 None 이어야 재발급 요청에 쿠키가 실린다. None 은 Secure=true 필수.
+    refresh-cookie-same-site: ${REFRESH_COOKIE_SAME_SITE:Lax}
