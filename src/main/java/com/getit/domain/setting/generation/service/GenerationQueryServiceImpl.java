@@ -23,4 +23,9 @@ public class GenerationQueryServiceImpl implements GenerationQueryService {
   public Optional<GenerationSummary> findById(Long generationId) {
     return generationRepository.findById(generationId).map(GenerationSummary::from);
   }
+
+  @Override
+  public Optional<GenerationSummary> findByGenerationNo(Integer generationNo) {
+    return generationRepository.findByGenerationNo(generationNo).map(GenerationSummary::from);
+  }
 }

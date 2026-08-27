@@ -18,4 +18,12 @@ public interface GenerationQueryService {
 
   /** id 로 기수를 조회한다. 없으면 empty. */
   Optional<GenerationSummary> findById(Long generationId);
+
+  /**
+   * 기수 번호(9, 8 ...)로 조회한다. 없으면 empty.
+   *
+   * <p>{@code user} 도메인이 9.2(사용자 기수 변경)에서 요청받은 {@code generationNo} 가
+   * 실제로 존재하는 기수인지 확인하는 데 쓴다 (#61 PR 리뷰 지적).
+   */
+  Optional<GenerationSummary> findByGenerationNo(Integer generationNo);
 }
