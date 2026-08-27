@@ -15,7 +15,10 @@ public enum UserErrorCode implements ErrorCode {
   DUPLICATE_GROUP_NAME(HttpStatus.CONFLICT, "같은 기수 안에 이미 같은 이름의 조가 있습니다."),
   ALREADY_IN_GROUP(HttpStatus.CONFLICT, "이미 다른 조에 속한 사용자입니다."),
   GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "기수를 찾을 수 없습니다."),
-  ACTIVE_GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "진행 중인 기수가 없습니다.");
+  ACTIVE_GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "진행 중인 기수가 없습니다."),
+  CANNOT_REMOVE_OWN_ADMIN(HttpStatus.FORBIDDEN, "자기 자신의 ADMIN 권한은 해제할 수 없습니다."),
+  INVALID_GROUP_FILTER(HttpStatus.BAD_REQUEST, "groupId 는 숫자 또는 'none' 이어야 합니다."),
+  GROUP_GENERATION_MISMATCH(HttpStatus.BAD_REQUEST, "조의 소속 기수와 사용자의 소속 기수가 다릅니다.");
 
   private final HttpStatus status;
   private final String message;

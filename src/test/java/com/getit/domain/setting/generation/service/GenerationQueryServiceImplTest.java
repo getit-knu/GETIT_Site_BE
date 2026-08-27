@@ -61,4 +61,21 @@ class GenerationQueryServiceImplTest {
   void returnsEmptyForUnknownId() {
     assertThat(generationQueryService.findById(999_999L)).isEmpty();
   }
+
+  @Test
+  @DisplayName("기수 번호로 조회한다")
+  void returnsGenerationByGenerationNo() {
+    generationRepository.save(Generation.create(9, 2026));
+
+    GenerationSummary summary = generationQueryService.findByGenerationNo(9).orElseThrow();
+
+    assertThat(summary.generationNo()).isEqualTo(9);
+    assertThat(summary.year()).isEqualTo(2026);
+  }
+
+  @Test
+  @DisplayName("없는 기수 번호로 조회하면 빈 Optional 을 반환한다")
+  void returnsEmptyForUnknownGenerationNo() {
+    assertThat(generationQueryService.findByGenerationNo(999)).isEmpty();
+  }
 }
