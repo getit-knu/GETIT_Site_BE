@@ -1,6 +1,7 @@
 package com.getit.domain.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.user.entity.Group;
 import com.getit.global.config.JpaAuditingConfig;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @DataJpaTest
 @Import(JpaAuditingConfig.class)
@@ -53,5 +55,29 @@ class GroupRepositoryTest {
 
     Group other = groupRepository.save(Group.create(1L, "2조"));
     assertThat(groupRepository.existsByGenerationIdAndNameAndIdNot(1L, "1조", other.getId())).isTrue();
+  }
+
+  /**
+   * exists 선검사만으로는 막지 못하는 경합(같은 이름을 동시에 저장하는 두 요청)의 최종 방어선이
+   * uk_user_group_generation_name 제약이라는 걸 확인한다. {@code GroupService.createGroup}·
+   * {@code renameGroup} 이 이 예외를 잡아 {@code DUPLICATE_GROUP_NAME} 409 로 변환한다
+   * (PR #60 Copilot 리뷰 지적).
+   */
+  @Test
+  @DisplayName("같은 기수·이름으로 저장하면 유니크 제약 위반이 발생한다")
+  void rejectsDuplicateNameAtDbLevel() {
+    groupRepository.saveAndFlush(Group.create(1L, "1조"));
+
+    assertThatThrownBy(() -> groupRepository.saveAndFlush(Group.create(1L, "1조")))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("id 와 기수가 모두 일치해야 조회된다")
+  void findsByIdAndGenerationIdOnlyWhenBothMatch() {
+    Group group = groupRepository.save(Group.create(1L, "1조"));
+
+    assertThat(groupRepository.findByIdAndGenerationId(group.getId(), 1L)).isPresent();
+    assertThat(groupRepository.findByIdAndGenerationId(group.getId(), 2L)).isEmpty();
   }
 }
