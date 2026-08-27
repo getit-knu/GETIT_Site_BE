@@ -66,6 +66,10 @@ jobs:
         with:
           context: .
           push: true
+          # 배포 대상 VM 이 x86_64 다. 명시하지 않으면 러너 아키텍처를 따라가는데,
+          # 러너가 바뀌거나 누가 로컬(Apple Silicon)에서 빌드해 올리면
+          # 컨테이너가 exec format error 로 재시작만 반복한다.
+          platforms: linux/amd64
           tags: |
             ${{ steps.tag.outputs.image }}:sha-${{ github.sha }}
             ${{ steps.tag.outputs.image }}:latest
