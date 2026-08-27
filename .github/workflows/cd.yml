@@ -1,0 +1,151 @@
+name: CD
+
+# main 에 머지되면 이미지를 만들어 GHCR 에 올린다.
+# 배포는 Azure 리소스가 준비된 뒤에만 동작한다 (아래 deploy job 의 조건 참조).
+on:
+  push:
+    branches: [ main ]
+  # 특정 커밋을 수동으로 다시 배포할 때 쓴다.
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: '배포할 이미지 태그 (비우면 방금 만든 이미지)'
+        required: false
+        type: string
+
+# 배포가 겹치면 나중 것이 먼저 끝나 이전 버전이 살아남을 수 있다.
+# 이미지 빌드와 달리 배포는 취소하지 않고 순서대로 처리한다.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 이미지 빌드 · 푸시 — Azure 계정이 없어도 오늘부터 동작한다.
+  # 머지할 때마다 배포 가능한 이미지가 GHCR 에 쌓인다.
+  # ---------------------------------------------------------------------------
+  image:
+    name: 이미지 빌드 · 푸시
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v5
+
+      - name: Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 태그 두 개를 단다.
+      #   - 커밋 SHA: 어떤 코드가 떠 있는지 추적하고 롤백할 때 쓴다
+      #   - latest  : App Service 가 기본으로 당겨오는 태그
+      - name: 태그 · 메타데이터
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest
+
+      - name: 빌드 · 푸시
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 다음 빌드에서 의존성 레이어를 재사용한다. 없으면 매번 Gradle 을 처음부터 돌린다.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 요약
+        run: |
+          echo "### 이미지 푸시 완료" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ---------------------------------------------------------------------------
+  # 배포 — Azure 리소스가 준비되기 전까지는 통째로 건너뛴다.
+  #
+  # 활성화 방법 (아래 준비가 끝난 뒤)
+  #   Settings > Secrets and variables > Actions > Variables
+  #     AZURE_DEPLOY_ENABLED = true
+  #     AZURE_WEBAPP_NAME    = {App Service 이름}
+  #   Secrets
+  #     AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID
+  #
+  # 자세한 절차는 docs/DEPLOYMENT.md 참조.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Azure App Service 배포
+    needs: image
+    if: vars.AZURE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    environment:
+      name: production
+      url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net
+
+    permissions:
+      contents: read
+      # OIDC 로 Azure 에 로그인한다. 장기 자격증명을 저장소에 두지 않는다.
+      id-token: write
+
+    steps:
+      - name: Azure 로그인
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 이미지 배포
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag || format('sha-{0}', github.sha) }}
+
+      # 배포가 끝나도 컨테이너가 뜨는 데 시간이 걸린다.
+      # 헬스체크가 통과해야 배포 성공으로 본다. 안 그러면 죽은 인스턴스를 성공으로 기록한다.
+      - name: 헬스체크
+        run: |
+          URL="https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
+          echo "확인 대상: $URL"
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" || echo 000)
+            if [ "$CODE" = "200" ]; then
+              echo "정상 기동 확인 (${i}회차)"
+              exit 0
+            fi
+            echo "  ${i}/30 — HTTP $CODE, 10초 후 재시도"
+            sleep 10
+          done
+          echo "::error::5분 안에 헬스체크가 통과하지 못했습니다. Azure 포털의 로그 스트림을 확인하세요."
+          exit 1
+
+      - name: Azure 로그아웃
+        if: always()
+        run: az logout || true
