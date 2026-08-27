@@ -180,5 +180,19 @@ class UserAdminControllerTest {
 
       assertThat(userRepository.findById(target.getId()).orElseThrow().isDeleted()).isTrue();
     }
+
+    @Test
+    @DisplayName("본인을 삭제하려 하면 403 이고 탈퇴 처리되지 않는다")
+    void rejectsSelfDeletion() throws Exception {
+      User admin = guest("google-8", "h@getit.com", "운영진");
+      admin.updateRole(Role.ADMIN);
+
+      mockMvc.perform(delete(USERS_PATH + "/" + admin.getId())
+              .header("Authorization", tokenFor(admin, Role.ADMIN)))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.error.code").value("CANNOT_REMOVE_OWN_ADMIN"));
+
+      assertThat(userRepository.findById(admin.getId()).orElseThrow().isDeleted()).isFalse();
+    }
   }
 }

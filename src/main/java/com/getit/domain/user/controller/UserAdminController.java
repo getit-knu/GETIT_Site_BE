@@ -58,7 +58,7 @@ public class UserAdminController {
   @Operation(summary = "사용자 삭제", description = "명세서 9.3")
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deleteUser(@PathVariable Long id) {
-    userAdminService.deleteUser(id);
+  public void deleteUser(@PathVariable Long id, @AuthenticationPrincipal CustomUserDetails principal) {
+    userAdminService.deleteUser(id, principal.getUserId());
   }
 }

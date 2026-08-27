@@ -127,10 +127,22 @@ public class UserAdminService {
     }
   }
 
-  /** 9.3. 지원서 · 과제 제출 · Q&A 이력 보존을 위해 soft delete 한다. */
+  /**
+   * 9.3. 지원서 · 과제 제출 · Q&A 이력 보존을 위해 soft delete 한다.
+   *
+   * <p>9.2 는 자기 자신의 ADMIN 권한 해제를 막지만, 삭제 API에 이 보호가 없으면 같은 결과를
+   * "권한 변경" 대신 "삭제"로 우회할 수 있다 (PR #62 Copilot 리뷰 지적). 대상이 ADMIN 인지
+   * 여부와 무관하게 자기 자신은 이 엔드포인트로 탈퇴시킬 수 없게 막는다 — 9.2 의 자기 강등
+   * 방지가 "다른 ADMIN 이 남아있는지"를 따지지 않는 것과 동일하게, 단순하고 예측 가능한
+   * 규칙을 유지하기 위함이다.
+   */
   @Transactional
-  public void deleteUser(Long userId) {
-    findUser(userId).withdraw();
+  public void deleteUser(Long userId, Long currentUserId) {
+    User user = findUser(userId);
+    if (userId.equals(currentUserId)) {
+      throw new BusinessException(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN, "자기 자신은 삭제할 수 없습니다.");
+    }
+    user.withdraw();
   }
 
   private void validateNotSelfAdminRevocation(User user, Long targetUserId, Long currentUserId, Role newRole) {

@@ -284,7 +284,7 @@ class UserAdminServiceTest {
     void softDeletesUser() {
       User user = guest("google-15", "o@getit.com", "부원");
 
-      userAdminService.deleteUser(user.getId());
+      userAdminService.deleteUser(user.getId(), 999L);
 
       User found = userRepository.findById(user.getId()).orElseThrow();
       assertThat(found.isDeleted()).isTrue();
@@ -294,10 +294,24 @@ class UserAdminServiceTest {
     @Test
     @DisplayName("없는 사용자면 예외가 발생한다")
     void throwsWhenUserNotFound() {
-      assertThatThrownBy(() -> userAdminService.deleteUser(999L))
+      assertThatThrownBy(() -> userAdminService.deleteUser(999L, 998L))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("본인을 삭제하려 하면 예외가 발생하고 탈퇴 처리되지 않는다")
+    void rejectsSelfDeletion() {
+      User admin = guest("google-22", "w@getit.com", "운영진");
+      admin.updateRole(Role.ADMIN);
+
+      assertThatThrownBy(() -> userAdminService.deleteUser(admin.getId(), admin.getId()))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN);
+
+      assertThat(admin.isDeleted()).isFalse();
     }
   }
 }
