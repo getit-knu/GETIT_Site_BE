@@ -13,6 +13,8 @@ import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
 import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
 import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
+import com.getit.domain.setting.generation.dto.GenerationSummary;
+import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,7 @@ public class ApplicationEvaluationService {
   private final ApplicationRepository applicationRepository;
   private final EvaluationCriterionRepository evaluationCriterionRepository;
   private final EvaluationScoreRepository evaluationScoreRepository;
+  private final GenerationQueryService generationQueryService;
 
   /**
    * 7.3. 기준마다 upsert 한다. 기준은 지원서와 같은 기수 소속이어야 한다 — 다른 기수 기준으로
@@ -92,42 +95,59 @@ public class ApplicationEvaluationService {
    * DOC_PASS/DOC_FAIL, DOC_PASS → FINAL_PASS/FINAL_FAIL)인 것만 원자적으로 갱신한다. 대상이
    * 아니었던 id 는 명세서 응답에 skip 목록이 없으므로 조용히 건너뛰고 {@code updatedCount} 로만
    * 반영한다 — 9.4(승격)의 skip 목록과 다른 점이다.
+   *
+   * <p>요청 본문엔 기수가 없어서, 활성 기수를 직접 구해 조건에 넣는다 — 그러지 않으면 비활성
+   * (과거) 기수의 지원서까지 함께 바뀔 수 있다 (PR #69 Copilot 리뷰 지적).
    */
   @Transactional
   public BulkDecisionResult decideBulk(List<Long> applicationIds, ApplicationStatus targetStatus) {
     ApplicationStatus requiredStatus = requiredPredecessorOf(targetStatus);
+    GenerationSummary activeGeneration = findActiveGeneration();
 
     int updated = applicationRepository.updateStatusIfCurrentStatusIn(
-        applicationIds, targetStatus, requiredStatus);
+        applicationIds, targetStatus, requiredStatus, activeGeneration.id());
 
     return new BulkDecisionResult(updated, targetStatus);
   }
 
   /**
-   * 7.3 채점 · 7.4 합불 처리 공용. DRAFT 는 없는 지원서처럼 404 로 처리하고(PR #52 리뷰 지적 —
-   * 예전엔 decide 가 이 확인 없이 findById 를 직접 써서, DRAFT 지원서의 존재가 409 로 노출됐다),
-   * 채점(saveScores)은 SUBMITTED 만 허용하므로 이 메서드는 그 상태만 통과시킨다. decide 는
-   * DOC_PASS 도 허용해야 해서 자체적으로 한 번 더 확인한다({@link #nextDecisionStatus}).
+   * 7.3 채점 전용. DRAFT 는 없는 지원서처럼 404 로 처리하고(PR #52 리뷰 지적 — 예전엔 decide 가
+   * 이 확인 없이 findById 를 직접 써서, DRAFT 지원서의 존재가 409 로 노출됐다), SUBMITTED 만
+   * 허용한다. {@code APPLICATION_NOT_SUBMITTED} 는 decide(7.4) 전용 코드라 여기서 재사용하면
+   * "제출됨 또는 서류합격 상태만 결정 가능"이라는 메시지가 채점 거부 이유와 모순된다 — 채점
+   * 전용 코드({@code APPLICATION_NOT_SCORABLE})를 따로 쓴다 (PR #69 Copilot 리뷰 지적).
    */
   private Application findSubmittedApplication(Long applicationId) {
     Application application = applicationRepository.findById(applicationId)
         .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
     if (application.getStatus() != ApplicationStatus.SUBMITTED) {
-      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SCORABLE);
     }
     return application;
   }
 
-  /** decide(7.4) 전용. DRAFT 는 404, SUBMITTED · DOC_PASS 가 아니면 409 로 처리한다. */
+  /**
+   * decide(7.4) 전용. 활성 기수로 스코프한다 — id 만으로 찾으면 비활성(과거) 기수의 DOC_PASS
+   * 지원서도 FINAL_PASS/FINAL_FAIL 로 바꿀 수 있다 (PR #69 Copilot 리뷰 지적 —
+   * {@code EvaluationCriterionService.findCriterion} 과 동일한 패턴). 다른 기수의 지원서는
+   * 존재해도 404 로 처리하고, SUBMITTED · DOC_PASS 가 아니면 409 로 처리한다.
+   */
   private Application findDecidableApplication(Long applicationId) {
-    Application application = applicationRepository.findById(applicationId)
+    GenerationSummary activeGeneration = findActiveGeneration();
+    Application application = applicationRepository
+        .findByIdAndGenerationId(applicationId, activeGeneration.id())
         .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
     if (application.getStatus() != ApplicationStatus.SUBMITTED && application.getStatus() != ApplicationStatus.DOC_PASS) {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
     }
     return application;
+  }
+
+  private GenerationSummary findActiveGeneration() {
+    return generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND));
   }
 
   private ApplicationStatus nextDecisionStatus(ApplicationStatus current, boolean passed) {

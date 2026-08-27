@@ -242,7 +242,7 @@ class ApplicationRepositoryTest {
 
       int updated = applicationRepository.updateStatusIfCurrentStatusIn(
           List.of(submitted1.getId(), submitted2.getId(), docPass.getId()),
-          ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED);
+          ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED, 9L);
 
       assertThat(updated).isEqualTo(2);
       assertThat(applicationRepository.findById(submitted1.getId()).orElseThrow().getStatus())
@@ -252,6 +252,33 @@ class ApplicationRepositoryTest {
       // 이미 DOC_PASS 였던 건 대상이 아니었으므로 그대로다.
       assertThat(applicationRepository.findById(docPass.getId()).orElseThrow().getStatus())
           .isEqualTo(ApplicationStatus.DOC_PASS);
+    }
+
+    @Test
+    @DisplayName("다른 기수의 지원서는 id·상태가 일치해도 갱신하지 않는다")
+    void doesNotUpdateApplicationInOtherGeneration() {
+      Application otherGeneration = submitted(1L, 8L, "다른 기수");
+
+      int updated = applicationRepository.updateStatusIfCurrentStatusIn(
+          List.of(otherGeneration.getId()), ApplicationStatus.DOC_PASS, ApplicationStatus.SUBMITTED, 9L);
+
+      assertThat(updated).isZero();
+      assertThat(applicationRepository.findById(otherGeneration.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.SUBMITTED);
+    }
+  }
+
+  @Nested
+  @DisplayName("findByIdAndGenerationId (7.4 decide)")
+  class FindByIdAndGenerationId {
+
+    @Test
+    @DisplayName("id 와 기수가 모두 일치해야 조회된다")
+    void findsByIdAndGenerationIdOnlyWhenBothMatch() {
+      Application application = submitted(1L, 9L, "홍길동");
+
+      assertThat(applicationRepository.findByIdAndGenerationId(application.getId(), 9L)).isPresent();
+      assertThat(applicationRepository.findByIdAndGenerationId(application.getId(), 8L)).isEmpty();
     }
   }
 

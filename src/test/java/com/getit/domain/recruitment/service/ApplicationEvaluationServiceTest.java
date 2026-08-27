@@ -187,7 +187,7 @@ class ApplicationEvaluationServiceTest {
           application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SCORABLE);
     }
   }
 
@@ -281,6 +281,21 @@ class ApplicationEvaluationServiceTest {
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 결정할 수 없다 (존재하지 않는 것과 동일하게 취급)")
+    void throwsWhenGenerationInactive() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application application = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
+      application.submit(LocalDateTime.now());
+
+      assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), true))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
   }
 
   @Nested
@@ -340,6 +355,24 @@ class ApplicationEvaluationServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.INVALID_DECISION_STATUS);
+    }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 함께 갱신되지 않는다")
+    void doesNotUpdateApplicationInInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application otherGenerationApplication = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "지난기수", "old@gmail.com", "010-0000-0000",
+          null, null, 2, null));
+      otherGenerationApplication.submit(LocalDateTime.now());
+      Application activeApplication = submitted(2L, "홍길동");
+
+      BulkDecisionResult result = applicationEvaluationService.decideBulk(
+          List.of(otherGenerationApplication.getId(), activeApplication.getId()), ApplicationStatus.DOC_PASS);
+
+      assertThat(result.updatedCount()).isEqualTo(1);
+      assertThat(applicationRepository.findById(otherGenerationApplication.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.SUBMITTED);
     }
   }
 }

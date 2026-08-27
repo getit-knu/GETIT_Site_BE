@@ -306,7 +306,7 @@ class ApplicationAdminControllerTest {
               .contentType(MediaType.APPLICATION_JSON)
               .content(scoresRequestJson(criterion.getId(), 10)))
           .andExpect(status().isConflict())
-          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SCORABLE"));
     }
   }
 
