@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +58,11 @@ public class SubmissionService {
 
     AssignmentSubmission submission = AssignmentSubmission.submit(
         assignmentId, userId, request.fileId(), request.linkUrl(), request.comment(), status, now);
-    assignmentSubmissionRepository.save(submission);
+    try {
+      assignmentSubmissionRepository.saveAndFlush(submission);
+    } catch (DataIntegrityViolationException e) {
+      throw new BusinessException(LectureErrorCode.DUPLICATE_SUBMISSION);
+    }
 
     return toResult(submission);
   }
