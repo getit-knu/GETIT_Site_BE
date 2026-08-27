@@ -48,6 +48,22 @@ spring:
               - profile
               - email
 
+# 헬스체크만 노출한다. env · beans · metrics 까지 열면 내부 구조가 그대로 드러난다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    # Redis 는 아직 코드에서 쓰지 않는다. 켜두면 붙을 곳이 없어 헬스체크가 DOWN 이 된다.
+    redis:
+      enabled: false
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
