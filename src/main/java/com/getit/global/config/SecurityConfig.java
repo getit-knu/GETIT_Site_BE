@@ -41,7 +41,10 @@ public class SecurityConfig {
       // 토큰 재발급과 로그아웃은 Access Token 이 만료된 상태에서도 호출된다 (명세서 1.3 · 1.4).
       // 로그아웃은 자기가 이미 가진 Refresh 쿠키를 폐기하는 것뿐이라 열어도 안전하다.
       // 인증을 요구하면 만료된 사용자가 로그아웃을 못 해 Refresh 가 최대 2주 살아남는다.
-      "/api/auth/refresh", "/api/auth/logout", "/api/auth/callback"
+      "/api/auth/refresh", "/api/auth/logout", "/api/auth/callback",
+      // 배포 환경의 헬스 프로브. 인증을 걸면 플랫폼이 인스턴스를 죽은 것으로 판단한다.
+      // 상세 정보는 management.endpoint.health.show-details: never 로 막혀 있다.
+      "/actuator/health", "/actuator/health/**"
   };
 
   private static final String[] DOCS_ENDPOINTS = {
