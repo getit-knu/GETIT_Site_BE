@@ -45,6 +45,28 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
    */
   List<Application> findByGenerationIdAndStatus(Long generationId, ApplicationStatus status, Sort sort);
 
+  /** 9.4 승격 대상 조회 - applicationIds 를 지정하지 않았을 때, 기수의 FINAL_PASS 전체. */
+  List<Application> findByGenerationIdAndStatus(Long generationId, ApplicationStatus status);
+
+  /**
+   * 9.4 승격 대상 조회 - applicationIds 를 지정했을 때. 같은 기수 · FINAL_PASS 인 것만 남긴다.
+   * 요청에 있었지만 여기 없는 id 는 호출부가 "대상 아님"으로 skip 처리한다.
+   */
+  List<Application> findByIdInAndGenerationIdAndStatus(
+      List<Long> ids, Long generationId, ApplicationStatus status);
+
+  /**
+   * 7.4 일괄 처리를 원자적으로 반영한다. {@code updateStatusIfCurrentStatus} 와 같은 이유로 조건과
+   * 갱신을 하나의 UPDATE 로 묶는다 — id 목록 중 {@code requiredStatus} 인 행만 갱신되고, 나머지는
+   * 조용히 건너뛴다(명세서 7.4 일괄 처리 응답에 skip 목록이 없다 — updatedCount 로만 반영).
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("update Application a set a.status = :newStatus where a.id in :ids and a.status = :requiredStatus")
+  int updateStatusIfCurrentStatusIn(
+      @Param("ids") List<Long> ids,
+      @Param("newStatus") ApplicationStatus newStatus,
+      @Param("requiredStatus") ApplicationStatus requiredStatus);
+
   /**
    * 엑셀 다운로드(7.6) - status 필터가 없을 때 쓴다. 7.1 과 동일하게 DRAFT 는 제외한다.
    */
