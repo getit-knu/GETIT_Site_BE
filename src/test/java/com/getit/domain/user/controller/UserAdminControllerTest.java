@@ -3,18 +3,25 @@ package com.getit.domain.user.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.recruitment.entity.Application;
+import com.getit.domain.recruitment.repository.ApplicationRepository;
+import com.getit.domain.setting.generation.entity.Generation;
+import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.user.dto.PromoteRequest;
 import com.getit.domain.user.dto.UserUpdateRequest;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,7 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 9.1~9.3 /api/admin/users */
+/** 9.1~9.4 /api/admin/users */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -47,6 +54,12 @@ class UserAdminControllerTest {
 
   @Autowired
   private GroupRepository groupRepository;
+
+  @Autowired
+  private ApplicationRepository applicationRepository;
+
+  @Autowired
+  private GenerationRepository generationRepository;
 
   private User guest(String providerId, String email, String name) {
     return userRepository.save(User.createGuest(providerId, email, name, "https://cdn.getit.com/1.png"));
@@ -193,6 +206,48 @@ class UserAdminControllerTest {
           .andExpect(jsonPath("$.error.code").value("CANNOT_REMOVE_OWN_ADMIN"));
 
       assertThat(userRepository.findById(admin.getId()).orElseThrow().isDeleted()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("POST " + USERS_PATH + "/promote")
+  class Promote {
+
+    @Test
+    @DisplayName("기수의 FINAL_PASS 지원자를 일괄 승격한다")
+    void promotesFinalPassApplicants() throws Exception {
+      Generation generation = generationRepository.save(Generation.create(9, 2026));
+      User applicant = guest("google-9", "i@getit.com", "지원자");
+      Application application = applicationRepository.save(Application.createDraft(
+          applicant.getId(), generation.getId(), "지원자", "app@getit.com", "010-1234-5678",
+          null, null, 3, "2021110000"));
+      application.submit(LocalDateTime.now());
+      application.decideDocumentResult(true);
+      application.decideFinalResult(true);
+      String body = objectMapper.writeValueAsString(new PromoteRequest(generation.getId(), null));
+
+      mockMvc.perform(post(USERS_PATH + "/promote")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.promotedCount").value(1))
+          .andExpect(jsonPath("$.data.skippedCount").value(0));
+
+      assertThat(userRepository.findById(applicant.getId()).orElseThrow().getRole()).isEqualTo(Role.MEMBER);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 기수면 404 다")
+    void returns404WhenGenerationNotFound() throws Exception {
+      String body = objectMapper.writeValueAsString(new PromoteRequest(999L, null));
+
+      mockMvc.perform(post(USERS_PATH + "/promote")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("GENERATION_NOT_FOUND"));
     }
   }
 }
