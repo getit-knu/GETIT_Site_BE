@@ -7,10 +7,13 @@ public record FileInfo(
     String url,
     String originalName,
     String contentType,
-    Long size
+    Long size,
+    Long uploaderId
 ) {
 
   public static FileInfo from(FileAsset file) {
-    return new FileInfo(file.getId(), file.getUrl(), file.getOriginalName(), file.getContentType(), file.getSize());
+    return new FileInfo(
+        file.getId(), file.getUrl(), file.getOriginalName(), file.getContentType(), file.getSize(),
+        file.getUploaderId());
   }
 }
