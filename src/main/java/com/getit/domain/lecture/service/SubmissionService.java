@@ -17,6 +17,7 @@ import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,7 @@ public class SubmissionService {
   private final AssignmentRepository assignmentRepository;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
+  private final Clock clock;
 
   @Transactional
   public SubmissionResult.Detail submit(Long assignmentId, SubmissionRequest.Submit request, Long userId) {
@@ -50,7 +52,7 @@ public class SubmissionService {
       fileConnectionService.connectAll(List.of(request.fileId()));
     }
 
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     SubmissionStatus status = determineStatus(now, assignment.getDeadline());
 
     AssignmentSubmission submission = AssignmentSubmission.submit(
@@ -73,7 +75,7 @@ public class SubmissionService {
 
     swapConnectedFile(submission.getFileId(), request.fileId());
 
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     SubmissionStatus status = determineStatus(now, assignment.getDeadline());
     submission.resubmit(request.fileId(), request.linkUrl(), request.comment(), status, now);
 
@@ -138,7 +140,8 @@ public class SubmissionService {
         .findFirst()
         .orElse(null);
     if (fileInfo == null) {
-      log.warn("과제 제출 파일 조회 실패. submissionId={}, fileId={}", submission.getId(), submission.getFileId());
+      log.warn("과제 제출 파일 조회 실패. submissionId={}, fileId={}",
+          submission.getId(), submission.getFileId());
       return SubmissionResult.Detail.of(submission, null, null);
     }
     return SubmissionResult.Detail.of(submission, fileInfo.url(), fileInfo.originalName());
