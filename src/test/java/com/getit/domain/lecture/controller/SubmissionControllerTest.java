@@ -10,10 +10,18 @@ import com.getit.domain.auth.jwt.JwtProvider;
 import com.getit.domain.lecture.dto.SubmissionRequest;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
+import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.SubmissionStatus;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.lecture.repository.LectureRepository;
+import com.getit.domain.setting.category.entity.SubCategory;
+import com.getit.domain.setting.category.entity.Track;
+import com.getit.domain.setting.category.repository.SubCategoryRepository;
+import com.getit.domain.setting.category.repository.TrackRepository;
+import com.getit.domain.setting.generation.entity.Generation;
+import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.entity.Role;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -48,12 +56,32 @@ class SubmissionControllerTest {
   @Autowired
   private AssignmentSubmissionRepository assignmentSubmissionRepository;
 
+  @Autowired
+  private LectureRepository lectureRepository;
+
+  @Autowired
+  private GenerationRepository generationRepository;
+
+  @Autowired
+  private TrackRepository trackRepository;
+
+  @Autowired
+  private SubCategoryRepository subCategoryRepository;
+
   private Long assignmentId;
 
   @BeforeEach
   void setUp() {
+    Generation generation = Generation.create(9, 2026);
+    generation.activate();
+    Long activeGenerationId = generationRepository.save(generation).getId();
+    Long trackId = trackRepository.save(Track.create("SW", 1)).getId();
+    Long subCategoryId = subCategoryRepository.save(SubCategory.create("웹기초", 1, trackId)).getId();
+    Long lectureId = lectureRepository.save(Lecture.create(
+        1, "테스트 강의", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L)).getId();
+
     assignmentId = assignmentRepository.save(Assignment.create(
-        1L, "과제", "설명", LocalDateTime.now().plusDays(7), Set.of(SubmissionType.LINK), null)).getId();
+        lectureId, "과제", "설명", LocalDateTime.now().plusDays(7), Set.of(SubmissionType.LINK), null)).getId();
   }
 
   private String memberToken() {

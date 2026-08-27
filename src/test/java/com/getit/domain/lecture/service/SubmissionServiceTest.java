@@ -10,11 +10,19 @@ import com.getit.domain.lecture.dto.SubmissionRequest;
 import com.getit.domain.lecture.dto.SubmissionResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
+import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.SubmissionStatus;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.lecture.repository.LectureRepository;
+import com.getit.domain.setting.category.entity.SubCategory;
+import com.getit.domain.setting.category.entity.Track;
+import com.getit.domain.setting.category.repository.SubCategoryRepository;
+import com.getit.domain.setting.category.repository.TrackRepository;
+import com.getit.domain.setting.generation.entity.Generation;
+import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.time.LocalDateTime;
@@ -41,6 +49,18 @@ class SubmissionServiceTest {
   private AssignmentSubmissionRepository assignmentSubmissionRepository;
 
   @Autowired
+  private LectureRepository lectureRepository;
+
+  @Autowired
+  private GenerationRepository generationRepository;
+
+  @Autowired
+  private TrackRepository trackRepository;
+
+  @Autowired
+  private SubCategoryRepository subCategoryRepository;
+
+  @Autowired
   private FileAssetRepository fileAssetRepository;
 
   private static final Long USER_ID = 100L;
@@ -48,18 +68,37 @@ class SubmissionServiceTest {
   private Long fileAssignmentId;
   private Long linkAssignmentId;
   private Long bothAssignmentId;
+  private Long activeLectureId;
   private LocalDateTime futureDeadline;
 
   @BeforeEach
   void setUp() {
+    Long generationId = activeGenerationId();
+    activeLectureId = createLecture(generationId);
+
     futureDeadline = LocalDateTime.now().plusDays(7);
     fileAssignmentId = assignmentRepository.save(Assignment.create(
-        1L, "파일 과제", "설명", futureDeadline, Set.of(SubmissionType.FILE), null)).getId();
+        createLecture(generationId), "파일 과제", "설명", futureDeadline, Set.of(SubmissionType.FILE), null))
+        .getId();
     linkAssignmentId = assignmentRepository.save(Assignment.create(
-        2L, "링크 과제", "설명", futureDeadline, Set.of(SubmissionType.LINK), null)).getId();
+        createLecture(generationId), "링크 과제", "설명", futureDeadline, Set.of(SubmissionType.LINK), null))
+        .getId();
     bothAssignmentId = assignmentRepository.save(Assignment.create(
-        3L, "파일·링크 과제", "설명", futureDeadline,
+        createLecture(generationId), "파일·링크 과제", "설명", futureDeadline,
         Set.of(SubmissionType.FILE, SubmissionType.LINK), null)).getId();
+  }
+
+  private Long activeGenerationId() {
+    Generation generation = Generation.create(9, 2026);
+    generation.activate();
+    return generationRepository.save(generation).getId();
+  }
+
+  private Long createLecture(Long generationId) {
+    Long trackId = trackRepository.save(Track.create("SW", 1)).getId();
+    Long subCategoryId = subCategoryRepository.save(SubCategory.create("웹기초", 1, trackId)).getId();
+    return lectureRepository.save(Lecture.create(
+        1, "테스트 강의", null, null, null, null, true, generationId, trackId, subCategoryId, 1L)).getId();
   }
 
   private Long uploadFile() {
@@ -103,7 +142,8 @@ class SubmissionServiceTest {
     @DisplayName("링크로 제출하면 LATE/SUBMITTED 상태가 정확히 판정된다")
     void submitsWithLinkAndMarksLateWhenPastDeadline() {
       Assignment pastDeadlineAssignment = assignmentRepository.save(Assignment.create(
-          4L, "마감지남", "설명", LocalDateTime.now().minusDays(1), Set.of(SubmissionType.LINK), null));
+          activeLectureId, "마감지남", "설명", LocalDateTime.now().minusDays(1),
+          Set.of(SubmissionType.LINK), null));
 
       SubmissionResult.Detail result = submissionService.submit(
           pastDeadlineAssignment.getId(),
@@ -119,6 +159,21 @@ class SubmissionServiceTest {
     void throwsWhenAssignmentNotFound() {
       assertThatThrownBy(() -> submissionService.submit(
           999_999L, new SubmissionRequest.Submit(null, "https://github.com/user/repo", null), USER_ID))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.ASSIGNMENT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("과거 기수 강의의 과제면 예외가 발생한다")
+    void throwsWhenLectureNotInActiveGeneration() {
+      Generation pastGeneration = generationRepository.save(Generation.create(8, 2025));
+      Long pastLectureId = createLecture(pastGeneration.getId());
+      Assignment pastAssignment = assignmentRepository.save(Assignment.create(
+          pastLectureId, "지난 기수 과제", "설명", futureDeadline, Set.of(SubmissionType.LINK), null));
+
+      assertThatThrownBy(() -> submissionService.submit(
+          pastAssignment.getId(), new SubmissionRequest.Submit(null, "https://github.com/user/repo", null),
+          USER_ID))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.ASSIGNMENT_NOT_FOUND);
     }
