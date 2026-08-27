@@ -3,6 +3,8 @@ package com.getit.domain.recruitment.controller;
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
+import com.getit.domain.recruitment.dto.BulkDecisionRequest;
+import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
@@ -78,6 +80,13 @@ public class ApplicationAdminController {
       @Valid @RequestBody DocumentDecisionRequest request
   ) {
     return ApiResponse.success(applicationEvaluationService.decide(id, request.passed()));
+  }
+
+  @Operation(summary = "서류/최종 합불 일괄 처리", description = "명세서 7.4 일괄 처리")
+  @PutMapping("/status")
+  public ApiResponse<BulkDecisionResult> decideBulk(@Valid @RequestBody BulkDecisionRequest request) {
+    return ApiResponse.success(
+        applicationEvaluationService.decideBulk(request.applicationIds(), request.status()));
   }
 
   @Operation(summary = "지원자 순차탐색(이전 · 다음)", description = "명세서 7.5")

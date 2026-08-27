@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.recruitment.dto.BulkDecisionRequest;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
@@ -344,9 +345,33 @@ class ApplicationAdminControllerTest {
     }
 
     @Test
-    @DisplayName("이미 결정된 지원서를 다시 결정하려 하면 409 다")
-    void returns409WhenAlreadyDecided() throws Exception {
+    @DisplayName("DOC_PASS 상태에서 다시 결정하면 최종 합불로 전이한다 (7.4 확장)")
+    void decidesFinalResultFromDocPass() throws Exception {
       Application application = submitted(1L, "홍길동");
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("DOC_PASS"));
+
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("FINAL_PASS"));
+    }
+
+    @Test
+    @DisplayName("이미 최종 결정된 지원서를 다시 결정하려 하면 409 다")
+    void returns409WhenAlreadyFinalDecided() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(decisionRequestJson(true)))
+          .andExpect(status().isOk());
       mockMvc.perform(patch(APPLICATIONS_PATH + "/" + application.getId() + "/decision")
               .header("Authorization", adminToken())
               .contentType(MediaType.APPLICATION_JSON)
@@ -359,6 +384,43 @@ class ApplicationAdminControllerTest {
               .content(decisionRequestJson(false)))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_SUBMITTED"));
+    }
+  }
+
+  @Nested
+  @DisplayName("PUT " + APPLICATIONS_PATH + "/status")
+  class DecideBulk {
+
+    private String bulkRequestJson(List<Long> applicationIds, ApplicationStatus status) throws Exception {
+      return objectMapper.writeValueAsString(new BulkDecisionRequest(applicationIds, status));
+    }
+
+    @Test
+    @DisplayName("SUBMITTED 인 지원서들을 일괄로 DOC_PASS 처리한다")
+    void decidesBulk() throws Exception {
+      Application first = submitted(1L, "홍길동");
+      Application second = submitted(2L, "김철수");
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/status")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(bulkRequestJson(List.of(first.getId(), second.getId()), ApplicationStatus.DOC_PASS)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.updatedCount").value(2))
+          .andExpect(jsonPath("$.data.status").value("DOC_PASS"));
+    }
+
+    @Test
+    @DisplayName("목표 status 가 유효하지 않으면 400 이다")
+    void returns400WhenTargetStatusInvalid() throws Exception {
+      Application application = submitted(1L, "홍길동");
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/status")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(bulkRequestJson(List.of(application.getId()), ApplicationStatus.SUBMITTED)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_DECISION_STATUS"));
     }
   }
 

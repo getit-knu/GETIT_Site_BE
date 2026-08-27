@@ -1,5 +1,6 @@
 package com.getit.domain.recruitment.service;
 
+import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
 import com.getit.domain.recruitment.dto.EvaluationScoreResult;
@@ -62,32 +63,51 @@ public class ApplicationEvaluationService {
   }
 
   /**
-   * 7.4. 서류 합불 처리. 제출(SUBMITTED) 상태에서만 가능하다 — 그 외 상태는 이미 처리됐거나
-   * 대상이 아니다.
+   * 7.4. 합불 처리. {@code SUBMITTED}(→ 서류 합불) · {@code DOC_PASS}(→ 최종 합불, 7.4 확장) 단계
+   * 둘 다에서 호출할 수 있다 — 어느 단계인지는 지원서의 현재 상태로 판단하고, 클라이언트는 여전히
+   * {@code passed} 불리언 하나만 보낸다(명세서 원문은 목표 status 를 직접 받는 형태지만, 기존
+   * 구현이 이미 이 불리언 시그니처로 나가 있어(PR #52) 굳이 바꾸지 않는다).
    *
-   * <p>먼저 {@link #findSubmittedApplication} 으로 404(없음 · DRAFT) · 409(SUBMITTED 아님)를
-   * 정확히 구분해서 던지고, 실제 갱신은 {@code updateStatusIfCurrentStatus} 로 원자적으로 한다
-   * — 두 결정 요청이 동시에 들어와 앞의 확인을 둘 다 통과해도 실제 갱신은 하나만 성공한다
+   * <p>먼저 {@link #findDecidableApplication} 으로 404(없음 · DRAFT) · 409(결정 가능한 상태
+   * 아님)를 정확히 구분해서 던지고, 실제 갱신은 {@code updateStatusIfCurrentStatus} 로 원자적으로
+   * 한다 — 두 결정 요청이 동시에 들어와 앞의 확인을 둘 다 통과해도 실제 갱신은 하나만 성공한다
    * (PR #52 Copilot 리뷰 지적 — 확인과 갱신이 분리돼 있으면 lost update 가 날 수 있었다).
    */
   @Transactional
   public DocumentDecisionResult decide(Long applicationId, boolean passed) {
-    findSubmittedApplication(applicationId);
+    Application application = findDecidableApplication(applicationId);
+    ApplicationStatus current = application.getStatus();
+    ApplicationStatus target = nextDecisionStatus(current, passed);
 
-    ApplicationStatus result = passed ? ApplicationStatus.DOC_PASS : ApplicationStatus.DOC_FAIL;
-    int updated = applicationRepository.updateStatusIfCurrentStatus(
-        applicationId, result, ApplicationStatus.SUBMITTED);
+    int updated = applicationRepository.updateStatusIfCurrentStatus(applicationId, target, current);
     if (updated == 0) {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
     }
 
-    return new DocumentDecisionResult(applicationId, result);
+    return new DocumentDecisionResult(applicationId, target);
+  }
+
+  /**
+   * 7.4 일괄 처리(확장). {@code applicationIds} 중 {@code targetStatus} 의 선행 상태(SUBMITTED →
+   * DOC_PASS/DOC_FAIL, DOC_PASS → FINAL_PASS/FINAL_FAIL)인 것만 원자적으로 갱신한다. 대상이
+   * 아니었던 id 는 명세서 응답에 skip 목록이 없으므로 조용히 건너뛰고 {@code updatedCount} 로만
+   * 반영한다 — 9.4(승격)의 skip 목록과 다른 점이다.
+   */
+  @Transactional
+  public BulkDecisionResult decideBulk(List<Long> applicationIds, ApplicationStatus targetStatus) {
+    ApplicationStatus requiredStatus = requiredPredecessorOf(targetStatus);
+
+    int updated = applicationRepository.updateStatusIfCurrentStatusIn(
+        applicationIds, targetStatus, requiredStatus);
+
+    return new BulkDecisionResult(updated, targetStatus);
   }
 
   /**
    * 7.3 채점 · 7.4 합불 처리 공용. DRAFT 는 없는 지원서처럼 404 로 처리하고(PR #52 리뷰 지적 —
    * 예전엔 decide 가 이 확인 없이 findById 를 직접 써서, DRAFT 지원서의 존재가 409 로 노출됐다),
-   * SUBMITTED 가 아닌 다른 상태(이미 결정됨 등)는 409 로 구분한다.
+   * 채점(saveScores)은 SUBMITTED 만 허용하므로 이 메서드는 그 상태만 통과시킨다. decide 는
+   * DOC_PASS 도 허용해야 해서 자체적으로 한 번 더 확인한다({@link #nextDecisionStatus}).
    */
   private Application findSubmittedApplication(Long applicationId) {
     Application application = applicationRepository.findById(applicationId)
@@ -97,6 +117,34 @@ public class ApplicationEvaluationService {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
     }
     return application;
+  }
+
+  /** decide(7.4) 전용. DRAFT 는 404, SUBMITTED · DOC_PASS 가 아니면 409 로 처리한다. */
+  private Application findDecidableApplication(Long applicationId) {
+    Application application = applicationRepository.findById(applicationId)
+        .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
+    if (application.getStatus() != ApplicationStatus.SUBMITTED && application.getStatus() != ApplicationStatus.DOC_PASS) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+    }
+    return application;
+  }
+
+  private ApplicationStatus nextDecisionStatus(ApplicationStatus current, boolean passed) {
+    return switch (current) {
+      case SUBMITTED -> passed ? ApplicationStatus.DOC_PASS : ApplicationStatus.DOC_FAIL;
+      case DOC_PASS -> passed ? ApplicationStatus.FINAL_PASS : ApplicationStatus.FINAL_FAIL;
+      default -> throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+    };
+  }
+
+  /** 7.4 일괄 처리 전용. 목표 status 에서 요구되는 현재 상태를 구한다 (허용 전이 표, 명세서 7.4). */
+  private ApplicationStatus requiredPredecessorOf(ApplicationStatus targetStatus) {
+    return switch (targetStatus) {
+      case DOC_PASS, DOC_FAIL -> ApplicationStatus.SUBMITTED;
+      case FINAL_PASS, FINAL_FAIL -> ApplicationStatus.DOC_PASS;
+      default -> throw new BusinessException(RecruitmentErrorCode.INVALID_DECISION_STATUS);
+    };
   }
 
   /**
