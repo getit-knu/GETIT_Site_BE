@@ -12,7 +12,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,5 +63,21 @@ public class UserAdminController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deleteUser(@PathVariable Long id, @AuthenticationPrincipal CustomUserDetails principal) {
     userAdminService.deleteUser(id, principal.getUserId());
+  }
+
+  /** 바이너리(XLSX) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. (7.6과 같은 이유) */
+  @Operation(summary = "사용자 목록 엑셀 다운로드", description = "명세서 9.5")
+  @GetMapping("/export")
+  public ResponseEntity<byte[]> exportExcel(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Role role,
+      @RequestParam(required = false) String groupId,
+      @RequestParam(required = false) Integer generationNo
+  ) {
+    byte[] excel = userAdminService.exportUsersExcel(keyword, role, groupId, generationNo);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=users.xlsx")
+        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        .body(excel);
   }
 }

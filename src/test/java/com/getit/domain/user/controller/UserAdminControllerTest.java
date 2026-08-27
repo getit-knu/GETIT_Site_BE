@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +16,9 @@ import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
+import java.io.ByteArrayInputStream;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,7 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 9.1~9.3 /api/admin/users */
+/** 9.1~9.3 · 9.5 /api/admin/users */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -193,6 +197,31 @@ class UserAdminControllerTest {
           .andExpect(jsonPath("$.error.code").value("CANNOT_REMOVE_OWN_ADMIN"));
 
       assertThat(userRepository.findById(admin.getId()).orElseThrow().isDeleted()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("GET " + USERS_PATH + "/export")
+  class ExportExcel {
+
+    @Test
+    @DisplayName("사용자 목록을 엑셀 파일로 반환한다")
+    void downloadsExcel() throws Exception {
+      guest("google-9", "i@getit.com", "김부원");
+
+      byte[] excel = mockMvc.perform(get(USERS_PATH + "/export")
+              .param("keyword", "김")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(header().string(
+              "Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+          .andReturn().getResponse().getContentAsByteArray();
+
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        assertThat(sheet.getLastRowNum()).isEqualTo(1);
+        assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("김부원");
+      }
     }
   }
 }
