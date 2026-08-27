@@ -225,10 +225,56 @@ class GroupServiceTest {
       GroupMemberAddResult result = groupService.addMembers(
           group.getId(), List.of(first.getId(), second.getId()));
 
+      // 원자적 UPDATE(assignToGroupIfUnassigned)로 반영되므로 영속성 컨텍스트가 비워진다.
+      // first · second 는 이제 detached 라 groupId 를 다시 조회해서 확인해야 한다.
       assertThat(result.addedCount()).isEqualTo(2);
       assertThat(result.memberCount()).isEqualTo(2);
-      assertThat(first.getGroupId()).isEqualTo(group.getId());
-      assertThat(second.getGroupId()).isEqualTo(group.getId());
+      assertThat(userRepository.findById(first.getId()).orElseThrow().getGroupId()).isEqualTo(group.getId());
+      assertThat(userRepository.findById(second.getId()).orElseThrow().getGroupId()).isEqualTo(group.getId());
+    }
+
+    @Test
+    @DisplayName("이미 이 조에 속한 사용자는 멱등하게 건너뛰고 addedCount 에 포함하지 않는다")
+    void skipsMembersAlreadyInTargetGroup() {
+      Group group = groupRepository.save(Group.create(activeGeneration.getId(), "1조"));
+      User already = member("google-11", "already@getit.com", "경영학과");
+      already.assignToGroup(group.getId());
+      User newMember = member("google-12", "new@getit.com", "컴퓨터공학과");
+
+      GroupMemberAddResult result = groupService.addMembers(
+          group.getId(), List.of(already.getId(), newMember.getId()));
+
+      assertThat(result.addedCount()).isEqualTo(1);
+      assertThat(result.memberCount()).isEqualTo(2);
+      assertThat(userRepository.findById(newMember.getId()).orElseThrow().getGroupId()).isEqualTo(group.getId());
+    }
+
+    @Test
+    @DisplayName("다른 기수 사용자를 추가하면 예외가 발생한다")
+    void throwsWhenUserBelongsToOtherGeneration() {
+      Group group = groupRepository.save(Group.create(activeGeneration.getId(), "1조"));
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
+      User otherGenerationUser = userRepository.save(
+          User.createGuest("google-13", "other-gen@getit.com", "부원", "url"));
+      otherGenerationUser.promoteToMember(otherGeneration.getGenerationNo());
+
+      assertThatThrownBy(() -> groupService.addMembers(group.getId(), List.of(otherGenerationUser.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 사용자를 추가하면 예외가 발생한다")
+    void throwsWhenUserIsWithdrawn() {
+      Group group = groupRepository.save(Group.create(activeGeneration.getId(), "1조"));
+      User withdrawn = member("google-14", "withdrawn@getit.com", "경영학과");
+      withdrawn.withdraw();
+
+      assertThatThrownBy(() -> groupService.addMembers(group.getId(), List.of(withdrawn.getId())))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.USER_NOT_FOUND);
     }
 
     @Test
@@ -299,6 +345,22 @@ class GroupServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 조 소속 사용자를 빼려 하면 예외가 발생하고 원래 배정은 유지된다")
+    void throwsWhenUserBelongsToDifferentGroup() {
+      Group group = groupRepository.save(Group.create(activeGeneration.getId(), "1조"));
+      Group otherGroup = groupRepository.save(Group.create(activeGeneration.getId(), "2조"));
+      User user = member("google-15", "k@getit.com", "경영학과");
+      user.assignToGroup(otherGroup.getId());
+
+      assertThatThrownBy(() -> groupService.removeMember(group.getId(), user.getId()))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+
+      assertThat(user.getGroupId()).isEqualTo(otherGroup.getId());
     }
   }
 }
