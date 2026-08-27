@@ -49,6 +49,9 @@ dependencies {
   // --- refresh token 저장소 -------------------------------------------------
   implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+  // --- 헬스체크 (배포 환경에서 인스턴스 상태 판별) ------------------------------
+  implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
   // --- API 문서 -------------------------------------------------------------
   implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 
