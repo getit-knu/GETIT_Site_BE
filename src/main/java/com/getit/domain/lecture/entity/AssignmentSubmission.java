@@ -15,12 +15,16 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
   name = "assignment_submission",
   uniqueConstraints = {
-    @UniqueConstraint(name = "uk_assignment_submission_assignment_id_user_id", columnNames = {"assignment_id", "user_id"})
+    @UniqueConstraint(
+        name = "uk_assignment_submission_assignment_id_user_id",
+        columnNames = {"assignment_id", "user_id"})
   }
 )
 @Getter
@@ -38,6 +42,7 @@ public class AssignmentSubmission extends BaseTimeEntity {
   private String linkUrl;
 
   @Enumerated(EnumType.STRING)
+  @JdbcTypeCode(SqlTypes.VARCHAR)
   @Column(nullable = false, length = 20)
   private SubmissionStatus status;
 
@@ -92,7 +97,8 @@ public class AssignmentSubmission extends BaseTimeEntity {
         .build();
   }
 
-  public void resubmit(Long fileId, String linkUrl, String comment, SubmissionStatus status, LocalDateTime submittedAt) {
+  public void resubmit(
+      Long fileId, String linkUrl, String comment, SubmissionStatus status, LocalDateTime submittedAt) {
     this.fileId = fileId;
     this.linkUrl = linkUrl;
     this.comment = comment;
