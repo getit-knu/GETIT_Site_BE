@@ -17,8 +17,8 @@ import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SubmissionService {
 
+  private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
+
   private final AssignmentSubmissionRepository assignmentSubmissionRepository;
   private final AssignmentRepository assignmentRepository;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
-  private final Clock clock;
 
   @Transactional
   public SubmissionResult.Detail submit(Long assignmentId, SubmissionRequest.Submit request, Long userId) {
@@ -53,7 +54,7 @@ public class SubmissionService {
       fileConnectionService.connectAll(List.of(request.fileId()));
     }
 
-    LocalDateTime now = LocalDateTime.now(clock);
+    LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
     SubmissionStatus status = determineStatus(now, assignment.getDeadline());
 
     AssignmentSubmission submission = AssignmentSubmission.submit(
@@ -80,7 +81,7 @@ public class SubmissionService {
 
     swapConnectedFile(submission.getFileId(), request.fileId());
 
-    LocalDateTime now = LocalDateTime.now(clock);
+    LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
     SubmissionStatus status = determineStatus(now, assignment.getDeadline());
     submission.resubmit(request.fileId(), request.linkUrl(), request.comment(), status, now);
 
