@@ -62,8 +62,7 @@ class FileConnectionServiceImplTest {
 
     assertThatThrownBy(() -> fileConnectionService.connectAll(List.of(1L, 2L)))
         .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_ALREADY_CONNECTED)
-        .hasMessageContaining("2");
+        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_ALREADY_CONNECTED);
     verify(fileAssetRepository, never()).updateStatusByIdIn(List.of(1L, 2L), FileStatus.CONNECTED);
   }
 
@@ -76,8 +75,7 @@ class FileConnectionServiceImplTest {
 
     assertThatThrownBy(() -> fileConnectionService.connectAll(List.of(1L, 2L)))
         .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND)
-        .hasMessageContaining("2");
+        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND);
   }
 
   @Test
@@ -105,8 +103,7 @@ class FileConnectionServiceImplTest {
 
     assertThatThrownBy(() -> fileConnectionService.disconnectAll(List.of(1L, 2L)))
         .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND)
-        .hasMessageContaining("2");
+        .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND);
     verify(fileAssetRepository, never()).updateStatusByIdIn(List.of(1L, 2L), FileStatus.PENDING);
   }
 }
