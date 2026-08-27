@@ -34,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubmissionService {
 
   private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
+  private static final String DUPLICATE_SUBMISSION_CONSTRAINT =
+      "uk_assignment_submission_assignment_id_user_id";
 
   private final AssignmentSubmissionRepository assignmentSubmissionRepository;
   private final AssignmentRepository assignmentRepository;
@@ -62,6 +64,9 @@ public class SubmissionService {
     try {
       assignmentSubmissionRepository.saveAndFlush(submission);
     } catch (DataIntegrityViolationException e) {
+      if (!isDuplicateSubmissionConstraintViolation(e)) {
+        throw e;
+      }
       throw new BusinessException(LectureErrorCode.DUPLICATE_SUBMISSION);
     }
 
@@ -86,6 +91,11 @@ public class SubmissionService {
     submission.resubmit(request.fileId(), request.linkUrl(), request.comment(), status, now);
 
     return toResult(submission);
+  }
+
+  private boolean isDuplicateSubmissionConstraintViolation(DataIntegrityViolationException e) {
+    Throwable cause = e.getMostSpecificCause();
+    return cause.getMessage() != null && cause.getMessage().contains(DUPLICATE_SUBMISSION_CONSTRAINT);
   }
 
   private Assignment findAssignment(Long assignmentId) {
