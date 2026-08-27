@@ -140,11 +140,11 @@ public class LectureService {
       throw new BusinessException(FileErrorCode.FILE_NOT_FOUND, "파일을 찾을 수 없습니다: " + missingFileIds);
     }
 
-    for (Long fileId : distinctFileIds) {
-      FileInfo fileInfo = fileInfoByFileId.get(fileId);
-      fileConnectionService.connect(fileId);
-      lectureFileRepository.save(LectureFile.create(fileInfo.originalName(), lectureId, fileId));
-    }
+    fileConnectionService.connectAll(distinctFileIds);
+    List<LectureFile> lectureFiles = distinctFileIds.stream()
+        .map(fileId -> LectureFile.create(fileInfoByFileId.get(fileId).originalName(), lectureId, fileId))
+        .toList();
+    lectureFileRepository.saveAll(lectureFiles);
   }
 
   private void createAssignment(Long lectureId, LectureRequest.AssignmentPart assignment) {
