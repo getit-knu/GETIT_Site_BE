@@ -80,6 +80,13 @@ public class User extends SoftDeletableEntity {
   private Integer generationNo;
 
   /**
+   * 소속 조. 미배정이면 null. {@code Group} 을 참조하는 FK 지만, 이 프로젝트 컨벤션대로
+   * JPA 연관관계 없이 값만 갖는다. (API 명세서 9.2 · 9.10 · 9.11)
+   */
+  @Column
+  private Long groupId;
+
+  /**
    * Hibernate 6 은 Java enum 을 MySQL 네이티브 ENUM 타입으로 매핑한다.
    * 그러면 값을 추가할 때마다 ALTER TABLE 이 필요하므로 varchar 로 고정한다.
    */
@@ -153,6 +160,16 @@ public class User extends SoftDeletableEntity {
   public void promoteToMember(Integer generationNo) {
     this.role = Role.MEMBER;
     this.generationNo = generationNo;
+  }
+
+  /** 조 배정. (9.2 PUT /admin/users/{id}, 9.10 POST /admin/groups/{groupId}/members) */
+  public void assignToGroup(Long groupId) {
+    this.groupId = groupId;
+  }
+
+  /** 조 배정 해제. (9.9 조 삭제, 9.11 조원 빼기) */
+  public void leaveGroup() {
+    this.groupId = null;
   }
 
   /**

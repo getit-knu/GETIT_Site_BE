@@ -45,6 +45,7 @@ class UserTest {
       assertThat(user.getStudentYear()).isNull();
       assertThat(user.getStudentNumber()).isNull();
       assertThat(user.getGenerationNo()).isNull();
+      assertThat(user.getGroupId()).isNull();
     }
 
     @Test
@@ -94,6 +95,32 @@ class UserTest {
 
       assertThat(user.getRole()).isEqualTo(Role.MEMBER);
       assertThat(user.getGenerationNo()).isEqualTo(9);
+    }
+  }
+
+  @Nested
+  @DisplayName("assignToGroup · leaveGroup")
+  class AssignAndLeaveGroup {
+
+    @Test
+    @DisplayName("조에 배정하면 groupId 가 채워진다")
+    void assignsGroup() {
+      User user = createGuest();
+
+      user.assignToGroup(1L);
+
+      assertThat(user.getGroupId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("배정을 해제하면 groupId 가 null 이 된다")
+    void leavesGroup() {
+      User user = createGuest();
+      user.assignToGroup(1L);
+
+      user.leaveGroup();
+
+      assertThat(user.getGroupId()).isNull();
     }
   }
 
