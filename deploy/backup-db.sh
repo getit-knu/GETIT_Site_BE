@@ -27,6 +27,12 @@ FILE="$BACKUP_DIR/getit-$STAMP.sql.gz"
 
 # --single-transaction 으로 잠금 없이 일관된 스냅샷을 뜬다.
 # 없으면 백업 중 쓰기가 막혀 서비스가 멈춘다.
+#
+# stderr 를 버리지 않는다. 실패했을 때 원인이 남아야 고칠 수 있다.
+# 다만 "Using a password on the command line" 경고는 매번 나오므로 걸러낸다.
+ERR_LOG=$(mktemp)
+trap 'rm -f "$ERR_LOG"' EXIT
+
 if ! docker compose exec -T mysql \
   mysqldump \
     --single-transaction \
@@ -34,15 +40,19 @@ if ! docker compose exec -T mysql \
     --routines \
     --triggers \
     -u root -p"$MYSQL_ROOT_PASSWORD" \
-    "${DB_NAME:-getit}" 2>/dev/null | gzip > "$FILE"
+    "${DB_NAME:-getit}" 2>"$ERR_LOG" | gzip > "$FILE"
 then
   echo "[$(date '+%F %T')] 백업 실패" >&2
+  grep -v "Using a password on the command line" "$ERR_LOG" | sed 's/^/    /' >&2 || true
   rm -f "$FILE"
   exit 1
 fi
 
 # 빈 파일이 만들어졌는데 성공으로 넘어가면 백업이 있다고 착각하게 된다.
-SIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
+#
+# stat -c 는 GNU 전용이라 실패하면 0 이 되고, 그러면 멀쩡한 백업을 지운다.
+# wc -c 는 어디서나 같게 동작한다.
+SIZE=$(wc -c < "$FILE")
 if [ "$SIZE" -lt 1000 ]; then
   echo "[$(date '+%F %T')] 백업 파일이 비정상적으로 작습니다 (${SIZE}B)" >&2
   rm -f "$FILE"

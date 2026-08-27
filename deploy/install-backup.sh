@@ -17,7 +17,14 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-install -o "$APP_USER" -g "$APP_USER" -m 0755 /tmp/backup-db.sh "$APP_DIR/backup-db.sh"
+SRC=/tmp/backup-db.sh
+if [ ! -f "$SRC" ]; then
+  echo "$SRC 가 없습니다. backup-db.sh 를 함께 전송했는지 확인하세요." >&2
+  echo "  scp -i {키} deploy/backup-db.sh deploy/install-backup.sh azureuser@{IP}:/tmp/" >&2
+  exit 1
+fi
+
+install -o "$APP_USER" -g "$APP_USER" -m 0755 "$SRC" "$APP_DIR/backup-db.sh"
 echo "▸ $APP_DIR/backup-db.sh 설치됨"
 
 mkdir -p "$APP_DIR/backups"

@@ -212,11 +212,45 @@ ghcr.io/getit-knu/getit_site_be:sha-{되돌릴 커밋}
 `ddl-auto: validate` 가 스키마 불일치로 기동을 막을 수 있다.
 스키마를 바꾸는 배포는 롤백이 어렵다는 점을 감안해 나눠 배포한다.
 
-**DB 백업** — 아직 자동화하지 않았다. 실사용 전에 필요하다.
+**DB 백업** — 매일 04:00 (KST) 자동 실행된다. `/opt/getit/backups` 에 14일 보관한다.
 
 ```bash
-docker compose exec mysql mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" getit > backup.sql
+# 수동 실행
+cd /opt/getit && ./backup-db.sh
+
+# 백업 목록과 로그
+ls -lh /opt/getit/backups/
+tail /opt/getit/backups/backup.log
 ```
+
+**복구** — 백업만 있고 복구 절차를 모르면 정작 필요할 때 못 쓴다.
+
+```bash
+cd /opt/getit
+source .env
+
+# 1. 앱을 먼저 내린다. 복구 중에 쓰기가 들어오면 데이터가 섞인다
+docker compose stop app
+
+# 2. 복구할 파일을 고른다
+ls -lh backups/
+
+# 3. 밀어넣는다
+gunzip -c backups/getit-{타임스탬프}.sql.gz \
+  | docker compose exec -T mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME"
+
+# 4. 앱을 올린다
+docker compose start app
+docker compose logs app --tail 50
+```
+
+⚠️ **Flyway 와의 관계** — 백업에는 `flyway_schema_history` 도 들어 있다.
+백업 시점보다 앞선 마이그레이션이 적용된 이미지가 떠 있으면
+`ddl-auto: validate` 가 스키마 불일치로 기동을 막는다.
+그럴 때는 백업 시점에 맞는 이미지 태그로 함께 롤백한다.
+
+⚠️ **백업이 DB 와 같은 디스크에 있다.** 디스크가 깨지면 둘 다 사라진다.
+실사용 전에 외부(Azure Blob 등)로 복사하는 단계를 추가해야 한다.
 
 **디스크** — 29GB 다. CD 가 배포마다 7일 지난 이미지를 정리하고,
 컨테이너 로그는 10MB × 3개로 제한했다.
