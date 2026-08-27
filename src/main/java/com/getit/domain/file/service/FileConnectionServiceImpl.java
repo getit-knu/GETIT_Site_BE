@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,8 +35,8 @@ public class FileConnectionServiceImpl implements FileConnectionService {
         .map(FileAsset::getId)
         .toList();
     if (!alreadyConnectedFileIds.isEmpty()) {
-      throw new BusinessException(
-          FileErrorCode.FILE_ALREADY_CONNECTED, "이미 연결된 파일: " + alreadyConnectedFileIds);
+      log.warn("이미 연결된 파일 재연결 시도. fileIds={}", alreadyConnectedFileIds);
+      throw new BusinessException(FileErrorCode.FILE_ALREADY_CONNECTED);
     }
 
     fileAssetRepository.updateStatusByIdIn(distinctFileIds, FileStatus.CONNECTED);
@@ -58,6 +60,7 @@ public class FileConnectionServiceImpl implements FileConnectionService {
     }
     Set<Long> foundIds = foundFiles.stream().map(FileAsset::getId).collect(Collectors.toSet());
     List<Long> missingFileIds = requestedFileIds.stream().filter(id -> !foundIds.contains(id)).toList();
-    throw new BusinessException(FileErrorCode.FILE_NOT_FOUND, "파일을 찾을 수 없습니다: " + missingFileIds);
+    log.warn("존재하지 않는 파일 연결/해제 시도. fileIds={}", missingFileIds);
+    throw new BusinessException(FileErrorCode.FILE_NOT_FOUND);
   }
 }
