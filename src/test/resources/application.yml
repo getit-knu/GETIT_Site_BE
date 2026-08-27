@@ -54,6 +54,7 @@ getit:
   auth:
     oauth2-redirect-uri: http://localhost:5173/oauth/callback
     refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax
 
 logging:
   level:

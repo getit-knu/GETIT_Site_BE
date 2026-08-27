@@ -111,4 +111,28 @@ public class Lecture extends SoftDeletableEntity {
   }
 
   public boolean isPublished() { return published; }
+
+  public void update(
+      Integer week,
+      String title,
+      String description,
+      String youtubeUrl,
+      String materialUrl,
+      Integer durationMinutes,
+      boolean published,
+      Long generationId,
+      Long trackId,
+      Long subCategoryId
+  ) {
+    this.week = week;
+    this.title = title;
+    this.description = description;
+    this.youtubeUrl = youtubeUrl;
+    this.materialUrl = materialUrl;
+    this.durationMinutes = durationMinutes;
+    this.published = published;
+    this.generationId = generationId;
+    this.trackId = trackId;
+    this.subCategoryId = subCategoryId;
+  }
 }

@@ -184,6 +184,29 @@ class UserRepositoryTest {
     assertThat(userRepository.findById(alreadyGrouped.getId()).orElseThrow().getGroupId()).isEqualTo(2L);
   }
 
+  @Test
+  @DisplayName("GUEST 인 사용자만 원자적으로 승격하고 반영된 행 수를 반환한다")
+  void promotesOnlyGuestUsersAtomically() {
+    User guestUser = userRepository.save(guest("google-sub-19", "s@getit.com"));
+    User alreadyMember = userRepository.save(guest("google-sub-20", "t@getit.com"));
+    alreadyMember.promoteToMember(8);
+    userRepository.flush();
+
+    int updated = userRepository.promoteIfEligible(
+        guestUser.getId(), Role.MEMBER, Role.GUEST, 9, "010-1234-5678", "IT융합대학", "컴퓨터공학과", 3, "2021110000");
+    int notUpdated = userRepository.promoteIfEligible(
+        alreadyMember.getId(), Role.MEMBER, Role.GUEST, 9, "010-1234-5678", null, null, 3, "2021110000");
+
+    assertThat(updated).isEqualTo(1);
+    assertThat(notUpdated).isEqualTo(0);
+    User promoted = userRepository.findById(guestUser.getId()).orElseThrow();
+    assertThat(promoted.getRole()).isEqualTo(Role.MEMBER);
+    assertThat(promoted.getGenerationNo()).isEqualTo(9);
+    assertThat(promoted.getCollege()).isEqualTo("IT융합대학");
+    // 이미 MEMBER 인 사용자는 건드리지 않는다 (다른 기수 소속을 덮어쓰지 않아야 함)
+    assertThat(userRepository.findById(alreadyMember.getId()).orElseThrow().getGenerationNo()).isEqualTo(8);
+  }
+
   @Nested
   @DisplayName("searchUsers")
   class SearchUsers {

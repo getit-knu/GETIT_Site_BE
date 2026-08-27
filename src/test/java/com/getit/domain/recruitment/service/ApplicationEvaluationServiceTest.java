@@ -3,6 +3,7 @@ package com.getit.domain.recruitment.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveResult;
@@ -186,7 +187,24 @@ class ApplicationEvaluationServiceTest {
           application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SCORABLE);
+    }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 채점할 수 없다 (존재하지 않는 것과 동일하게 취급)")
+    void throwsWhenGenerationInactive() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application application = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
+      application.submit(LocalDateTime.now());
+      EvaluationCriterion criterion = criterion(otherGeneration.getId(), 1, "전공 적합성", 60);
+
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
+          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
     }
   }
 
@@ -226,12 +244,47 @@ class ApplicationEvaluationServiceTest {
     }
 
     @Test
-    @DisplayName("이미 결정된 지원서면 예외가 발생한다")
-    void throwsWhenAlreadyDecided() {
+    @DisplayName("DOC_PASS 상태에서 다시 결정하면 최종 합불(FINAL_PASS/FINAL_FAIL)로 전이한다 (7.4 확장)")
+    void decidesFinalResultFromDocPass() {
       Application application = submitted(1L, "홍길동");
-      applicationEvaluationService.decide(application.getId(), true);
+      applicationEvaluationService.decide(application.getId(), true); // SUBMITTED -> DOC_PASS
 
-      assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), false))
+      DocumentDecisionResult result = applicationEvaluationService.decide(application.getId(), true);
+
+      assertThat(result.status()).isEqualTo(ApplicationStatus.FINAL_PASS);
+    }
+
+    @Test
+    @DisplayName("DOC_PASS 상태에서 false 로 결정하면 FINAL_FAIL 로 전이한다 (7.4 확장)")
+    void decidesFinalFailFromDocPass() {
+      Application application = submitted(1L, "홍길동");
+      applicationEvaluationService.decide(application.getId(), true); // SUBMITTED -> DOC_PASS
+
+      DocumentDecisionResult result = applicationEvaluationService.decide(application.getId(), false);
+
+      assertThat(result.status()).isEqualTo(ApplicationStatus.FINAL_FAIL);
+    }
+
+    @Test
+    @DisplayName("이미 최종 결정된(FINAL_PASS) 지원서를 다시 결정하려 하면 예외가 발생한다")
+    void throwsWhenAlreadyFinalDecided() {
+      Application application = submitted(1L, "홍길동");
+      applicationEvaluationService.decide(application.getId(), true); // -> DOC_PASS
+      applicationEvaluationService.decide(application.getId(), true); // -> FINAL_PASS
+
+      assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), true))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
+    }
+
+    @Test
+    @DisplayName("DOC_FAIL 상태의 지원서는 더 이상 결정할 수 없다 (다음 단계가 없음)")
+    void throwsWhenDocFail() {
+      Application application = submitted(1L, "홍길동");
+      applicationEvaluationService.decide(application.getId(), false); // -> DOC_FAIL
+
+      assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), true))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SUBMITTED);
@@ -244,6 +297,99 @@ class ApplicationEvaluationServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 결정할 수 없다 (존재하지 않는 것과 동일하게 취급)")
+    void throwsWhenGenerationInactive() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application application = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
+          null, null, 2, "2021110000"));
+      application.submit(LocalDateTime.now());
+
+      assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), true))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("decideBulk (7.4 일괄 처리)")
+  class DecideBulk {
+
+    @Test
+    @DisplayName("SUBMITTED 인 것만 DOC_PASS 로 일괄 갱신한다")
+    void updatesOnlySubmittedToDocPass() {
+      Application first = submitted(1L, "홍길동");
+      Application second = submitted(2L, "김철수");
+      Application alreadyDocPass = submitted(3L, "이영희");
+      applicationEvaluationService.decide(alreadyDocPass.getId(), true);
+
+      BulkDecisionResult result = applicationEvaluationService.decideBulk(
+          List.of(first.getId(), second.getId(), alreadyDocPass.getId()), ApplicationStatus.DOC_PASS);
+
+      assertThat(result.updatedCount()).isEqualTo(2);
+      assertThat(result.status()).isEqualTo(ApplicationStatus.DOC_PASS);
+    }
+
+    @Test
+    @DisplayName("DOC_PASS 인 것만 FINAL_PASS 로 일괄 갱신한다")
+    void updatesOnlyDocPassToFinalPass() {
+      Application docPass1 = submitted(1L, "홍길동");
+      applicationEvaluationService.decide(docPass1.getId(), true);
+      Application docPass2 = submitted(2L, "김철수");
+      applicationEvaluationService.decide(docPass2.getId(), true);
+      Application stillSubmitted = submitted(3L, "이영희");
+
+      BulkDecisionResult result = applicationEvaluationService.decideBulk(
+          List.of(docPass1.getId(), docPass2.getId(), stillSubmitted.getId()), ApplicationStatus.FINAL_PASS);
+
+      assertThat(result.updatedCount()).isEqualTo(2);
+      assertThat(applicationRepository.findById(stillSubmitted.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.SUBMITTED);
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 updatedCount 0을 반환한다")
+    void returnsZeroWhenNoMatch() {
+      Application application = submitted(1L, "홍길동");
+
+      BulkDecisionResult result = applicationEvaluationService.decideBulk(
+          List.of(application.getId()), ApplicationStatus.FINAL_PASS);
+
+      assertThat(result.updatedCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("목표 status 가 DRAFT · SUBMITTED 면 예외가 발생한다")
+    void throwsWhenTargetStatusInvalid() {
+      Application application = submitted(1L, "홍길동");
+
+      assertThatThrownBy(() -> applicationEvaluationService.decideBulk(
+          List.of(application.getId()), ApplicationStatus.SUBMITTED))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(RecruitmentErrorCode.INVALID_DECISION_STATUS);
+    }
+
+    @Test
+    @DisplayName("비활성 기수의 지원서는 함께 갱신되지 않는다")
+    void doesNotUpdateApplicationInInactiveGeneration() {
+      Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
+      Application otherGenerationApplication = applicationRepository.save(Application.createDraft(
+          1L, otherGeneration.getId(), "지난기수", "old@gmail.com", "010-0000-0000",
+          null, null, 2, null));
+      otherGenerationApplication.submit(LocalDateTime.now());
+      Application activeApplication = submitted(2L, "홍길동");
+
+      BulkDecisionResult result = applicationEvaluationService.decideBulk(
+          List.of(otherGenerationApplication.getId(), activeApplication.getId()), ApplicationStatus.DOC_PASS);
+
+      assertThat(result.updatedCount()).isEqualTo(1);
+      assertThat(applicationRepository.findById(otherGenerationApplication.getId()).orElseThrow().getStatus())
+          .isEqualTo(ApplicationStatus.SUBMITTED);
     }
   }
 }

@@ -1,0 +1,17 @@
+# 빌드 컨텍스트에서 제외한다. 이미지에 들어가면 안 되거나 캐시를 무효화하는 것들.
+.git
+.github
+.gradle
+build
+!build.gradle
+*/build
+.idea
+*.iml
+uploads
+.env
+.env.*
+!.env.example
+DOCS
+*.md
+.editorconfig
+.claude

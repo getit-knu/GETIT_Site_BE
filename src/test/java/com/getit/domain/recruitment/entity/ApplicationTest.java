@@ -83,4 +83,30 @@ class ApplicationTest {
 
     assertThat(application.getStatus()).isEqualTo(ApplicationStatus.DOC_FAIL);
   }
+
+  @Test
+  @DisplayName("decideFinalResult(true) 는 상태를 FINAL_PASS 로 바꾼다")
+  void decideFinalResultTruePassesToFinalPass() {
+    Application application = Application.createDraft(
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
+    application.submit(LocalDateTime.now());
+    application.decideDocumentResult(true);
+
+    application.decideFinalResult(true);
+
+    assertThat(application.getStatus()).isEqualTo(ApplicationStatus.FINAL_PASS);
+  }
+
+  @Test
+  @DisplayName("decideFinalResult(false) 는 상태를 FINAL_FAIL 로 바꾼다")
+  void decideFinalResultFalseFailsToFinalFail() {
+    Application application = Application.createDraft(
+        1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
+    application.submit(LocalDateTime.now());
+    application.decideDocumentResult(true);
+
+    application.decideFinalResult(false);
+
+    assertThat(application.getStatus()).isEqualTo(ApplicationStatus.FINAL_FAIL);
+  }
 }
