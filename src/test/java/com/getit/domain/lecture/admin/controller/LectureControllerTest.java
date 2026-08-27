@@ -323,6 +323,18 @@ class LectureControllerTest {
               .content(objectMapper.writeValueAsString(updateRequest())))
           .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(put(LECTURES_PATH + "/" + lecture.getId())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest())))
+          .andExpect(status().isUnauthorized());
+    }
   }
 
   @Nested
@@ -358,6 +370,16 @@ class LectureControllerTest {
 
       mockMvc.perform(delete(LECTURES_PATH + "/" + lecture.getId()).header("Authorization", memberToken()))
           .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      Lecture lecture = lectureRepository.save(Lecture.create(
+          1, "HTML/CSS 기초", null, null, null, null, true, activeGenerationId, trackId, subCategoryId, 1L));
+
+      mockMvc.perform(delete(LECTURES_PATH + "/" + lecture.getId()))
+          .andExpect(status().isUnauthorized());
     }
   }
 }
