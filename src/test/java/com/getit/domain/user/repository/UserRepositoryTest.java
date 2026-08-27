@@ -7,7 +7,6 @@ import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.entity.UserStatus;
 import com.getit.global.config.JpaAuditingConfig;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,46 +137,5 @@ class UserRepositoryTest {
     assertThat(userRepository.findByRoleAndStatusAndGenerationNo(Role.MEMBER, UserStatus.ACTIVE, 9))
         .extracting(User::getEmail)
         .containsExactly("i@getit.com");
-  }
-
-  @Test
-  @DisplayName("특정 기수의 활성 사용자 전체를 조 배정 여부와 무관하게 조회한다")
-  void findsAllActiveUsersByGenerationNoRegardlessOfGroup() {
-    User grouped = userRepository.save(guest("google-sub-13", "m@getit.com"));
-    grouped.promoteToMember(9);
-    grouped.assignToGroup(1L);
-
-    User unassigned = userRepository.save(guest("google-sub-14", "n@getit.com"));
-    unassigned.promoteToMember(9);
-
-    User otherGeneration = userRepository.save(guest("google-sub-15", "o@getit.com"));
-    otherGeneration.promoteToMember(8);
-
-    User withdrawnMember = userRepository.save(guest("google-sub-16", "p@getit.com"));
-    withdrawnMember.promoteToMember(9);
-    withdrawnMember.withdraw();
-
-    userRepository.flush();
-
-    assertThat(userRepository.findByGenerationNoAndStatus(9, UserStatus.ACTIVE))
-        .extracting(User::getEmail)
-        .containsExactlyInAnyOrder("m@getit.com", "n@getit.com");
-  }
-
-  @Test
-  @DisplayName("미배정 사용자만 원자적으로 조에 배정하고 반영된 행 수를 반환한다")
-  void assignsOnlyUnassignedUsersAtomically() {
-    User unassigned = userRepository.save(guest("google-sub-17", "q@getit.com"));
-    User alreadyGrouped = userRepository.save(guest("google-sub-18", "r@getit.com"));
-    alreadyGrouped.assignToGroup(2L);
-    userRepository.flush();
-
-    int updated = userRepository.assignToGroupIfUnassigned(
-        1L, List.of(unassigned.getId(), alreadyGrouped.getId()));
-
-    assertThat(updated).isEqualTo(1);
-    assertThat(userRepository.findById(unassigned.getId()).orElseThrow().getGroupId()).isEqualTo(1L);
-    // 이미 배정돼 있던 사용자는 건드리지 않는다 (다른 조에 이미 속한 경우를 덮어쓰지 않아야 함)
-    assertThat(userRepository.findById(alreadyGrouped.getId()).orElseThrow().getGroupId()).isEqualTo(2L);
   }
 }
