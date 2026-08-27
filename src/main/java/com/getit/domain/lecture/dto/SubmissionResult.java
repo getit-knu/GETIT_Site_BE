@@ -2,7 +2,8 @@ package com.getit.domain.lecture.dto;
 
 import com.getit.domain.lecture.entity.AssignmentSubmission;
 import com.getit.domain.lecture.entity.SubmissionStatus;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 public class SubmissionResult {
 
@@ -13,14 +14,16 @@ public class SubmissionResult {
       String fileName,
       String linkUrl,
       String comment,
-      LocalDateTime submittedAt,
+      OffsetDateTime submittedAt,
       SubmissionStatus status
   ) {
 
     public static Detail of(AssignmentSubmission submission, String fileUrl, String fileName) {
       return new Detail(
           submission.getId(), submission.getAssignmentId(), fileUrl, fileName, submission.getLinkUrl(),
-          submission.getComment(), submission.getSubmittedAt(), submission.getStatus());
+          submission.getComment(),
+          submission.getSubmittedAt().atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime(),
+          submission.getStatus());
     }
   }
 }
