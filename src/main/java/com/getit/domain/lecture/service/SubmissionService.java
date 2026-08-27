@@ -8,12 +8,15 @@ import com.getit.domain.lecture.dto.SubmissionResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AllowedLinkHost;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
+import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.SubmissionStatus;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.file.exception.FileErrorCode;
+import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.net.URI;
@@ -40,6 +43,8 @@ public class SubmissionService {
 
   private final AssignmentSubmissionRepository assignmentSubmissionRepository;
   private final AssignmentRepository assignmentRepository;
+  private final LectureRepository lectureRepository;
+  private final GenerationQueryService generationQueryService;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
 
@@ -104,8 +109,21 @@ public class SubmissionService {
   }
 
   private Assignment findAssignment(Long assignmentId) {
-    return assignmentRepository.findById(assignmentId)
+    Assignment assignment = assignmentRepository.findById(assignmentId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.ASSIGNMENT_NOT_FOUND));
+    validateActiveGeneration(assignment);
+    return assignment;
+  }
+
+  private void validateActiveGeneration(Assignment assignment) {
+    Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(assignment.getLectureId())
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.ASSIGNMENT_NOT_FOUND));
+    Long activeGenerationId = generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.ACTIVE_GENERATION_NOT_FOUND))
+        .id();
+    if (!lecture.getGenerationId().equals(activeGenerationId)) {
+      throw new BusinessException(LectureErrorCode.ASSIGNMENT_NOT_FOUND);
+    }
   }
 
   private void validateFileOwnership(Long fileId, Long userId) {
