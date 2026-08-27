@@ -1,0 +1,188 @@
+name: CD
+
+# main 에 머지되면 이미지를 만들어 GHCR 에 올리고 VM 에 배포한다.
+# 팀원은 PR 을 머지하는 것 외에 할 일이 없다.
+on:
+  push:
+    branches: [ main ]
+  # 특정 이미지로 되돌릴 때 쓴다.
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: '배포할 이미지 태그 (비우면 방금 만든 이미지)'
+        required: false
+        type: string
+
+# 배포가 겹치면 나중 것이 먼저 끝나 이전 버전이 살아남을 수 있다.
+# 이미지 빌드와 달리 배포는 취소하지 않고 순서대로 처리한다.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 이미지 빌드 · 푸시 — VM 설정과 무관하게 항상 동작한다.
+  # ---------------------------------------------------------------------------
+  image:
+    name: 이미지 빌드 · 푸시
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v5
+
+      - name: Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 소문자로 맞춘다. 저장소 이름에 대문자가 있으면 docker 가 태그를 거부한다.
+      - name: 이미지 태그 결정
+        id: tag
+        run: |
+          IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "value=$IMAGE:sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: 빌드 · 푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.tag.outputs.image }}:sha-${{ github.sha }}
+            ${{ steps.tag.outputs.image }}:latest
+          # 다음 빌드에서 의존성 레이어를 재사용한다. 없으면 매번 Gradle 을 처음부터 돌린다.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 요약
+        run: |
+          echo "### 이미지 푸시 완료" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.tag.outputs.value }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ---------------------------------------------------------------------------
+  # VM 배포 — VM_DEPLOY_ENABLED 변수가 true 일 때만 동작한다.
+  #
+  # 활성화 방법 (VM 세팅이 끝난 뒤)
+  #   Settings > Secrets and variables > Actions
+  #     Variables : VM_DEPLOY_ENABLED = true
+  #                 VM_HOST           = 40.82.154.5
+  #                 VM_USER           = azureuser
+  #                 HEALTHCHECK_URL   = https://{도메인}/actuator/health
+  #     Secrets   : VM_SSH_KEY        = pem 파일 내용 전체
+  #
+  # 자세한 절차는 docs/DEPLOYMENT.md 참조.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: VM 배포
+    needs: image
+    if: vars.VM_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    environment:
+      name: production
+      url: ${{ vars.HEALTHCHECK_URL }}
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v5
+
+      - name: SSH 키 준비
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ vars.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # compose 파일도 함께 배포한다. 구성이 바뀌면 VM 에 수동으로 반영할 필요가 없다.
+      - name: compose 파일 전송
+        run: |
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml \
+            "${{ vars.VM_USER }}@${{ vars.VM_HOST }}:/opt/getit/docker-compose.yml"
+
+      - name: 이미지 교체 · 재시작
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || needs.image.outputs.tag }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
+            "APP_IMAGE='$IMAGE_TAG' \
+             GHCR_USER='${{ github.actor }}' \
+             GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+             bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/getit
+
+          # 이미지를 당길 때만 로그인한다. VM 에 장기 자격증명을 남기지 않는다.
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # 배포할 이미지를 .env 에 기록한다. 수동 재시작 시에도 같은 버전이 뜬다.
+          if grep -q '^APP_IMAGE=' .env; then
+            sed -i "s|^APP_IMAGE=.*|APP_IMAGE=$APP_IMAGE|" .env
+          else
+            echo "APP_IMAGE=$APP_IMAGE" >> .env
+          fi
+
+          echo "▸ 배포 이미지: $APP_IMAGE"
+          docker compose pull app
+          docker compose up -d --remove-orphans
+
+          # 오래된 이미지가 쌓이면 디스크가 찬다. 29GB 밖에 없다.
+          docker image prune -f --filter "until=168h" >/dev/null 2>&1 || true
+
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker compose ps
+          REMOTE
+
+      # 컨테이너가 떴다고 애플리케이션이 뜬 것은 아니다.
+      # Flyway 마이그레이션과 JVM 기동에 시간이 걸린다.
+      - name: 헬스체크
+        run: |
+          URL="${{ vars.HEALTHCHECK_URL }}"
+          echo "확인 대상: $URL"
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" || echo 000)
+            if [ "$CODE" = "200" ]; then
+              echo "정상 기동 확인 (${i}회차)"
+              exit 0
+            fi
+            echo "  ${i}/30 — HTTP $CODE, 10초 후 재시도"
+            sleep 10
+          done
+          echo "::error::5분 안에 헬스체크가 통과하지 못했습니다."
+          echo "::error::VM 에서 'docker compose logs app --tail 100' 으로 원인을 확인하세요."
+          exit 1
+
+      - name: 실패 시 로그 수집
+        if: failure()
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
+            'cd /opt/getit && docker compose logs app --tail 100' || true
+
+      - name: SSH 키 삭제
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
