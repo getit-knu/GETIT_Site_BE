@@ -55,7 +55,8 @@ Let's Encrypt 인증서가 이 주소로 정상 발급된다. 도메인을 사�
 ### 3. VM 세팅
 
 ```bash
-scp -i GETIT_key.pem deploy/setup-vm.sh azureuser@40.82.154.5:/tmp/
+# 두 스크립트를 함께 보낸다. issue-cert.sh 는 5번 단계에서 쓴다.
+scp -i GETIT_key.pem deploy/setup-vm.sh deploy/issue-cert.sh azureuser@40.82.154.5:/tmp/
 ssh -i GETIT_key.pem azureuser@40.82.154.5 'sudo bash /tmp/setup-vm.sh'
 ```
 

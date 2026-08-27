@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # VM 최초 세팅. 여러 번 돌려도 같은 결과가 되도록 작성했다.
 #
-#   scp -i {키} deploy/setup-vm.sh azureuser@{IP}:/tmp/
+#   scp -i {키} deploy/setup-vm.sh deploy/issue-cert.sh azureuser@{IP}:/tmp/
 #   ssh -i {키} azureuser@{IP} 'sudo bash /tmp/setup-vm.sh'
 #
 # 하는 일 — docker · nginx · certbot 설치, 방화벽, 배포 디렉터리 생성.
@@ -24,8 +24,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
 log "기본 도구 설치"
-apt-get install -y -qq ca-certificates curl gnupg ufw ntpsysv 2>/dev/null \
-  || apt-get install -y -qq ca-certificates curl gnupg ufw
+apt-get install -y -qq ca-certificates curl gnupg ufw
 
 log "타임존 Asia/Seoul"
 timedatectl set-timezone Asia/Seoul
@@ -110,7 +109,7 @@ cat <<'NEXT'
   다음 순서
     1. /opt/getit/.env 의 값을 채운다
     2. Azure 포털에서 공인 IP 에 DNS 이름 라벨을 지정한다
-    3. deploy/issue-cert.sh 로 TLS 인증서를 발급한다
+    3. sudo bash /tmp/issue-cert.sh {도메인} {이메일} 로 TLS 인증서를 발급한다
     4. GitHub Actions 에서 CD 를 돌린다
 
 NEXT

@@ -115,9 +115,13 @@ jobs:
       - name: SSH 키 준비
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
+          # printf 로 끝 개행을 보장한다. 개행이 없으면 ssh 가 키를 invalid format 으로 거부한다.
+          printf '%s\n' "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ vars.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          # 키가 실제로 읽히는지 먼저 확인한다. 배포 중간에 실패하면 원인 파악이 어렵다.
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
+            || { echo "::error::VM_SSH_KEY 를 읽을 수 없습니다. pem 전체를 그대로 넣었는지 확인하세요."; exit 1; }
 
       # compose 파일도 함께 배포한다. 구성이 바뀌면 VM 에 수동으로 반영할 필요가 없다.
       - name: compose 파일 전송
