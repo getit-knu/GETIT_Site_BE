@@ -60,4 +60,20 @@ class GenerationRepositoryTest {
     assertThatThrownBy(() -> generationRepository.saveAndFlush(Generation.create(9, 2027)))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
+
+  @Test
+  @DisplayName("활성 상태인 기수만 원자적으로 비활성화하고 반영된 행 수를 반환한다")
+  void deactivatesOnlyIfStillActive() {
+    Generation active = Generation.create(9, 2026);
+    active.activate();
+    generationRepository.saveAndFlush(active);
+
+    int updated = generationRepository.deactivateIfActive(active.getId());
+    // 이미 비활성화된 뒤 다시 시도하면 0행이 반영된다 (동시 요청이 먼저 처리한 상황을 흉내낸다).
+    int updatedAgain = generationRepository.deactivateIfActive(active.getId());
+
+    assertThat(updated).isEqualTo(1);
+    assertThat(updatedAgain).isEqualTo(0);
+    assertThat(generationRepository.findById(active.getId()).orElseThrow().isActive()).isFalse();
+  }
 }
