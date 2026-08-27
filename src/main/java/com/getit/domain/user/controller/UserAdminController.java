@@ -1,6 +1,7 @@
 package com.getit.domain.user.controller;
 
 import com.getit.domain.auth.security.CustomUserDetails;
+import com.getit.domain.user.dto.UserExportFilter;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.dto.UserUpdateRequest;
 import com.getit.domain.user.entity.Role;
@@ -74,7 +75,7 @@ public class UserAdminController {
       @RequestParam(required = false) String groupId,
       @RequestParam(required = false) Integer generationNo
   ) {
-    byte[] excel = userAdminService.exportUsersExcel(keyword, role, groupId, generationNo);
+    byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter(keyword, role, groupId, generationNo));
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=users.xlsx")
         .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

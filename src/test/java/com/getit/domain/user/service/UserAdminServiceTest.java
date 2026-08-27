@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.user.dto.UserExportFilter;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
@@ -333,7 +334,7 @@ class UserAdminServiceTest {
       target.assignToGroup(group.getId());
       guest("google-24", "y@getit.com", "이회원");
 
-      byte[] excel = userAdminService.exportUsersExcel("김", null, null, null);
+      byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter("김", null, null, null));
 
       try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
         Sheet sheet = workbook.getSheetAt(0);
@@ -350,7 +351,7 @@ class UserAdminServiceTest {
     @Test
     @DisplayName("대상이 없으면 헤더만 있는 시트를 반환한다")
     void returnsHeaderOnlyWhenNoMatch() throws IOException {
-      byte[] excel = userAdminService.exportUsersExcel(null, Role.ADMIN, null, null);
+      byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter(null, Role.ADMIN, null, null));
 
       try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
         Sheet sheet = workbook.getSheetAt(0);

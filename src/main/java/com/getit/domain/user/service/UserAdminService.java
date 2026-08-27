@@ -3,6 +3,7 @@ package com.getit.domain.user.service;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.GroupSummary;
+import com.getit.domain.user.dto.UserExportFilter;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
@@ -75,13 +76,19 @@ public class UserAdminService {
     return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
   }
 
-  /** 9.5. 9.1 과 동일한 필터로 페이징 없이 전체를 한 시트에 담는다 (7.6 과 같은 이유). */
-  public byte[] exportUsersExcel(String keyword, Role role, String groupId, Integer generationNo) {
-    boolean unassignedOnly = UNASSIGNED_GROUP_FILTER.equalsIgnoreCase(groupId);
-    Long targetGroupId = parseGroupId(groupId, unassignedOnly);
+  /**
+   * 9.5. 9.1 과 동일한 필터로 페이징 없이 전체를 한 시트에 담는다 (7.6 과 같은 이유).
+   *
+   * <p>필터를 {@link UserExportFilter} 로 묶어서 받는다 — {@code keyword} 와 {@code groupId} 가
+   * 둘 다 {@code String} 이라, 네 인자를 그대로 받으면 호출부에서 순서가 바뀌어도 컴파일 에러 없이
+   * 통과한다(PR #71 Copilot 리뷰 지적).
+   */
+  public byte[] exportUsersExcel(UserExportFilter filter) {
+    boolean unassignedOnly = UNASSIGNED_GROUP_FILTER.equalsIgnoreCase(filter.groupId());
+    Long targetGroupId = parseGroupId(filter.groupId(), unassignedOnly);
 
     Page<User> users = userRepository.searchUsers(
-        blankToNull(keyword), role, generationNo, targetGroupId, unassignedOnly,
+        blankToNull(filter.keyword()), filter.role(), filter.generationNo(), targetGroupId, unassignedOnly,
         Pageable.unpaged(Sort.by(Sort.Direction.ASC, "id")));
 
     Map<Long, GroupSummary> groupsById = loadGroups(users.getContent());
