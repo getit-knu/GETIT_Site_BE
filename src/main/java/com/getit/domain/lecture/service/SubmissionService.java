@@ -13,6 +13,7 @@ import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.net.URI;
@@ -53,6 +54,7 @@ public class SubmissionService {
     validateSubmissionContent(request.fileId(), request.linkUrl(), assignment);
 
     if (request.fileId() != null) {
+      validateFileOwnership(request.fileId(), userId);
       fileConnectionService.connectAll(List.of(request.fileId()));
     }
 
@@ -84,6 +86,9 @@ public class SubmissionService {
     Assignment assignment = findAssignment(submission.getAssignmentId());
     validateSubmissionContent(request.fileId(), request.linkUrl(), assignment);
 
+    if (request.fileId() != null) {
+      validateFileOwnership(request.fileId(), userId);
+    }
     swapConnectedFile(submission.getFileId(), request.fileId());
 
     LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
@@ -101,6 +106,16 @@ public class SubmissionService {
   private Assignment findAssignment(Long assignmentId) {
     return assignmentRepository.findById(assignmentId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.ASSIGNMENT_NOT_FOUND));
+  }
+
+  private void validateFileOwnership(Long fileId, Long userId) {
+    FileInfo fileInfo = fileQueryService.findAllByIds(List.of(fileId)).stream()
+        .filter(info -> Objects.equals(info.fileId(), fileId))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(FileErrorCode.FILE_NOT_FOUND));
+    if (!fileInfo.uploaderId().equals(userId)) {
+      throw new BusinessException(CommonErrorCode.NOT_RESOURCE_OWNER);
+    }
   }
 
   private void validateSubmissionContent(Long fileId, String linkUrl, Assignment assignment) {
