@@ -95,6 +95,12 @@ FILE_BASE_URL=
 REFRESH_COOKIE_SECURE=true
 # 프론트와 백엔드가 같은 등록 도메인이면 Lax, 다르면 None
 REFRESH_COOKIE_SAME_SITE=Lax
+
+# --- 백업 원격 복사 (비워두면 로컬 백업만) ---
+# 자격증명은 넣지 않는다. VM 의 관리 ID 로 인증한다.
+# 준비 절차는 docs/DEPLOYMENT.md 의 "백업 오프디스크 복사" 참조.
+AZURE_STORAGE_ACCOUNT=
+AZURE_BACKUP_CONTAINER=db-backups
 ENVEOF
   chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
   chmod 600 "$APP_DIR/.env"

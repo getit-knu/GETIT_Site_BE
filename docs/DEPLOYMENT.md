@@ -32,9 +32,9 @@ App Service 였다면 `AzureBlobFileStorage` 구현이 끝날 때까지 배포�
 | 도메인 · TLS | ✅ `api.getit.io.kr`, Let's Encrypt 자동 갱신 |
 | DB 백업 | ✅ 매일 04:00 (KST) |
 | **자동 배포** | ✅ **동작 중.** main 머지 → CI 통과 → 배포 → 헬스체크 |
-| 롤백 | ⚠️ 절차만 있고 실제로 해본 적 없다 |
+| 롤백 | ✅ 리허설 완료 (추가 전용 마이그레이션 기준) |
 | 모니터링 | ⬜ 헬스체크 외 알림 없음 |
-| 백업 오프디스크 복사 | ⬜ DB 와 같은 디스크에 있다 |
+| 백업 오프디스크 복사 | ⚠️ 스크립트는 있다. Azure 스토리지 설정 전까지는 로컬에만 있다 |
 
 **팀원이 할 일은 PR 머지뿐이다.** 서버에 접속할 필요가 없다.
 CI 가 실패하면 배포는 시작조차 하지 않는다.
@@ -248,9 +248,36 @@ Actions → CD → Run workflow → `image_tag` 에 입력
 ghcr.io/getit-knu/getit_site_be:sha-{되돌릴 커밋}
 ```
 
-⚠️ **마이그레이션은 되돌아가지 않는다.** `V{n}` 이 적용된 뒤 이전 이미지로 롤백하면
-`ddl-auto: validate` 가 스키마 불일치로 기동을 막을 수 있다.
-스키마를 바꾸는 배포는 롤백이 어렵다는 점을 감안해 나눠 배포한다.
+`image_tag` 를 채우면 이미지 빌드를 건너뛴다. 롤백인데 빌드하면
+`latest` 가 되돌리려는 버전이 아니라 최신 main 을 가리키게 된다.
+배포한 이미지는 `.env` 의 `APP_IMAGE` 에 기록되므로, VM 에서 수동으로 재시작해도
+되돌린 버전이 그대로 뜬다.
+
+**리허설 결과 (V18 스키마에 V14 시절 이미지)** — 로컬에서 왕복 검증했다.
+
+```
+Successfully validated 18 migrations
+WARN: Schema `getit` has a version (18) that is newer than
+      the latest available migration (14) !
+Schema `getit` is up to date. No migration necessary.
+```
+
+Flyway 는 경고만 남기고 진행한다. `ddl-auto: validate` 도 통과했고 앱은 정상 기동했다.
+롤백은 코드만 되돌리고 스키마는 건드리지 않는다 — 그래서 다시 최신으로 올릴 때
+마이그레이션 재실행 없이 바로 복귀한다.
+
+⚠️ **다만 이건 V15~V18 에 파괴적 변경이 없었기 때문이다.**
+V15·V18 은 테이블 추가, V16 은 인덱스 추가, V17 은 **nullable 컬럼 추가와 데이터 갱신**이다.
+기존 컬럼을 지우거나 타입을 바꾼 것이 없어서 구버전 엔티티가 그대로 통과했다.
+다음 경우엔 롤백이 깨진다.
+
+| 마이그레이션 | 롤백 시 |
+|---|---|
+| 테이블 · 컬럼 추가 | 안전 (검증됨) |
+| 컬럼 삭제 · 타입 변경 | 구버전 엔티티가 찾는 컬럼이 없어 `validate` 실패 |
+| `NOT NULL` 제약 추가 | 구버전이 그 컬럼을 모르고 INSERT 하면 실패 |
+
+**스키마를 파괴적으로 바꾸는 배포는 롤백이 안 된다고 보고 나눠서 배포한다.**
 
 **DB 백업** — 매일 04:00 (KST) 자동 실행된다. `/opt/getit/backups` 에 14일 보관한다.
 
@@ -289,8 +316,64 @@ docker compose logs app --tail 50
 `ddl-auto: validate` 가 스키마 불일치로 기동을 막는다.
 그럴 때는 백업 시점에 맞는 이미지 태그로 함께 롤백한다.
 
-⚠️ **백업이 DB 와 같은 디스크에 있다.** 디스크가 깨지면 둘 다 사라진다.
-실사용 전에 외부(Azure Blob 등)로 복사하는 단계를 추가해야 한다.
+### 백업 오프디스크 복사
+
+백업이 DB 와 같은 디스크에만 있으면 디스크가 깨질 때 둘 다 사라진다.
+`upload-backup.sh` 가 백업 성공 직후 Azure Blob 으로 사본을 보낸다.
+
+**자격증명을 저장하지 않는다.** VM 의 관리 ID 로 토큰을 받아 쓴다.
+스토리지 키를 `.env` 에 넣으면 파일 하나가 새는 것만으로 어디서든 쓸 수 있는
+장기 자격증명이 유출된다. 관리 ID 토큰은 VM 안에서만 받을 수 있고 곧 만료된다.
+
+🔴 **다만 관리 ID 만으로 VM 침해가 막히지는 않는다.**
+`Storage Blob Data Contributor` 에는 **삭제 권한이 포함돼 있다.**
+VM 을 잡은 쪽은 IMDS 에서 토큰을 계속 받아 원격 백업도 지울 수 있다.
+그래서 **soft delete 와 버전 관리를 반드시 함께 켠다.** 이 설정은 계정 수준이라
+데이터 평면 권한(Blob Data Contributor)으로는 끌 수 없다. 지워져도 되돌릴 수 있다.
+
+준비는 Azure 포털에서 한 번만 하면 된다.
+
+1. **스토리지 계정 생성** — 리소스 그룹 `GETIT_그룹`, 지역 `Korea Central`
+   - 중복성: `LRS` 로 충분하다
+   - 🔴 **공용 액세스는 반드시 비활성화.** 백업에 지원자 개인정보가 들어간다
+2. **데이터 보호 켜기** — 스토리지 계정 → 데이터 관리 → 데이터 보호
+   - ✅ Blob 일시 삭제 (soft delete) — 보존 `30일`
+   - ✅ 컨테이너 일시 삭제 — 보존 `30일`
+   - ✅ Blob 버전 관리
+   - 이걸 켜야 위의 삭제 위협이 실제로 막힌다. 건너뛰면 안 된다
+3. **컨테이너 생성** — 이름 `db-backups`, 액세스 수준 **비공개**
+4. **VM 관리 ID 켜기** — 가상 머신 → 보안 → ID → 시스템 할당 → **켬**
+5. **역할 부여** — 스토리지 계정 → 액세스 제어(IAM) → 역할 할당 추가
+   → 역할 `Storage Blob Data Contributor` → 액세스 할당 대상 `관리 ID` → VM 선택
+
+   더 조이려면 `.../blobs/write` 와 `/read` 만 갖고 `/delete` 는 없는 **사용자 지정 역할**을
+   만들어 부여한다. 그러면 VM 이 털려도 원격 백업을 지울 수 없다.
+   변경 불가(immutability) 정책을 잠가서 걸면 더 강하지만, 잘못 걸면 보존 기간이 끝날 때까지
+   아무도 못 지우므로 신중히 한다.
+
+6. **VM 설정**
+
+```bash
+nano /opt/getit/.env
+#   AZURE_STORAGE_ACCOUNT={만든 계정 이름}
+#   AZURE_BACKUP_CONTAINER=db-backups
+
+# 스크립트 설치 (백업 · 업로드 · 설치 세 개를 함께 보낸다)
+scp -i GETIT_key.pem deploy/backup-db.sh deploy/upload-backup.sh deploy/install-backup.sh \
+  azureuser@40.82.154.5:/tmp/
+ssh -i GETIT_key.pem azureuser@40.82.154.5 'sudo bash /tmp/install-backup.sh'
+
+# 바로 확인
+ssh -i GETIT_key.pem azureuser@40.82.154.5 'cd /opt/getit && ./backup-db.sh'
+```
+
+마지막 줄에 `원격 복사 완료: db-backups/getit/2026/08/...` 가 나오면 된다.
+
+`AZURE_STORAGE_ACCOUNT` 가 비어 있으면 원격 복사를 건너뛰고 로컬 백업만 한다.
+원격 복사가 실패해도 로컬 백업은 남고, 로그에 실패가 기록된다.
+
+**원격 보관 기간**은 스토리지 계정의 수명 주기 관리 정책으로 건다.
+스크립트는 원격 파일을 지우지 않는다 — 백업을 지우는 코드는 버그가 나면 되돌릴 수 없다.
 
 **디스크** — 29GB 다. CD 가 배포마다 7일 지난 이미지를 정리하고,
 컨테이너 로그는 10MB × 3개로 제한했다.
@@ -301,8 +384,7 @@ docker compose logs app --tail 50
 
 | 항목 | 담당 | 비고 |
 |---|---|---|
-| 롤백 리허설 | R | 절차만 있고 실제로 해본 적이 없다 |
-| 백업 오프디스크 복사 | B | 지금은 DB 와 같은 디스크. 디스크가 깨지면 둘 다 사라진다 |
+| 백업 오프디스크 복사 | R | 스크립트는 있다. Azure 스토리지 계정 · 관리 ID 설정만 남았다 |
 | 모니터링 | B | 헬스체크 외에 알림 없음 (UptimeRobot 정도면 충분) |
 | Cloudflare 프록시 | R | 켜려면 SSL/TLS 를 `Full (strict)` 로. `Flexible` 은 리다이렉트 루프 |
 | Redis | — | **만들지 않는다.** 코드에서 쓰지 않는다 |
