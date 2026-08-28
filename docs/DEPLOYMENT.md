@@ -31,12 +31,13 @@ App Service 였다면 `AzureBlobFileStorage` 구현이 끝날 때까지 배포�
 | VM (40.82.154.5) | ✅ docker · nginx · certbot · 방화벽 |
 | 도메인 · TLS | ✅ `api.getit.io.kr`, Let's Encrypt 자동 갱신 |
 | DB 백업 | ✅ 매일 04:00 (KST) |
-| **자동 배포** | ⬜ **`VM_DEPLOY_ENABLED` 미설정 — 아직 한 번도 돌지 않았다** |
+| **자동 배포** | ✅ **동작 중.** main 머지 → CI 통과 → 배포 → 헬스체크 |
+| 롤백 | ⚠️ 절차만 있고 실제로 해본 적 없다 |
 | 모니터링 | ⬜ 헬스체크 외 알림 없음 |
 | 백업 오프디스크 복사 | ⬜ DB 와 같은 디스크에 있다 |
 
-`VM_DEPLOY_ENABLED` 를 켜기 전까지 배포는 수동이다.
-CD 는 이미지만 만들어 GHCR 에 올리고 VM 은 건드리지 않는다.
+**팀원이 할 일은 PR 머지뿐이다.** 서버에 접속할 필요가 없다.
+CI 가 실패하면 배포는 시작조차 하지 않는다.
 
 ---
 
@@ -108,16 +109,27 @@ https://{도메인}/login/oauth2/code/google
 ### 7. GitHub 설정
 
 Settings → Secrets and variables → Actions
+(`https://github.com/getit-knu/GETIT_Site_BE/settings/variables/actions`)
 
-**Variables**
+**Variables** — `New repository variable` 을 눌러 **하나씩 5개**를 만든다.
 
-```
-VM_DEPLOY_ENABLED = true            ← 이걸 켜는 순간 자동 배포 시작
-VM_HOST           = 40.82.154.5
-VM_USER           = azureuser
-HEALTHCHECK_URL   = https://api.getit.io.kr/actuator/health
-VM_SSH_HOST_KEY   = 40.82.154.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG6yBTIvd8cPBrFfogc9eDbk7UhtZK3h2OyqlUQO5FM4
-```
+| Name | Value |
+|---|---|
+| `VM_DEPLOY_ENABLED` | `true` |
+| `VM_HOST` | `40.82.154.5` |
+| `VM_USER` | `azureuser` |
+| `HEALTHCHECK_URL` | `https://api.getit.io.kr/actuator/health` |
+| `VM_SSH_HOST_KEY` | `40.82.154.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG6yBTIvd8cPBrFfogc9eDbk7UhtZK3h2OyqlUQO5FM4` |
+
+🔴 **한 항목에 여러 줄을 몰아 넣으면 안 된다.** Name 칸에는 변수 이름만,
+Value 칸에는 값만 들어간다. 위 목록을 통째로 붙여넣어 변수 하나로 만들면
+`vars.VM_DEPLOY_ENABLED` 는 존재하지 않게 되고, 배포가 조용히 건너뛰어진다.
+
+🔴 **Repository variables** 영역이어야 한다. 같은 화면 아래쪽의 Environment
+variables 에 넣으면 job 조건에서 읽히지 않는다. 옆의 Secrets 탭도 아니다.
+
+오타도 조심한다. `ture` 는 `true` 가 아니고 `azuresuser` 는 `azureuser` 가 아니다.
+값이 무엇으로 읽혔는지는 CD 실행의 `배포 설정 확인` 스텝 로그에 그대로 찍힌다.
 
 `VM_SSH_HOST_KEY` 는 접속할 서버가 정말 우리 VM 인지 확인하는 데 쓴다.
 없으면 CD 가 접속 직전에 받은 키를 그대로 믿는데, 중간자가 끼면
@@ -146,8 +158,28 @@ PR 머지 → CI 통과 → 이미지 빌드 · GHCR 푸시 → VM 배포 → �
 
 **팀원이 할 일은 PR 머지뿐이다.** 서버에 접속할 필요가 없다.
 
+CD 는 `push` 가 아니라 CI 의 `workflow_run` 으로 시작한다.
+`push` 로 받으면 CI 와 나란히 돌아 결과를 기다리지 않기 때문에,
+테스트가 깨진 커밋도 운영에 올라갈 수 있었다. 지금은 CI 가 빨간불이면 배포가 시작되지 않는다.
+
 배포는 헬스체크가 통과해야 성공으로 기록된다.
 실패하면 워크플로가 빨간불이 되고 앱 로그 100줄이 Actions 로그에 남는다.
+
+### 배포가 안 될 때
+
+먼저 CD 실행의 **`배포 설정 확인`** 스텝 로그를 본다. 읽힌 변수 값이 그대로 찍힌다.
+
+| 증상 | 원인 |
+|---|---|
+| 값이 전부 비어 있다 | 변수를 한 항목에 몰아 넣었거나 Repository variables 가 아닌 곳에 등록했다 |
+| `VM_DEPLOY_ENABLED` 만 다르다 | 오타 (`ture` 등) |
+| SSH 에서 `Permission denied` | `VM_USER` 오타, 또는 `VM_SSH_KEY` 가 pem 전체가 아니다 |
+| `unauthorized` 로 pull 실패 | GHCR 로그인 실패. 이미지 job 은 성공했는지 확인한다 |
+| 헬스체크만 실패 | 앱이 뜨다 죽었다. 같은 실행의 로그 수집 스텝에 앱 로그 100줄이 있다 |
+
+배포 job 자체가 목록에 없거나 skip 이면 워크플로 조건 문제다.
+`if:` 를 `>-` 로 여러 줄에 쓸 때 **모든 줄의 들여쓰기를 맞춰야 한다.**
+더 깊이 들여쓴 줄은 접히지 않고 줄바꿈이 남아 조건식이 깨진다.
 
 ---
 
@@ -269,10 +301,9 @@ docker compose logs app --tail 50
 
 | 항목 | 담당 | 비고 |
 |---|---|---|
-| **GitHub Variables · Secret 등록** | R | 이것만 하면 자동 배포가 켜진다 |
-| 첫 자동 배포 검증 | R | VM 의 GHCR 인증 경로가 아직 한 번도 안 돌았다 |
 | 롤백 리허설 | R | 절차만 있고 실제로 해본 적이 없다 |
 | 백업 오프디스크 복사 | B | 지금은 DB 와 같은 디스크. 디스크가 깨지면 둘 다 사라진다 |
 | 모니터링 | B | 헬스체크 외에 알림 없음 (UptimeRobot 정도면 충분) |
+| Cloudflare 프록시 | R | 켜려면 SSL/TLS 를 `Full (strict)` 로. `Flexible` 은 리다이렉트 루프 |
 | Redis | — | **만들지 않는다.** 코드에서 쓰지 않는다 |
 | 프론트 배포 | R | 별도 저장소 |
