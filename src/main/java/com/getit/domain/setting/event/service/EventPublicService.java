@@ -19,10 +19,13 @@ public class EventPublicService {
 
   public EventCalendarResult getMonthly(int year, int month) {
     YearMonth target = YearMonth.of(year, month);
-    List<EventView> events = generationQueryService.findActive()
+    List<EventCalendarResult.Item> events = generationQueryService.findActive()
         .map(GenerationSummary::generationNo)
         .map(generationNo -> eventQueryService.findByMonth(generationNo, target))
-        .orElseGet(List::of);
+        .orElseGet(List::of)
+        .stream()
+        .map(EventCalendarResult.Item::from)
+        .toList();
     return new EventCalendarResult(year, month, events);
   }
 }
