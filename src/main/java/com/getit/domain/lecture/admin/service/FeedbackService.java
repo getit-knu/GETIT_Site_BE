@@ -52,6 +52,6 @@ public class FeedbackService {
   private String findAdminName(Long adminId) {
     return userAccountService.findActiveById(adminId)
         .map(UserAccount::name)
-        .orElse(null);
+        .orElse("UNKNOWN");
   }
 }

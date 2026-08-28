@@ -115,6 +115,20 @@ class FeedbackServiceTest {
     }
 
     @Test
+    @DisplayName("작성자 계정이 비활성이면 adminName 은 UNKNOWN 이다")
+    void adminNameFallsBackToUnknown() {
+      User withdrawn = User.createGuest("gone", "gone@getit.com", "탈퇴자", null);
+      withdrawn.updateRole(Role.ADMIN);
+      withdrawn.withdraw();
+      Long withdrawnId = userRepository.save(withdrawn).getId();
+
+      FeedbackResult.CreateResult result = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("내용"), withdrawnId);
+
+      assertThat(result.adminName()).isEqualTo("UNKNOWN");
+    }
+
+    @Test
     @DisplayName("한 제출물에 여러 건 작성할 수 있다")
     void allowsMultipleFeedbacks() {
       feedbackService.create(submissionId, new FeedbackRequest.Write("첫 피드백"), adminId);
