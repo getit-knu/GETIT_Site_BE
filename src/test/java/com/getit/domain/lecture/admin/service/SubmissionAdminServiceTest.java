@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.admin.dto.SubmissionDetailResult;
+import com.getit.domain.lecture.admin.dto.SubmissionFilter;
 import com.getit.domain.lecture.admin.dto.SubmissionOverviewResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
@@ -117,7 +118,7 @@ class SubmissionAdminServiceTest {
           SubmissionStatus.SUBMITTED, LocalDateTime.now()));
 
       SubmissionOverviewResult.Overview overview = submissionAdminService.getOverview(
-          lectureId, null, null, null, PageRequest.of(0, 50));
+          lectureId, new SubmissionFilter(null, null, null), PageRequest.of(0, 50));
 
       assertThat(overview.counts().total()).isEqualTo(2);
       assertThat(overview.counts().submitted()).isEqualTo(1);
@@ -135,7 +136,7 @@ class SubmissionAdminServiceTest {
           SubmissionStatus.SUBMITTED, LocalDateTime.now()));
 
       SubmissionOverviewResult.Overview overview = submissionAdminService.getOverview(
-          lectureId, true, null, null, PageRequest.of(0, 50));
+          lectureId, new SubmissionFilter(true, null, null), PageRequest.of(0, 50));
 
       assertThat(overview.content()).hasSize(1);
       assertThat(overview.content().get(0).userName()).isEqualTo("제출자");
@@ -151,7 +152,7 @@ class SubmissionAdminServiceTest {
           lectureRepository.findById(lectureId).orElseThrow().getSubCategoryId(), 1L)).getId();
 
       assertThatThrownBy(() -> submissionAdminService.getOverview(
-          lectureWithoutAssignment, null, null, null, PageRequest.of(0, 50)))
+          lectureWithoutAssignment, new SubmissionFilter(null, null, null), PageRequest.of(0, 50)))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.ASSIGNMENT_NOT_FOUND);
     }
@@ -236,7 +237,7 @@ class SubmissionAdminServiceTest {
       Long secondId = memberA.getId() < memberB.getId() ? submissionB.getId() : submissionA.getId();
 
       SubmissionDetailResult.Navigation navigation =
-          submissionAdminService.navigate(lectureId, firstId, null, null, null);
+          submissionAdminService.navigate(lectureId, firstId, new SubmissionFilter(null, null, null));
 
       assertThat(navigation.total()).isEqualTo(2);
       assertThat(navigation.prevSubmissionId()).isNull();

@@ -3,6 +3,7 @@ package com.getit.domain.lecture.admin.service;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.lecture.admin.dto.SubmissionDetailResult;
+import com.getit.domain.lecture.admin.dto.SubmissionFilter;
 import com.getit.domain.lecture.admin.dto.SubmissionOverviewResult;
 import com.getit.domain.lecture.admin.dto.SubmissionOverviewResult.Row;
 import com.getit.domain.lecture.util.KstDateTimes;
@@ -72,14 +73,14 @@ public class SubmissionAdminService {
   }
 
   public SubmissionOverviewResult.Overview getOverview(
-      Long lectureId, Boolean submittedFilter, Boolean feedbackDoneFilter, Long groupId, Pageable pageable) {
+      Long lectureId, SubmissionFilter filter, Pageable pageable) {
     Lecture lecture = findLecture(lectureId);
     Assignment assignment = findAssignmentByLectureId(lectureId);
 
     List<RowCandidate> allCandidates = buildCandidates(lecture, assignment);
     SubmissionOverviewResult.Counts counts = countOf(allCandidates);
 
-    List<Row> filteredRows = filterCandidates(allCandidates, submittedFilter, feedbackDoneFilter, groupId).stream()
+    List<Row> filteredRows = filterCandidates(allCandidates, filter).stream()
         .map(RowCandidate::toRow)
         .toList();
     Page<Row> page = paginate(filteredRows, pageable);
@@ -125,14 +126,13 @@ public class SubmissionAdminService {
   }
 
   public SubmissionDetailResult.Navigation navigate(
-      Long lectureId, Long currentSubmissionId, Boolean submittedFilter, Boolean feedbackDoneFilter, Long groupId) {
+      Long lectureId, Long currentSubmissionId, SubmissionFilter filter) {
     Lecture lecture = findLecture(lectureId);
     Assignment assignment = findAssignmentByLectureId(lectureId);
     if (!findSubmission(currentSubmissionId).getAssignmentId().equals(assignment.getId())) {
       throw new BusinessException(LectureErrorCode.SUBMISSION_NOT_FOUND);
     }
-    List<RowCandidate> candidates = filterCandidates(
-        buildCandidates(lecture, assignment), submittedFilter, feedbackDoneFilter, groupId).stream()
+    List<RowCandidate> candidates = filterCandidates(buildCandidates(lecture, assignment), filter).stream()
         .filter(RowCandidate::submitted)
         .toList();
     return navigationOf(candidates, currentSubmissionId);
@@ -171,12 +171,11 @@ public class SubmissionAdminService {
         feedbackDoneSubmissionIds.contains(submission.getId()));
   }
 
-  private List<RowCandidate> filterCandidates(
-      List<RowCandidate> candidates, Boolean submittedFilter, Boolean feedbackDoneFilter, Long groupId) {
+  private List<RowCandidate> filterCandidates(List<RowCandidate> candidates, SubmissionFilter filter) {
     return candidates.stream()
-        .filter(row -> submittedFilter == null || row.submitted() == submittedFilter)
-        .filter(row -> feedbackDoneFilter == null || row.feedbackDone() == feedbackDoneFilter)
-        .filter(row -> groupId == null || groupId.equals(row.groupId()))
+        .filter(row -> filter.submitted() == null || row.submitted() == filter.submitted())
+        .filter(row -> filter.feedbackDone() == null || row.feedbackDone() == filter.feedbackDone())
+        .filter(row -> filter.groupId() == null || filter.groupId().equals(row.groupId()))
         .toList();
   }
 

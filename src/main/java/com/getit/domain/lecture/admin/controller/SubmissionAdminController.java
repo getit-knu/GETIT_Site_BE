@@ -1,6 +1,7 @@
 package com.getit.domain.lecture.admin.controller;
 
 import com.getit.domain.lecture.admin.dto.SubmissionDetailResult;
+import com.getit.domain.lecture.admin.dto.SubmissionFilter;
 import com.getit.domain.lecture.admin.dto.SubmissionOverviewResult;
 import com.getit.domain.lecture.admin.service.SubmissionAdminService;
 import com.getit.global.dto.ApiResponse;
@@ -32,8 +33,8 @@ public class SubmissionAdminController {
       @RequestParam(required = false) Long groupId,
       @PageableDefault(size = 50) Pageable pageable
   ) {
-    return ApiResponse.success(
-        submissionAdminService.getOverview(id, submitted, feedbackDone, groupId, pageable));
+    return ApiResponse.success(submissionAdminService.getOverview(
+        id, new SubmissionFilter(submitted, feedbackDone, groupId), pageable));
   }
 
   @Operation(summary = "제출물 상세", description = "명세서 8.7")
@@ -51,7 +52,7 @@ public class SubmissionAdminController {
       @RequestParam(required = false) Boolean feedbackDone,
       @RequestParam(required = false) Long groupId
   ) {
-    return ApiResponse.success(
-        submissionAdminService.navigate(id, currentSubmissionId, submitted, feedbackDone, groupId));
+    return ApiResponse.success(submissionAdminService.navigate(
+        id, currentSubmissionId, new SubmissionFilter(submitted, feedbackDone, groupId)));
   }
 }
