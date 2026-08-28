@@ -98,6 +98,21 @@ class ProjectAdminControllerTest {
   }
 
   @Test
+  @DisplayName("기술 스택 이름에 쉼표가 있으면 400 이다")
+  void rejectsCommaInTechStack() throws Exception {
+    String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
+        "프로젝트", "팀", "2025 Fall", null, List.of("React, Redux"),
+        null, null, null, true, null));
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  }
+
+  @Test
   @DisplayName("삭제하면 204 다")
   void deletes() throws Exception {
     ProjectCommand command = new ProjectCommand(

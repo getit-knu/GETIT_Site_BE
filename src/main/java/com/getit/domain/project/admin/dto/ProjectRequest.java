@@ -3,6 +3,9 @@ package com.getit.domain.project.admin.dto;
 import com.getit.domain.project.dto.ProjectCommand;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
@@ -13,11 +16,11 @@ public class ProjectRequest {
       @NotBlank @Size(max = 100) String teamName,
       @NotBlank @Size(max = 50) String semester,
       String description,
-      List<String> techStacks,
+      @Size(max = 10) List<@Size(max = 40) @Pattern(regexp = "[^,]+") String> techStacks,
       @Size(max = 512) String codeUrl,
       @Size(max = 512) String demoUrl,
-      Long fileId,
-      boolean isFeatured,
+      @Positive Long fileId,
+      @NotNull Boolean isFeatured,
       @Min(1) Integer order
   ) {
 

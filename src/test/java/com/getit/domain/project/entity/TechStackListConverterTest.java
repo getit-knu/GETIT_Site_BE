@@ -1,7 +1,6 @@
 package com.getit.domain.project.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -25,12 +24,5 @@ class TechStackListConverterTest {
     assertThat(converter.convertToDatabaseColumn(List.of())).isNull();
     assertThat(converter.convertToEntityAttribute(null)).isEmpty();
     assertThat(converter.convertToEntityAttribute("")).isEmpty();
-  }
-
-  @Test
-  @DisplayName("스택 이름에 쉼표가 있으면 저장을 거부한다")
-  void rejectsComma() {
-    assertThatThrownBy(() -> converter.convertToDatabaseColumn(List.of("React, Redux")))
-        .isInstanceOf(IllegalArgumentException.class);
   }
 }
