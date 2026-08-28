@@ -180,6 +180,21 @@ class SubmissionAdminServiceTest {
     }
 
     @Test
+    @DisplayName("피드백 작성 관리자를 찾을 수 없으면 이름을 UNKNOWN 으로 반환한다")
+    void returnsUnknownWhenAdminNotFound() {
+      User member = createMember("sub-7", "제출자", "컴퓨터공학과");
+      AssignmentSubmission submission = assignmentSubmissionRepository.save(AssignmentSubmission.submit(
+          assignmentId, member.getId(), null, "https://github.com/user/repo", "코멘트",
+          SubmissionStatus.SUBMITTED, LocalDateTime.now()));
+      feedbackRepository.save(Feedback.create(submission.getId(), 999_999L, "탈퇴한 관리자의 피드백"));
+
+      SubmissionDetailResult.Detail detail = submissionAdminService.getDetail(submission.getId());
+
+      assertThat(detail.feedbacks()).hasSize(1);
+      assertThat(detail.feedbacks().get(0).adminName()).isEqualTo("UNKNOWN");
+    }
+
+    @Test
     @DisplayName("이미지·PDF 파일이면 previewable 이 true 다")
     void marksPreviewableForImageFile() {
       User member = createMember("sub-6", "제출자", "컴퓨터공학과");
