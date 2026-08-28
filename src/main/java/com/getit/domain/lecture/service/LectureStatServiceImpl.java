@@ -6,15 +6,14 @@ import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository.AssignmentSubmissionCount;
 import com.getit.domain.lecture.repository.LectureRepository;
+import com.getit.domain.lecture.repository.LectureRepository.OngoingLectureRow;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -57,7 +56,8 @@ public class LectureStatServiceImpl implements LectureStatService {
     List<Lecture> lectures = lectureRepository.findRecentPublishedWithAssignment(
         generationId, trackId, PageRequest.of(0, size));
     Map<Long, Assignment> assignmentByLectureId = assignmentByLectureId(lectures);
-    Map<Long, Long> submittedByAssignmentId = submittedCountByAssignmentId(assignmentByLectureId.values());
+    Map<Long, Long> submittedByAssignmentId = submittedCountByAssignmentIds(
+        assignmentByLectureId.values().stream().map(Assignment::getId).toList());
 
     return lectures.stream()
         .map(lecture -> {
@@ -76,34 +76,21 @@ public class LectureStatServiceImpl implements LectureStatService {
     if (generationId == null) {
       return List.of();
     }
-    List<Long> lectureIds = lectureRepository.findPublishedLectureIds(generationId);
-    if (lectureIds.isEmpty()) {
-      return List.of();
-    }
     LocalDateTime todayStart = LocalDate.now(ZONE_SEOUL).atStartOfDay();
-    List<Assignment> ongoing = assignmentRepository.findOngoingByLectureIds(lectureIds, todayStart);
-    if (ongoing.isEmpty()) {
+    List<OngoingLectureRow> rows = lectureRepository.findOngoingWithAssignment(generationId, todayStart);
+    if (rows.isEmpty()) {
       return List.of();
     }
-    Map<Long, Lecture> lectureById = lectureRepository
-        .findAllById(ongoing.stream().map(Assignment::getLectureId).toList()).stream()
-        .collect(Collectors.toMap(Lecture::getId, Function.identity()));
-    Map<Long, Long> submittedByAssignmentId = submittedCountByAssignmentId(ongoing);
+    Map<Long, Long> submittedByAssignmentId = submittedCountByAssignmentIds(
+        rows.stream().map(OngoingLectureRow::getAssignmentId).toList());
 
-    return ongoing.stream()
-        .map(assignment -> {
-          Lecture lecture = lectureById.get(assignment.getLectureId());
-          if (lecture == null) {
-            return null;
-          }
-          return new OngoingLectureStat(
-              lecture.getId(),
-              lecture.getTitle(),
-              lecture.getSubCategoryId(),
-              assignment.getDeadline(),
-              submittedByAssignmentId.getOrDefault(assignment.getId(), 0L));
-        })
-        .filter(Objects::nonNull)
+    return rows.stream()
+        .map(row -> new OngoingLectureStat(
+            row.getLectureId(),
+            row.getTitle(),
+            row.getSubCategoryId(),
+            row.getDeadline(),
+            submittedByAssignmentId.getOrDefault(row.getAssignmentId(), 0L)))
         .toList();
   }
 
@@ -117,8 +104,7 @@ public class LectureStatServiceImpl implements LectureStatService {
         .collect(Collectors.toMap(Assignment::getLectureId, Function.identity(), (first, ignored) -> first));
   }
 
-  private Map<Long, Long> submittedCountByAssignmentId(Collection<Assignment> assignments) {
-    List<Long> assignmentIds = assignments.stream().map(Assignment::getId).toList();
+  private Map<Long, Long> submittedCountByAssignmentIds(List<Long> assignmentIds) {
     if (assignmentIds.isEmpty()) {
       return Map.of();
     }
