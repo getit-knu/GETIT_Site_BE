@@ -12,6 +12,7 @@ import com.getit.domain.lecture.entity.Feedback;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.LectureFile;
 import com.getit.domain.lecture.entity.SubmissionStatus;
+import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
@@ -30,6 +31,7 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.time.LocalDateTime;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -108,11 +110,11 @@ class LectureServiceTest {
 
   private Assignment assignment(Long lectureId, LocalDateTime deadline) {
     return assignmentRepository.save(Assignment.create(
-        lectureId, "과제", "설명", deadline, java.util.Set.of(
-            com.getit.domain.lecture.entity.SubmissionType.LINK), null));
+        lectureId, "과제", "설명", deadline, Set.of(SubmissionType.LINK), null));
   }
 
   @Nested
+  @DisplayName("getLectures (4.1)")
   class GetLectures {
 
     @Test
@@ -154,16 +156,20 @@ class LectureServiceTest {
     }
 
     @Test
-    @DisplayName("공개 강의가 있는 소분류만 탭으로 노출한다")
-    void tabsListSubCategoriesWithPublishedLectures() {
+    @DisplayName("강의가 0개인 소분류도 탭에 포함하고 count 는 0 이다")
+    void tabsIncludeEmptySubCategories() {
       lecture(true, activeGenerationId, memberId);
       Long emptySubCategoryId = subCategoryRepository.save(SubCategory.create("빈 분류", 2, trackId)).getId();
 
       LectureResult.ListResult result =
           lectureService.getLectures(memberId, null, null, PageRequest.of(0, 12));
 
-      assertThat(result.tabs()).extracting(LectureResult.Tab::subCategoryId).containsExactly(subCategoryId);
-      assertThat(result.tabs()).extracting(LectureResult.Tab::subCategoryId).doesNotContain(emptySubCategoryId);
+      assertThat(result.tabs()).extracting(LectureResult.Tab::subCategoryId)
+          .containsExactlyInAnyOrder(subCategoryId, emptySubCategoryId);
+      assertThat(result.tabs())
+          .filteredOn(tab -> tab.subCategoryId().equals(emptySubCategoryId))
+          .singleElement()
+          .extracting(LectureResult.Tab::count).isEqualTo(0L);
     }
 
     @Test
@@ -178,6 +184,7 @@ class LectureServiceTest {
   }
 
   @Nested
+  @DisplayName("getLecture (4.2)")
   class GetLecture {
 
     @Test
@@ -202,6 +209,42 @@ class LectureServiceTest {
             assertThat(feedback.adminName()).isEqualTo("관리자");
             assertThat(feedback.content()).isEqualTo("좋습니다");
           });
+    }
+
+    @Test
+    @DisplayName("피드백 작성자 계정이 탈퇴 상태면 adminName 은 UNKNOWN")
+    void feedbackAdminNameFallsBackToUnknown() {
+      User admin = userRepository.save(User.createGuest("admin", "admin@getit.com", "관리자", null));
+      admin.withdraw();
+      Lecture lecture = lecture(true, activeGenerationId, memberId);
+      Assignment assignment = assignment(lecture.getId(), LocalDateTime.now().plusDays(3));
+      AssignmentSubmission submission = assignmentSubmissionRepository.save(AssignmentSubmission.submit(
+          assignment.getId(), memberId, null, "https://github.com/a/b", null, SubmissionStatus.SUBMITTED,
+          LocalDateTime.now()));
+      feedbackRepository.save(Feedback.create(submission.getId(), admin.getId(), "확인함"));
+
+      LectureResult.DetailResult result = lectureService.getLecture(memberId, lecture.getId());
+
+      assertThat(result.mySubmission().feedbacks()).singleElement()
+          .extracting(LectureResult.FeedbackItem::adminName).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("연결된 파일이 삭제됐으면 해당 자료는 materials 에서 조용히 빠진다")
+    void deletedMaterialFileIsSilentlyExcluded() {
+      Lecture lecture = lecture(true, activeGenerationId, memberId);
+      FileAsset live = fileAssetRepository.save(FileAsset.upload(
+          "key/live", "살아있음.pdf", "https://cdn/live", 10L, "application/pdf", memberId));
+      FileAsset gone = fileAssetRepository.save(FileAsset.upload(
+          "key/gone", "사라짐.pdf", "https://cdn/gone", 10L, "application/pdf", memberId));
+      gone.delete();
+      lectureFileRepository.save(LectureFile.create("살아있음", lecture.getId(), live.getId()));
+      lectureFileRepository.save(LectureFile.create("사라짐", lecture.getId(), gone.getId()));
+
+      LectureResult.DetailResult result = lectureService.getLecture(memberId, lecture.getId());
+
+      assertThat(result.materials()).extracting(LectureResult.Material::fileId)
+          .containsExactly(live.getId());
     }
 
     @Test
@@ -250,6 +293,7 @@ class LectureServiceTest {
   }
 
   @Nested
+  @DisplayName("getMaterialDownloadUrl (4.3)")
   class GetMaterialDownloadUrl {
 
     @Test
@@ -279,6 +323,18 @@ class LectureServiceTest {
           lectureService.getMaterialDownloadUrl(memberId, lecture.getId(), file.getId()))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", FileErrorCode.FILE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 기수가 없으면 403")
+    void forbiddenWhenNoActiveGeneration() {
+      Lecture lecture = lecture(true, activeGenerationId, memberId);
+      generationRepository.findById(activeGenerationId).orElseThrow().deactivate();
+
+      assertThatThrownBy(() ->
+          lectureService.getMaterialDownloadUrl(memberId, lecture.getId(), 1L))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.FORBIDDEN);
     }
   }
 }

@@ -18,6 +18,7 @@ import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -79,49 +80,64 @@ class LectureControllerTest {
     return "Bearer " + jwtProvider.createAccessToken(userId, userId + "@getit.com", Role.MEMBER);
   }
 
-  @Test
-  @DisplayName("GET /api/member/lectures: 토큰 없으면 401")
-  void listRejectsAnonymous() throws Exception {
-    mockMvc.perform(get("/api/member/lectures"))
-        .andExpect(status().isUnauthorized());
+  @Nested
+  @DisplayName("GET /api/member/lectures")
+  class GetLectures {
+
+    @Test
+    @DisplayName("토큰 없으면 401")
+    void rejectsAnonymous() throws Exception {
+      mockMvc.perform(get("/api/member/lectures"))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("활성 기수 부원이면 200")
+    void returnsLectures() throws Exception {
+      mockMvc.perform(get("/api/member/lectures").header("Authorization", token(memberId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].id").value(lectureId));
+    }
+
+    @Test
+    @DisplayName("다른 기수 부원이면 403")
+    void forbidsOutsider() throws Exception {
+      mockMvc.perform(get("/api/member/lectures").header("Authorization", token(outsiderId)))
+          .andExpect(status().isForbidden());
+    }
   }
 
-  @Test
-  @DisplayName("GET /api/member/lectures: 활성 기수 부원이면 200")
-  void listReturnsLectures() throws Exception {
-    mockMvc.perform(get("/api/member/lectures").header("Authorization", token(memberId)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content[0].id").value(lectureId));
+  @Nested
+  @DisplayName("GET /api/member/lectures/{id}")
+  class GetLecture {
+
+    @Test
+    @DisplayName("활성 기수 부원이면 200")
+    void returnsLecture() throws Exception {
+      mockMvc.perform(get("/api/member/lectures/" + lectureId).header("Authorization", token(memberId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.id").value(lectureId))
+          .andExpect(jsonPath("$.data.mySubmission").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("없는 강의면 404")
+    void notFound() throws Exception {
+      mockMvc.perform(get("/api/member/lectures/999999").header("Authorization", token(memberId)))
+          .andExpect(status().isNotFound());
+    }
   }
 
-  @Test
-  @DisplayName("GET /api/member/lectures: 다른 기수 부원이면 403")
-  void listForbidsOutsider() throws Exception {
-    mockMvc.perform(get("/api/member/lectures").header("Authorization", token(outsiderId)))
-        .andExpect(status().isForbidden());
-  }
+  @Nested
+  @DisplayName("GET /api/member/lectures/{lectureId}/materials/{fileId}/download")
+  class DownloadMaterial {
 
-  @Test
-  @DisplayName("GET /api/member/lectures/{id}: 활성 기수 부원이면 200")
-  void detailReturnsLecture() throws Exception {
-    mockMvc.perform(get("/api/member/lectures/" + lectureId).header("Authorization", token(memberId)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.id").value(lectureId))
-        .andExpect(jsonPath("$.data.mySubmission").doesNotExist());
-  }
-
-  @Test
-  @DisplayName("GET /api/member/lectures/{id}: 없는 강의면 404")
-  void detailNotFound() throws Exception {
-    mockMvc.perform(get("/api/member/lectures/999999").header("Authorization", token(memberId)))
-        .andExpect(status().isNotFound());
-  }
-
-  @Test
-  @DisplayName("GET .../materials/{fileId}/download: 연결 안 된 파일이면 404")
-  void downloadNotFoundWhenFileNotLinked() throws Exception {
-    mockMvc.perform(get("/api/member/lectures/" + lectureId + "/materials/123/download")
-            .header("Authorization", token(memberId)))
-        .andExpect(status().isNotFound());
+    @Test
+    @DisplayName("연결 안 된 파일이면 404")
+    void notFoundWhenFileNotLinked() throws Exception {
+      mockMvc.perform(get("/api/member/lectures/" + lectureId + "/materials/123/download")
+              .header("Authorization", token(memberId)))
+          .andExpect(status().isNotFound());
+    }
   }
 }
