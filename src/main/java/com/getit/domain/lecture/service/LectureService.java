@@ -1,5 +1,6 @@
 package com.getit.domain.lecture.service;
 
+import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.lecture.dto.LectureResult;
@@ -53,6 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class LectureService {
 
+  /** 로컬 스토리지라 presigned URL 이 아니다. 계약 유지용 고정값이며 실제 만료는 없다. */
+  private static final int DOWNLOAD_URL_EXPIRES_IN = 300;
+
   private final LectureRepository lectureRepository;
   private final LectureFileRepository lectureFileRepository;
   private final AssignmentRepository assignmentRepository;
@@ -97,12 +101,7 @@ public class LectureService {
 
   public LectureResult.DetailResult getLecture(Long userId, Long lectureId) {
     GenerationSummary generation = requireActiveMember(userId);
-
-    Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
-        .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
-    if (!lecture.isPublished() || !lecture.getGenerationId().equals(generation.id())) {
-      throw new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND);
-    }
+    Lecture lecture = requireVisibleLecture(lectureId, generation);
 
     CategoryNames names = CategoryNames.from(categoryQueryService.findAllTracksWithSubCategories());
     Assignment assignment = assignmentRepository.findByLectureId(lectureId).orElse(null);
@@ -124,6 +123,27 @@ public class LectureService {
             assignment.getId(), assignment.getTitle(), assignment.getDescription(),
             KstDateTimes.toOffset(assignment.getDeadline())),
         assignment == null ? null : resolveMySubmission(assignment.getId(), userId));
+  }
+
+  public LectureResult.DownloadUrl getMaterialDownloadUrl(Long userId, Long lectureId, Long fileId) {
+    GenerationSummary generation = requireActiveMember(userId);
+    requireVisibleLecture(lectureId, generation);
+
+    LectureFile lectureFile = lectureFileRepository.findByLectureIdAndFileId(lectureId, fileId)
+        .orElseThrow(() -> new BusinessException(FileErrorCode.FILE_NOT_FOUND));
+    FileInfo info = fileQueryService.findById(fileId);
+
+    return new LectureResult.DownloadUrl(
+        info.url(), lectureFile.getDisplayName(), info.contentType(), DOWNLOAD_URL_EXPIRES_IN);
+  }
+
+  private Lecture requireVisibleLecture(Long lectureId, GenerationSummary generation) {
+    Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
+    if (!lecture.isPublished() || !lecture.getGenerationId().equals(generation.id())) {
+      throw new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND);
+    }
+    return lecture;
   }
 
   private Set<Long> findSubmittedAssignmentIds(Long userId, Collection<Assignment> assignments) {

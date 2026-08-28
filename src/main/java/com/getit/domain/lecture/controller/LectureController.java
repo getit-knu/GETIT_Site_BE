@@ -44,4 +44,15 @@ public class LectureController {
   ) {
     return ApiResponse.success(lectureService.getLecture(principal.getUserId(), id));
   }
+
+  @Operation(summary = "부원 강의 자료 다운로드 URL", description = "명세서 4.3")
+  @GetMapping("/{lectureId}/materials/{fileId}/download")
+  public ApiResponse<LectureResult.DownloadUrl> getMaterialDownloadUrl(
+      @PathVariable Long lectureId,
+      @PathVariable Long fileId,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ApiResponse.success(
+        lectureService.getMaterialDownloadUrl(principal.getUserId(), lectureId, fileId));
+  }
 }

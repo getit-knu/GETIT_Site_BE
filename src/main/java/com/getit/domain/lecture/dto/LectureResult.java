@@ -74,4 +74,6 @@ public class LectureResult {
   ) { }
 
   public record FeedbackItem(Long id, String adminName, String content, OffsetDateTime createdAt) { }
+
+  public record DownloadUrl(String downloadUrl, String fileName, String contentType, int expiresIn) { }
 }
