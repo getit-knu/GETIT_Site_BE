@@ -146,13 +146,15 @@ jobs:
     name: VM 배포
     needs: image
     # image 를 건너뛴 롤백에서도 배포는 이어져야 하므로 always() 로 받고 조건을 직접 쓴다.
+    #
+    # ⚠️ 모든 줄의 들여쓰기를 똑같이 맞춘다. `>-` 는 더 깊이 들여쓴 줄을 접지 않고
+    # 줄바꿈을 그대로 남기는데, 그러면 조건식이 여러 줄짜리 문자열로 전달돼
+    # 조용히 거짓이 되고 배포가 skip 된다. 이유가 로그에 남지 않아 찾기 어렵다.
     if: >-
       always()
       && vars.VM_DEPLOY_ENABLED == 'true'
-      && (github.event_name == 'workflow_dispatch'
-          || github.event.workflow_run.conclusion == 'success')
-      && (needs.image.result == 'success'
-          || (needs.image.result == 'skipped' && inputs.image_tag != ''))
+      && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+      && (needs.image.result == 'success' || (needs.image.result == 'skipped' && inputs.image_tag != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
