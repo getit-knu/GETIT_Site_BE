@@ -58,10 +58,14 @@ public class FaqAdminService {
    */
   @Transactional
   public FaqResult updateFaq(Long faqId, FaqRequest request) {
-    Faq target = findFaq(faqId);
+    List<Faq> siblings = faqRepository.findAllForUpdate();
+    Faq target = siblings.stream()
+        .filter(candidate -> candidate.getId().equals(faqId))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(FaqErrorCode.FAQ_NOT_FOUND));
 
     if (request.order() != null) {
-      moveOrder(target, request.order());
+      moveOrder(siblings, target, request.order());
     }
     target.update(request.toCommand());
 
@@ -85,8 +89,7 @@ public class FaqAdminService {
         .forEach(sibling -> sibling.updateOrder(sibling.getOrder() - 1));
   }
 
-  private void moveOrder(Faq target, int requestedOrder) {
-    List<Faq> siblings = faqRepository.findAllForUpdate();
+  private void moveOrder(List<Faq> siblings, Faq target, int requestedOrder) {
     int currentOrder = target.getOrder();
     int newOrder = clamp(requestedOrder, 1, siblings.size());
     if (newOrder < currentOrder) {
@@ -105,10 +108,5 @@ public class FaqAdminService {
 
   private int clamp(int value, int min, int max) {
     return Math.max(min, Math.min(value, max));
-  }
-
-  private Faq findFaq(Long faqId) {
-    return faqRepository.findById(faqId)
-        .orElseThrow(() -> new BusinessException(FaqErrorCode.FAQ_NOT_FOUND));
   }
 }
