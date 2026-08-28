@@ -8,7 +8,7 @@ CREATE TABLE event
     place          varchar(100) NOT NULL,
     start_date     date         NOT NULL,
     end_date       date         NOT NULL,
-    visible        bit(1)       NOT NULL,
+    is_visible     bit(1)       NOT NULL,
     type           varchar(20)  NOT NULL,
     generation_id  bigint       NOT NULL,
 

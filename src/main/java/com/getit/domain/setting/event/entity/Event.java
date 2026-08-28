@@ -40,7 +40,7 @@ public class Event extends BaseTimeEntity {
   private LocalDate endDate;
 
   @Column(nullable = false)
-  private boolean visible;
+  private boolean isVisible;
 
   @Enumerated(EnumType.STRING)
   @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -56,7 +56,7 @@ public class Event extends BaseTimeEntity {
       String place,
       LocalDate startDate,
       LocalDate endDate,
-      boolean visible,
+      boolean isVisible,
       EventType type,
       long generationId
   ) {
@@ -64,7 +64,7 @@ public class Event extends BaseTimeEntity {
     this.place = place;
     this.startDate = startDate;
     this.endDate = endDate;
-    this.visible = visible;
+    this.isVisible = isVisible;
     this.type = type;
     this.generationId = generationId;
   }
@@ -74,7 +74,7 @@ public class Event extends BaseTimeEntity {
       String place,
       LocalDate startDate,
       LocalDate endDate,
-      boolean visible,
+      boolean isVisible,
       EventType type,
       long generationId
   ) {
@@ -83,7 +83,7 @@ public class Event extends BaseTimeEntity {
         .place(place)
         .startDate(startDate)
         .endDate(endDate)
-        .visible(visible)
+        .isVisible(isVisible)
         .type(type)
         .generationId(generationId)
         .build();
@@ -94,7 +94,7 @@ public class Event extends BaseTimeEntity {
       String place,
       LocalDate startDate,
       LocalDate endDate,
-      boolean visible,
+      boolean isVisible,
       EventType type,
       long generationId
   ) {
@@ -102,7 +102,7 @@ public class Event extends BaseTimeEntity {
     this.place = place;
     this.startDate = startDate;
     this.endDate = endDate;
-    this.visible = visible;
+    this.isVisible = isVisible;
     this.type = type;
     this.generationId = generationId;
   }
