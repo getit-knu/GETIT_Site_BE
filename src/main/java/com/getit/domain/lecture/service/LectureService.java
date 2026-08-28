@@ -22,6 +22,7 @@ import com.getit.domain.setting.category.service.CategoryQueryService;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.UserAccount;
+import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.service.UserAccountService;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
@@ -241,6 +242,9 @@ public class LectureService {
         .orElseThrow(() -> new BusinessException(CommonErrorCode.FORBIDDEN));
     UserAccount me = userAccountService.findActiveById(userId)
         .orElseThrow(() -> new BusinessException(CommonErrorCode.FORBIDDEN));
+    if (me.role() != Role.MEMBER && me.role() != Role.ADMIN) {
+      throw new BusinessException(CommonErrorCode.FORBIDDEN);
+    }
     if (me.generationNo() == null || !me.generationNo().equals(active.generationNo())) {
       throw new BusinessException(CommonErrorCode.FORBIDDEN);
     }

@@ -26,6 +26,7 @@ import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
@@ -170,6 +171,19 @@ class LectureServiceTest {
           .filteredOn(tab -> tab.subCategoryId().equals(emptySubCategoryId))
           .singleElement()
           .extracting(LectureResult.Tab::count).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("역할이 부원·운영진이 아니면 기수 번호가 남아 있어도 FORBIDDEN")
+    void throwsForbiddenWhenRoleNotMemberEvenWithGenerationNo() {
+      User demoted = member("demoted", ACTIVE_GENERATION_NO);
+      demoted.updateRole(Role.GUEST);
+      userRepository.save(demoted);
+
+      assertThatThrownBy(() ->
+          lectureService.getLectures(demoted.getId(), null, null, PageRequest.of(0, 12)))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.FORBIDDEN);
     }
 
     @Test
