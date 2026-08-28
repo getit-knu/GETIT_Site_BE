@@ -181,7 +181,33 @@ jobs:
           echo "VM_USER           = '${{ vars.VM_USER }}'"
           echo "HEALTHCHECK_URL   = '${{ vars.HEALTHCHECK_URL }}'"
           echo "VM_SSH_HOST_KEY   = ${{ vars.VM_SSH_HOST_KEY != '' && '설정됨' || '비어 있음' }}"
-          echo "VM_SSH_KEY        = ${{ secrets.VM_SSH_KEY != '' && '설정됨' || '비어 있음' }}"
+          echo "VM_SSH_KEY(시크릿) = ${{ secrets.VM_SSH_KEY != '' && '설정됨' || '비어 있음' }}"
+
+          # vars 가 전부 비었을 때 어디에 등록됐는지 좁힌다.
+          # 같은 화면에 Variables 탭과 Secrets 탭이 나란히 있어 섞어 넣기 쉽다.
+          if [ -z "${{ vars.VM_DEPLOY_ENABLED }}${{ vars.VM_HOST }}${{ vars.VM_USER }}" ]; then
+            echo "--- vars 가 전부 비어 있어 시크릿 쪽을 확인합니다 ---"
+            echo "secrets.VM_DEPLOY_ENABLED = ${{ secrets.VM_DEPLOY_ENABLED != '' && '있음' || '없음' }}"
+            echo "secrets.VM_HOST           = ${{ secrets.VM_HOST != '' && '있음' || '없음' }}"
+            echo "secrets.VM_USER           = ${{ secrets.VM_USER != '' && '있음' || '없음' }}"
+            echo "secrets.HEALTHCHECK_URL   = ${{ secrets.HEALTHCHECK_URL != '' && '있음' || '없음' }}"
+            {
+              echo "### 배포 변수를 찾지 못했습니다"
+              echo ""
+              echo "| 이름 | Variables | Secrets |"
+              echo "|---|---|---|"
+              echo "| VM_DEPLOY_ENABLED | 비어 있음 | ${{ secrets.VM_DEPLOY_ENABLED != '' && '**있음**' || '없음' }} |"
+              echo "| VM_HOST | 비어 있음 | ${{ secrets.VM_HOST != '' && '**있음**' || '없음' }} |"
+              echo "| VM_USER | 비어 있음 | ${{ secrets.VM_USER != '' && '**있음**' || '없음' }} |"
+              echo "| HEALTHCHECK_URL | 비어 있음 | ${{ secrets.HEALTHCHECK_URL != '' && '**있음**' || '없음' }} |"
+              echo ""
+              echo "Secrets 쪽이 **있음** 이면 Variables 탭으로 다시 등록하면 됩니다."
+              echo "양쪽 다 없으면 저장소가 아니라 조직(Organization) 설정에 등록됐거나,"
+              echo "입력 후 저장 버튼을 누르지 않은 것입니다."
+              echo ""
+              echo "등록 위치: https://github.com/${{ github.repository }}/settings/variables/actions"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
 
           if [ "${{ vars.VM_DEPLOY_ENABLED }}" != "true" ]; then
             echo "::warning::VM_DEPLOY_ENABLED 가 'true' 가 아니라 배포를 건너뜁니다. 이미지는 GHCR 에 올라가 있습니다."
