@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
 import com.getit.domain.project.repository.ProjectRepository;
@@ -30,6 +32,9 @@ class ProjectPublicControllerTest {
 
   @Autowired
   private ProjectRepository projectRepository;
+
+  @Autowired
+  private FileAssetRepository fileAssetRepository;
 
   private void seed(String title, String semester, int order, Long fileId) {
     projectRepository.save(Project.create(new ProjectCommand(
@@ -58,12 +63,23 @@ class ProjectPublicControllerTest {
   }
 
   @Test
-  @DisplayName("삭제됐거나 없는 썸네일 파일은 thumbnailUrl 이 null 이다")
-  void nullThumbnailWhenFileMissing() throws Exception {
-    seed("A", "2025-FALL", 1, 999L);
+  @DisplayName("썸네일은 살아있는 파일이면 url, soft-delete 됐거나 없으면 null 이다")
+  void resolvesThumbnailUrl() throws Exception {
+    FileAsset live = fileAssetRepository.save(FileAsset.upload(
+        "k1", "live.png", "https://cdn.getit.com/live.png", 10L, "image/png", 1L));
+    FileAsset removed = fileAssetRepository.save(FileAsset.upload(
+        "k2", "gone.png", "https://cdn.getit.com/gone.png", 10L, "image/png", 1L));
+    removed.delete();
+    fileAssetRepository.flush();
+
+    seed("살아있음", "2025-FALL", 1, live.getId());
+    seed("삭제됨", "2025-FALL", 2, removed.getId());
+    seed("없음", "2025-FALL", 3, null);
 
     mockMvc.perform(get(PROJECTS_PATH))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content[0].thumbnailUrl").isEmpty());
+        .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://cdn.getit.com/live.png"))
+        .andExpect(jsonPath("$.data.content[1].thumbnailUrl").isEmpty())
+        .andExpect(jsonPath("$.data.content[2].thumbnailUrl").isEmpty());
   }
 }
