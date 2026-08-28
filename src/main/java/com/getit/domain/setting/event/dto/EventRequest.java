@@ -14,4 +14,9 @@ public record EventRequest(
     @NotNull LocalDate endDate,
     @NotNull EventType type,
     @NotNull Boolean isVisible
-) { }
+) {
+
+  public EventCommand toCommand() {
+    return new EventCommand(title, place, startDate, endDate, isVisible, type);
+  }
+}

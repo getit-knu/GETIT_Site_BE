@@ -1,5 +1,6 @@
 package com.getit.domain.setting.event.entity;
 
+import com.getit.domain.setting.event.dto.EventCommand;
 import com.getit.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,59 +52,29 @@ public class Event extends BaseTimeEntity {
   private long generationId;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private Event(
-      String title,
-      String place,
-      LocalDate startDate,
-      LocalDate endDate,
-      boolean isVisible,
-      EventType type,
-      long generationId
-  ) {
-    this.title = title;
-    this.place = place;
-    this.startDate = startDate;
-    this.endDate = endDate;
-    this.isVisible = isVisible;
-    this.type = type;
+  private Event(EventCommand command, long generationId) {
+    this.title = command.title();
+    this.place = command.place();
+    this.startDate = command.startDate();
+    this.endDate = command.endDate();
+    this.isVisible = command.isVisible();
+    this.type = command.type();
     this.generationId = generationId;
   }
 
-  public static Event create(
-      String title,
-      String place,
-      LocalDate startDate,
-      LocalDate endDate,
-      boolean isVisible,
-      EventType type,
-      long generationId
-  ) {
+  public static Event create(EventCommand command, long generationId) {
     return Event.builder()
-        .title(title)
-        .place(place)
-        .startDate(startDate)
-        .endDate(endDate)
-        .isVisible(isVisible)
-        .type(type)
+        .command(command)
         .generationId(generationId)
         .build();
   }
 
-  public void update(
-      String title,
-      String place,
-      LocalDate startDate,
-      LocalDate endDate,
-      boolean isVisible,
-      EventType type,
-      long generationId
-  ) {
-    this.title = title;
-    this.place = place;
-    this.startDate = startDate;
-    this.endDate = endDate;
-    this.isVisible = isVisible;
-    this.type = type;
-    this.generationId = generationId;
+  public void update(EventCommand command) {
+    this.title = command.title();
+    this.place = command.place();
+    this.startDate = command.startDate();
+    this.endDate = command.endDate();
+    this.isVisible = command.isVisible();
+    this.type = command.type();
   }
 }

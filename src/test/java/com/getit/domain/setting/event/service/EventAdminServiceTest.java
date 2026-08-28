@@ -3,6 +3,7 @@ package com.getit.domain.setting.event.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.setting.event.dto.EventCommand;
 import com.getit.domain.setting.event.dto.EventRequest;
 import com.getit.domain.setting.event.dto.EventResult;
 import com.getit.domain.setting.event.entity.Event;
@@ -50,8 +51,8 @@ class EventAdminServiceTest {
   }
 
   private Event savedEvent(long generationId, LocalDate startDate, String title) {
-    return eventRepository.save(
-        Event.create(title, "장소", startDate, startDate, true, EventType.EVENT, generationId));
+    return eventRepository.save(Event.create(
+        new EventCommand(title, "장소", startDate, startDate, true, EventType.EVENT), generationId));
   }
 
   @Nested

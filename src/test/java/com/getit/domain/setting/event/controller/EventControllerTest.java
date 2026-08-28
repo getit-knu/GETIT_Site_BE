@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.setting.event.dto.EventCommand;
 import com.getit.domain.setting.event.dto.EventRequest;
 import com.getit.domain.setting.event.entity.Event;
 import com.getit.domain.setting.event.entity.EventType;
@@ -71,8 +72,9 @@ class EventControllerTest {
   }
 
   private Event savedEvent(LocalDate startDate, String title) {
-    return eventRepository.save(
-        Event.create(title, "장소", startDate, startDate, true, EventType.EVENT, activeGeneration.getId()));
+    return eventRepository.save(Event.create(
+        new EventCommand(title, "장소", startDate, startDate, true, EventType.EVENT),
+        activeGeneration.getId()));
   }
 
   @Nested

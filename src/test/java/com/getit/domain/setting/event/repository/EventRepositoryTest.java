@@ -2,6 +2,7 @@ package com.getit.domain.setting.event.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.getit.domain.setting.event.dto.EventCommand;
 import com.getit.domain.setting.event.entity.Event;
 import com.getit.domain.setting.event.entity.EventType;
 import com.getit.global.config.JpaAuditingConfig;
@@ -20,7 +21,8 @@ class EventRepositoryTest {
   private EventRepository eventRepository;
 
   private Event event(long generationId, LocalDate startDate, String title) {
-    return Event.create(title, "장소", startDate, startDate, true, EventType.EVENT, generationId);
+    return Event.create(
+        new EventCommand(title, "장소", startDate, startDate, true, EventType.EVENT), generationId);
   }
 
   @Test

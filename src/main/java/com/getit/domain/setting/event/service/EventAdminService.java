@@ -34,9 +34,7 @@ public class EventAdminService {
     GenerationSummary activeGeneration = validateActiveGeneration(request.generationId());
     validatePeriod(request);
 
-    Event saved = eventRepository.save(Event.create(
-        request.title(), request.place(), request.startDate(), request.endDate(),
-        request.isVisible(), request.type(), activeGeneration.id()));
+    Event saved = eventRepository.save(Event.create(request.toCommand(), activeGeneration.id()));
 
     return EventResult.from(saved);
   }
@@ -47,9 +45,7 @@ public class EventAdminService {
     validatePeriod(request);
     Event event = findEvent(eventId, activeGeneration.id());
 
-    event.update(
-        request.title(), request.place(), request.startDate(), request.endDate(),
-        request.isVisible(), request.type(), activeGeneration.id());
+    event.update(request.toCommand());
 
     return EventResult.from(event);
   }
