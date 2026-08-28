@@ -16,6 +16,8 @@ public interface FaqRepository extends JpaRepository<Faq, Long> {
    */
   List<Faq> findAllByOrderByOrderAscIdAsc();
 
+  List<Faq> findByIsVisibleTrueOrderByOrderAscIdAsc();
+
   /**
    * 생성 · 순서 이동 · 삭제에서 목록을 읽을 때 쓴다. {@code PESSIMISTIC_WRITE} 로 전체 행을 잠근다 —
    * 목록 크기(또는 순번 위치)를 읽고 그 값을 근거로 새 순번을 저장하는 과정이 원자적이지 않으면,
