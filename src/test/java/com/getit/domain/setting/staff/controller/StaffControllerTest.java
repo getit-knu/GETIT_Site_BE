@@ -182,6 +182,20 @@ class StaffControllerTest {
 
       assertThat(staffRepository.findById(staff.getId())).isEmpty();
     }
+
+    @Test
+    @DisplayName("다른 기수의 운영진이면 404 다 (삭제되지 않는다)")
+    void returns404WhenBelongsToOtherGeneration() throws Exception {
+      Staff other = staffRepository.save(
+          Staff.create(8, 1, StaffSection.SW, "SW 운영진", "지난기수", "컴퓨터공학과", null, null, null));
+
+      mockMvc.perform(delete(STAFFS_PATH + "/" + other.getId())
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("STAFF_NOT_FOUND"));
+
+      assertThat(staffRepository.findById(other.getId())).isPresent();
+    }
   }
 
   @Nested
@@ -204,7 +218,11 @@ class StaffControllerTest {
               .content(body))
           .andExpect(status().isNoContent());
 
+      // second 가 1번이 된 것만 확인하면, first 가 그대로 1번에 남아 order 가 중복돼도
+      // 테스트를 통과한다 — first 가 2번으로 밀렸는지도 함께 확인해야 1..n 불변식이 실제로
+      // 지켜지는지 검증된다 (PR #83 Copilot 리뷰 지적).
       assertThat(staffRepository.findById(second.getId()).orElseThrow().getOrder()).isEqualTo(1);
+      assertThat(staffRepository.findById(first.getId()).orElseThrow().getOrder()).isEqualTo(2);
     }
   }
 }
