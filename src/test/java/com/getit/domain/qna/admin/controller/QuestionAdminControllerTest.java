@@ -73,6 +73,14 @@ class QuestionAdminControllerTest {
   }
 
   @Test
+  @DisplayName("lectureId 가 none·숫자가 아니면 400 이다")
+  void rejectsMalformedLectureId() throws Exception {
+    mockMvc.perform(get(PATH).param("lectureId", "abc").header("Authorization", adminToken()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
   @DisplayName("답변을 달면 201 이고 questionStatus 가 ANSWERED 다")
   void createsAnswer() throws Exception {
     Long questionId = questionRepository.save(Question.create(1L, null, "질문")).getId();

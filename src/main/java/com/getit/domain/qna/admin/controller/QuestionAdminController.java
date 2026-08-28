@@ -8,6 +8,8 @@ import com.getit.domain.qna.admin.service.QuestionAdminService;
 import com.getit.domain.qna.entity.QnaStatus;
 import com.getit.global.dto.ApiResponse;
 import com.getit.global.dto.PageResponse;
+import com.getit.global.exception.BusinessException;
+import com.getit.global.exception.CommonErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -45,9 +47,17 @@ public class QuestionAdminController {
       @PageableDefault(size = 20) Pageable pageable
   ) {
     boolean siteOnly = SITE_ONLY.equals(lectureId);
-    Long lectureIdFilter = siteOnly || lectureId == null ? null : Long.valueOf(lectureId);
+    Long lectureIdFilter = siteOnly || lectureId == null ? null : parseLectureId(lectureId);
     return ApiResponse.success(
         questionAdminService.search(status, siteOnly, lectureIdFilter, keyword, pageable));
+  }
+
+  private Long parseLectureId(String value) {
+    try {
+      return Long.valueOf(value);
+    } catch (NumberFormatException e) {
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+    }
   }
 
   @Operation(summary = "질문 상세", description = "명세서 11.2")
