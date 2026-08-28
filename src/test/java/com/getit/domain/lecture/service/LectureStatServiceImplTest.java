@@ -18,7 +18,9 @@ import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -171,6 +173,14 @@ class LectureStatServiceImplTest {
 
       assertThat(lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, null, 0)).isEmpty();
     }
+
+    @Test
+    @DisplayName("없는 기수면 빈 리스트다")
+    void emptyWhenGenerationMissing() {
+      assignment(lecture(1, true, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
+
+      assertThat(lectureStatService.findWeeklyStats(99, null, 5)).isEmpty();
+    }
   }
 
   @Nested
@@ -201,6 +211,26 @@ class LectureStatServiceImplTest {
       assignment(lecture(1, false, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
 
       assertThat(lectureStatService.findOngoingLectures(ACTIVE_GENERATION_NO)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("오늘 00:00 마감도 진행 중으로 포함한다")
+    void includesDeadlineAtTodayStart() {
+      LocalDateTime todayStart = LocalDate.now(ZoneId.of("Asia/Seoul")).atStartOfDay();
+      assignment(lecture(1, true, activeGenerationId).getId(), todayStart);
+      assignment(lecture(2, true, activeGenerationId).getId(), todayStart.minusSeconds(1));
+
+      var ongoing = lectureStatService.findOngoingLectures(ACTIVE_GENERATION_NO);
+
+      assertThat(ongoing).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("없는 기수면 빈 리스트다")
+    void emptyWhenGenerationMissing() {
+      assignment(lecture(1, true, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
+
+      assertThat(lectureStatService.findOngoingLectures(99)).isEmpty();
     }
   }
 

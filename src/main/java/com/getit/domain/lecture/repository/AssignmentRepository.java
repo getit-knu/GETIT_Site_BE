@@ -12,6 +12,6 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
   List<Assignment> findAllByLectureIdIn(List<Long> lectureIds);
 
-  List<Assignment> findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAsc(
+  List<Assignment> findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAscIdAsc(
       List<Long> lectureIds, LocalDateTime from);
 }

@@ -14,6 +14,7 @@ import java.time.ZoneId;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,9 +37,11 @@ public class LectureStatServiceImpl implements LectureStatService {
 
   @Override
   public long countUnEvaluatedSubmissions(int generationNo) {
-    List<Long> lectureIds = resolveGenerationId(generationNo)
-        .map(lectureRepository::findPublishedLectureIds)
-        .orElseGet(List::of);
+    Long generationId = resolveGenerationId(generationNo).orElse(null);
+    if (generationId == null) {
+      return 0L;
+    }
+    List<Long> lectureIds = lectureRepository.findPublishedLectureIds(generationId);
     if (lectureIds.isEmpty()) {
       return 0L;
     }
@@ -79,7 +82,7 @@ public class LectureStatServiceImpl implements LectureStatService {
     }
     LocalDateTime todayStart = LocalDate.now(ZONE_SEOUL).atStartOfDay();
     List<Assignment> ongoing = assignmentRepository
-        .findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAsc(lectureIds, todayStart);
+        .findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAscIdAsc(lectureIds, todayStart);
     if (ongoing.isEmpty()) {
       return List.of();
     }
@@ -91,6 +94,9 @@ public class LectureStatServiceImpl implements LectureStatService {
     return ongoing.stream()
         .map(assignment -> {
           Lecture lecture = lectureById.get(assignment.getLectureId());
+          if (lecture == null) {
+            return null;
+          }
           return new OngoingLectureStat(
               lecture.getId(),
               lecture.getTitle(),
@@ -98,6 +104,7 @@ public class LectureStatServiceImpl implements LectureStatService {
               assignment.getDeadline(),
               submittedByAssignmentId.getOrDefault(assignment.getId(), 0L));
         })
+        .filter(Objects::nonNull)
         .toList();
   }
 
@@ -108,7 +115,7 @@ public class LectureStatServiceImpl implements LectureStatService {
   private Map<Long, Assignment> assignmentByLectureId(List<Lecture> lectures) {
     List<Long> lectureIds = lectures.stream().map(Lecture::getId).toList();
     return assignmentRepository.findAllByLectureIdIn(lectureIds).stream()
-        .collect(Collectors.toMap(Assignment::getLectureId, Function.identity()));
+        .collect(Collectors.toMap(Assignment::getLectureId, Function.identity(), (first, ignored) -> first));
   }
 
   private Map<Long, Long> submittedCountByAssignmentId(Collection<Assignment> assignments) {
