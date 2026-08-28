@@ -16,7 +16,9 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
       where (:status is null or q.status = :status)
         and (:siteOnly = false or q.lectureId is null)
         and (:lectureId is null or q.lectureId = :lectureId)
-        and (:keyword is null or q.content like :keyword or q.authorId in :authorIds)
+        and (:keyword is null
+             or q.content like :keyword
+             or (:authorIds is not null and q.authorId in :authorIds))
       order by q.createdAt desc, q.id desc
       """)
   Page<Question> search(

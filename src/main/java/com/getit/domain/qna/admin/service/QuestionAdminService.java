@@ -48,10 +48,9 @@ public class QuestionAdminService {
       QnaStatus status, boolean siteOnly, Long lectureId, String keyword, Pageable pageable) {
     String trimmed = keyword == null || keyword.isBlank() ? null : keyword.trim();
     String keywordLike = trimmed == null ? null : "%" + trimmed + "%";
-    // 이름 매칭이 없어도 in 절이 빈 컬렉션이 되지 않도록 매칭 불가능한 값을 넣는다.
-    List<Long> authorIds = trimmed == null ? List.of(-1L) : findAuthorIdsByName(trimmed);
-    if (authorIds.isEmpty()) {
-      authorIds = List.of(-1L);
+    List<Long> authorIds = trimmed == null ? null : findAuthorIdsByName(trimmed);
+    if (authorIds != null && authorIds.isEmpty()) {
+      authorIds = null;
     }
 
     Page<Question> page = questionRepository.search(status, siteOnly, lectureId, keywordLike, authorIds, pageable);
