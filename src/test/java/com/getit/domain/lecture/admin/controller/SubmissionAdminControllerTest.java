@@ -138,6 +138,20 @@ class SubmissionAdminControllerTest {
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("SUBMISSION_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      mockMvc.perform(get("/api/admin/submissions/1"))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      mockMvc.perform(get("/api/admin/submissions/1").header("Authorization", memberToken()))
+          .andExpect(status().isForbidden());
+    }
   }
 
   @Nested

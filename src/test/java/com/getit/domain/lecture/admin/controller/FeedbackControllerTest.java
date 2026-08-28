@@ -184,5 +184,28 @@ class FeedbackControllerTest {
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.error.code").value("NOT_RESOURCE_OWNER"));
     }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 1L, "원래 내용"));
+
+      mockMvc.perform(put("/api/admin/feedbacks/" + feedback.getId())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(new FeedbackRequest.Write("수정된 내용"))))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 1L, "원래 내용"));
+
+      mockMvc.perform(put("/api/admin/feedbacks/" + feedback.getId())
+              .header("Authorization", memberToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(new FeedbackRequest.Write("수정된 내용"))))
+          .andExpect(status().isForbidden());
+    }
   }
 }
