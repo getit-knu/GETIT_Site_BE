@@ -110,7 +110,7 @@ class CurriculumControllerTest {
   class CreateCurriculum {
 
     @Test
-    @DisplayName("커리큘럼을 추가한다")
+    @DisplayName("커리큘럼을 추가한다 (첫 항목이라 order 는 1로 clamp 된다)")
     void createsCurriculum() throws Exception {
       mockMvc.perform(post(CURRICULUMS_PATH)
               .header("Authorization", adminToken())
@@ -118,7 +118,7 @@ class CurriculumControllerTest {
               .content(requestJson(activeGeneration.getId(), "팀 프로젝트", "실전 프로젝트 경험", 4)))
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.data.title").value("팀 프로젝트"))
-          .andExpect(jsonPath("$.data.order").value(4));
+          .andExpect(jsonPath("$.data.order").value(1));
     }
 
     @Test
@@ -130,6 +130,30 @@ class CurriculumControllerTest {
               .content(requestJson(999L, "팀 프로젝트", "실전 프로젝트 경험", 4)))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("GENERATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("title 이 100자를 넘으면 400 이다")
+    void returns400WhenTitleTooLong() throws Exception {
+      String tooLong = "가".repeat(101);
+
+      mockMvc.perform(post(CURRICULUMS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(requestJson(activeGeneration.getId(), tooLong, "부제목", 1)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("order 가 0 이하면 400 이다")
+    void returns400WhenOrderNotPositive() throws Exception {
+      mockMvc.perform(post(CURRICULUMS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(requestJson(activeGeneration.getId(), "팀 프로젝트", "실전 프로젝트 경험", 0)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
   }
 

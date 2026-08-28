@@ -38,8 +38,7 @@ public class CurriculumController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ApiResponse<CurriculumResult> createCurriculum(@Valid @RequestBody CurriculumRequest request) {
-    return ApiResponse.success(curriculumAdminService.createCurriculum(
-        request.generationId(), request.title(), request.subtitle(), request.order()));
+    return ApiResponse.success(curriculumAdminService.createCurriculum(request));
   }
 
   @Operation(summary = "커리큘럼 수정", description = "명세서 10.12")
@@ -48,8 +47,7 @@ public class CurriculumController {
       @PathVariable Long id,
       @Valid @RequestBody CurriculumRequest request
   ) {
-    return ApiResponse.success(curriculumAdminService.updateCurriculum(
-        id, request.generationId(), request.title(), request.subtitle(), request.order()));
+    return ApiResponse.success(curriculumAdminService.updateCurriculum(id, request));
   }
 
   @Operation(summary = "커리큘럼 삭제", description = "명세서 10.13")
