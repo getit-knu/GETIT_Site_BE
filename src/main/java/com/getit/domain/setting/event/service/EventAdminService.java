@@ -77,7 +77,7 @@ public class EventAdminService {
   private GenerationSummary validateActiveGeneration(Long generationId) {
     GenerationSummary activeGeneration = findActiveGeneration();
     if (!activeGeneration.id().equals(generationId)) {
-      throw new BusinessException(EventErrorCode.GENERATION_NOT_FOUND);
+      throw new BusinessException(EventErrorCode.GENERATION_NOT_ACTIVE);
     }
     return activeGeneration;
   }

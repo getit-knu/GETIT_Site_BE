@@ -100,8 +100,8 @@ class EventAdminServiceTest {
     }
 
     @Test
-    @DisplayName("요청 generationId 가 활성 기수와 다르면 예외가 발생한다")
-    void throwsWhenGenerationMismatch() {
+    @DisplayName("요청 generationId 가 활성 기수가 아니면 예외가 발생한다")
+    void throwsWhenGenerationNotActive() {
       EventRequest mismatched = new EventRequest(
           999L, "해커톤", "장소", LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 11),
           EventType.COMPETITION, true);
@@ -109,7 +109,7 @@ class EventAdminServiceTest {
       assertThatThrownBy(() -> eventAdminService.createEvent(mismatched))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
-          .isEqualTo(EventErrorCode.GENERATION_NOT_FOUND);
+          .isEqualTo(EventErrorCode.GENERATION_NOT_ACTIVE);
     }
 
     @Test

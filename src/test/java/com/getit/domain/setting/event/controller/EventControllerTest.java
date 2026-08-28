@@ -132,14 +132,14 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("generationId 가 활성 기수와 다르면 404 다")
-    void returns404WhenGenerationMismatch() throws Exception {
+    @DisplayName("generationId 가 활성 기수가 아니면 400 이다")
+    void returns400WhenGenerationNotActive() throws Exception {
       mockMvc.perform(post(EVENTS_PATH)
               .header("Authorization", adminToken())
               .contentType(MediaType.APPLICATION_JSON)
               .content(requestJson(999L, "해커톤", LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 11))))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.error.code").value("GENERATION_NOT_FOUND"));
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("GENERATION_NOT_ACTIVE"));
     }
 
     @Test
