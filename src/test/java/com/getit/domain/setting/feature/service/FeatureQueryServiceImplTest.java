@@ -23,8 +23,8 @@ class FeatureQueryServiceImplTest {
   private FeatureToggleRepository featureToggleRepository;
 
   @Test
-  @DisplayName("모든 토글을 key 순으로 enabled 상태와 함께 반환한다")
-  void returnsAllTogglesByKey() {
+  @DisplayName("모든 FeatureKey 를 선언 순서로 반환하고, 저장된 행의 enabled 를 반영한다")
+  void returnsEveryKeyInDeclarationOrder() {
     featureToggleRepository.save(FeatureToggle.create(FeatureKey.MOCK_INVESTMENT, true));
     featureToggleRepository.save(FeatureToggle.create(FeatureKey.STOCK_GAME, false));
 
@@ -33,5 +33,18 @@ class FeatureQueryServiceImplTest {
     assertThat(result).containsExactly(
         new FeatureView(FeatureKey.STOCK_GAME, false),
         new FeatureView(FeatureKey.MOCK_INVESTMENT, true));
+  }
+
+  @Test
+  @DisplayName("시드 안 된 키는 enabled=false 로 채워 넣는다")
+  void fillsMissingKeyAsDisabled() {
+    featureToggleRepository.deleteAll();
+    featureToggleRepository.save(FeatureToggle.create(FeatureKey.STOCK_GAME, true));
+
+    List<FeatureView> result = featureQueryService.findAll();
+
+    assertThat(result).containsExactly(
+        new FeatureView(FeatureKey.STOCK_GAME, true),
+        new FeatureView(FeatureKey.MOCK_INVESTMENT, false));
   }
 }
