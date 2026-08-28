@@ -1,5 +1,6 @@
 package com.getit.domain.setting.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.getit.domain.setting.event.entity.Event;
 import com.getit.domain.setting.event.entity.EventType;
 import java.time.LocalDate;
@@ -11,7 +12,7 @@ public record EventResult(
     LocalDate endDate,
     EventType type,
     String place,
-    boolean isVisible
+    @JsonProperty("isVisible") boolean isVisible
 ) {
 
   public static EventResult from(Event event) {
