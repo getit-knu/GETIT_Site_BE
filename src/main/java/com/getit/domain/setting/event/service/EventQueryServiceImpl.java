@@ -23,8 +23,8 @@ public class EventQueryServiceImpl implements EventQueryService {
   private final GenerationQueryService generationQueryService;
 
   @Override
-  public List<EventView> findByMonth(int year, int month) {
-    Long generationId = activeGenerationId();
+  public List<EventView> findByMonth(int generationNo, int year, int month) {
+    Long generationId = resolveGenerationId(generationNo);
     if (generationId == null) {
       return List.of();
     }
@@ -35,8 +35,8 @@ public class EventQueryServiceImpl implements EventQueryService {
   }
 
   @Override
-  public List<EventView> findUpcoming() {
-    Long generationId = activeGenerationId();
+  public List<EventView> findUpcoming(int generationNo) {
+    Long generationId = resolveGenerationId(generationNo);
     if (generationId == null) {
       return List.of();
     }
@@ -45,8 +45,8 @@ public class EventQueryServiceImpl implements EventQueryService {
         .toList();
   }
 
-  private Long activeGenerationId() {
-    return generationQueryService.findActive().map(GenerationSummary::id).orElse(null);
+  private Long resolveGenerationId(int generationNo) {
+    return generationQueryService.findByGenerationNo(generationNo).map(GenerationSummary::id).orElse(null);
   }
 
   private EventView toView(Event event) {

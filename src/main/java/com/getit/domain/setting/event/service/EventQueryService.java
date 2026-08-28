@@ -4,7 +4,7 @@ import java.util.List;
 
 public interface EventQueryService {
 
-  List<EventView> findByMonth(int year, int month);
+  List<EventView> findByMonth(int generationNo, int year, int month);
 
-  List<EventView> findUpcoming();
+  List<EventView> findUpcoming(int generationNo);
 }
