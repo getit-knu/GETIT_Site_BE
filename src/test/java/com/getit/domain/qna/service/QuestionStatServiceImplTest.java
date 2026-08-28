@@ -33,11 +33,14 @@ class QuestionStatServiceImplTest {
   }
 
   @Test
-  @DisplayName("findRecent 는 최신순으로 size 개 반환한다")
-  void returnsRecentLimited() {
+  @DisplayName("findRecent 는 미답변만 최신순으로 size 개 반환한다")
+  void returnsRecentPendingLimited() {
     questionRepository.save(Question.create(1L, 10L, "old"));
     questionRepository.save(Question.create(1L, 10L, "mid"));
     questionRepository.save(Question.create(1L, 10L, "new"));
+    Question answered = questionRepository.save(Question.create(1L, 10L, "answered"));
+    answered.markAnswered();
+    questionRepository.flush();
 
     var recent = questionStatService.findRecent(2);
 

@@ -25,7 +25,8 @@ public class QuestionStatServiceImpl implements QuestionStatService {
     if (size <= 0) {
       return List.of();
     }
-    return questionRepository.findByOrderByCreatedAtDescIdDesc(PageRequest.of(0, size)).stream()
+    return questionRepository.findByStatusOrderByCreatedAtDescIdDesc(QnaStatus.PENDING, PageRequest.of(0, size))
+        .stream()
         .map(question -> new RecentQuestion(
             question.getId(), question.getAuthorId(), question.getContent(),
             question.getCreatedAt(), question.getLectureId()))

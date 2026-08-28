@@ -32,5 +32,5 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
   long countByStatus(QnaStatus status);
 
-  List<Question> findByOrderByCreatedAtDescIdDesc(Pageable pageable);
+  List<Question> findByStatusOrderByCreatedAtDescIdDesc(QnaStatus status, Pageable pageable);
 }
