@@ -35,13 +35,4 @@ class QuestionTest {
 
     assertThat(question.getStatus()).isEqualTo(QnaStatus.ANSWERED);
   }
-
-  @Test
-  @DisplayName("작성자 확인: authorId 가 같을 때만 true")
-  void isWrittenBy() {
-    Question question = Question.create(1L, 5L, "질문");
-
-    assertThat(question.isWrittenBy(1L)).isTrue();
-    assertThat(question.isWrittenBy(2L)).isFalse();
-  }
 }

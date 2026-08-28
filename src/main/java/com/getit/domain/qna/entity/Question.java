@@ -57,6 +57,4 @@ public class Question extends BaseTimeEntity {
   }
 
   public void markAnswered() { this.status = QnaStatus.ANSWERED; }
-
-  public boolean isWrittenBy(long userId) { return this.authorId == userId; }
 }
