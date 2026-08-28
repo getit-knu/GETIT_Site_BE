@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Public", description = "공개 사이트")
 @RestController
 @RequestMapping("/api/public/events")
-@RequiredArgsConstructor
 @Validated
+@RequiredArgsConstructor
 public class EventPublicController {
 
   private final EventPublicService eventPublicService;
@@ -26,7 +26,7 @@ public class EventPublicController {
   @Operation(summary = "월별 행사 일정", description = "명세서 2.2")
   @GetMapping
   public ApiResponse<EventCalendarResult> getMonthlyEvents(
-      @RequestParam int year,
+      @RequestParam @Min(2000) @Max(2100) int year,
       @RequestParam @Min(1) @Max(12) int month
   ) {
     return ApiResponse.success(eventPublicService.getMonthly(year, month));

@@ -80,4 +80,11 @@ class EventPublicControllerTest {
     mockMvc.perform(get(EVENTS_PATH).param("year", "2026").param("month", "13"))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  @DisplayName("year 가 허용 범위 밖이면 400 이다")
+  void rejectsYearOutOfRange() throws Exception {
+    mockMvc.perform(get(EVENTS_PATH).param("year", "1999").param("month", "5"))
+        .andExpect(status().isBadRequest());
+  }
 }
