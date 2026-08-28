@@ -15,6 +15,7 @@ import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
 import com.getit.domain.lecture.repository.FeedbackRepository;
 import com.getit.domain.lecture.repository.LectureRepository;
+import com.getit.domain.lecture.util.KstDateTimes;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
 import com.getit.domain.setting.category.repository.SubCategoryRepository;
@@ -136,6 +137,19 @@ class FeedbackServiceTest {
           created.id(), new FeedbackRequest.Write("수정된 내용"), adminId);
 
       assertThat(result.content()).isEqualTo("수정된 내용");
+    }
+
+    @Test
+    @DisplayName("응답의 updatedAt 은 이번 수정 시각을 반영한다")
+    void updatedAtReflectsThisUpdate() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("원래 내용"), adminId);
+
+      FeedbackResult.UpdateResult result = feedbackService.update(
+          created.id(), new FeedbackRequest.Write("수정된 내용"), adminId);
+
+      LocalDateTime persisted = feedbackRepository.findById(created.id()).orElseThrow().getUpdatedAt();
+      assertThat(result.updatedAt()).isEqualTo(KstDateTimes.toOffset(persisted));
     }
 
     @Test

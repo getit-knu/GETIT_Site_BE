@@ -45,6 +45,7 @@ public class FeedbackService {
     }
 
     feedback.update(request.content());
+    feedbackRepository.flush();
     return FeedbackResult.UpdateResult.from(feedback);
   }
 
