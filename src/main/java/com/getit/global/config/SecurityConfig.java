@@ -1,6 +1,7 @@
 package com.getit.global.config;
 
 import com.getit.domain.auth.jwt.JwtAuthenticationFilter;
+import com.getit.domain.auth.oauth2.CookieOAuth2AuthorizationRequestRepository;
 import com.getit.domain.auth.oauth2.CustomOAuth2UserService;
 import com.getit.domain.auth.oauth2.OAuth2FailureHandler;
 import com.getit.domain.auth.oauth2.OAuth2SuccessHandler;
@@ -56,6 +57,7 @@ public class SecurityConfig {
   private final JwtAuthenticationEntryPoint authenticationEntryPoint;
   private final JwtAccessDeniedHandler accessDeniedHandler;
   private final CustomOAuth2UserService oAuth2UserService;
+  private final CookieOAuth2AuthorizationRequestRepository authorizationRequestRepository;
   private final OAuth2SuccessHandler oAuth2SuccessHandler;
   private final OAuth2FailureHandler oAuth2FailureHandler;
 
@@ -84,6 +86,10 @@ public class SecurityConfig {
 
         // Google 단일 로그인. 코드 교환까지 Spring 이 처리하고 토큰 발급은 SuccessHandler 가 한다
         .oauth2Login(oauth2 -> oauth2
+            // 기본 구현은 인증 요청을 HttpSession 에 담는다. 이 앱은 STATELESS 라
+            // 구글에서 돌아올 때 세션을 찾지 못해 authorization_request_not_found 가 난다.
+            .authorizationEndpoint(endpoint ->
+                endpoint.authorizationRequestRepository(authorizationRequestRepository))
             .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
             .successHandler(oAuth2SuccessHandler)
             .failureHandler(oAuth2FailureHandler))
