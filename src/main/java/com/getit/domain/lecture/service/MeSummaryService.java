@@ -20,7 +20,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,8 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class MeSummaryService {
 
   private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
-  private static final Comparator<Lecture> BY_WEEK_THEN_ID =
-      Comparator.comparing(Lecture::getWeek).thenComparing(Lecture::getId);
+  private static final Comparator<Lecture> BY_WEEK_THEN_ID = Comparator
+      .comparing(Lecture::getWeek, Comparator.nullsLast(Comparator.naturalOrder()))
+      .thenComparing(Lecture::getId);
 
   private final LectureRepository lectureRepository;
   private final AssignmentRepository assignmentRepository;
@@ -51,13 +52,16 @@ public class MeSummaryService {
     }
 
     List<Lecture> lectures = lectureRepository.findPublishedByGeneration(active.id());
-    Map<Long, Lecture> lectureById = lectures.stream()
-        .collect(Collectors.toMap(Lecture::getId, Function.identity()));
+    Map<Long, List<Assignment>> assignmentsByLectureId = assignmentRepository
+        .findAllByLectureIdIn(lectures.stream().map(Lecture::getId).toList()).stream()
+        .collect(Collectors.groupingBy(Assignment::getLectureId));
+    List<Long> assignmentIds = assignmentsByLectureId.values().stream()
+        .flatMap(List::stream)
+        .map(Assignment::getId)
+        .toList();
 
-    List<Assignment> assignments = assignmentRepository.findAllByLectureIdIn(
-        lectures.stream().map(Lecture::getId).toList());
-    List<AssignmentSubmission> mySubmissions = assignmentSubmissionRepository.findAllByAssignmentIdInAndUserId(
-        assignments.stream().map(Assignment::getId).toList(), userId);
+    List<AssignmentSubmission> mySubmissions =
+        assignmentSubmissionRepository.findAllByAssignmentIdInAndUserId(assignmentIds, userId);
     Set<Long> submittedAssignmentIds = mySubmissions.stream()
         .map(AssignmentSubmission::getAssignmentId)
         .collect(Collectors.toSet());
@@ -67,24 +71,29 @@ public class MeSummaryService {
         .collect(Collectors.toSet());
 
     LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
-    List<MeSummaryResult.LectureBrief> notSubmittedLectures = assignments.stream()
-        .filter(assignment -> assignment.getDeadline().isBefore(now))
-        .filter(assignment -> !submittedAssignmentIds.contains(assignment.getId()))
-        .map(assignment -> lectureById.get(assignment.getLectureId()))
-        .sorted(BY_WEEK_THEN_ID)
-        .map(this::toBrief)
-        .toList();
-    List<MeSummaryResult.LectureBrief> lateSubmittedLectures = assignments.stream()
-        .filter(assignment -> lateAssignmentIds.contains(assignment.getId()))
-        .map(assignment -> lectureById.get(assignment.getLectureId()))
-        .sorted(BY_WEEK_THEN_ID)
-        .map(this::toBrief)
-        .toList();
+    List<MeSummaryResult.LectureBrief> notSubmittedLectures = lecturesMatching(lectures, assignmentsByLectureId,
+        assignment -> assignment.getDeadline().isBefore(now)
+            && !submittedAssignmentIds.contains(assignment.getId()));
+    List<MeSummaryResult.LectureBrief> lateSubmittedLectures = lecturesMatching(lectures, assignmentsByLectureId,
+        assignment -> lateAssignmentIds.contains(assignment.getId()));
 
     MeSummaryResult.Stats stats = new MeSummaryResult.Stats(
         lectures.size(), mySubmissions.size(), notSubmittedLectures.size(), lateSubmittedLectures.size());
 
     return new MeSummaryResult.Response(toProfile(me), stats, notSubmittedLectures, lateSubmittedLectures);
+  }
+
+  private List<MeSummaryResult.LectureBrief> lecturesMatching(
+      List<Lecture> lectures,
+      Map<Long, List<Assignment>> assignmentsByLectureId,
+      Predicate<Assignment> assignmentMatches
+  ) {
+    return lectures.stream()
+        .filter(lecture -> assignmentsByLectureId.getOrDefault(lecture.getId(), List.of()).stream()
+            .anyMatch(assignmentMatches))
+        .sorted(BY_WEEK_THEN_ID)
+        .map(this::toBrief)
+        .toList();
   }
 
   private MeSummaryResult.Profile toProfile(UserAccount user) {
