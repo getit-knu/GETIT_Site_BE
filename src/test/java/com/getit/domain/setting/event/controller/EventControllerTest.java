@@ -169,6 +169,17 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("generationId 가 0 이하면 400 이다")
+    void returns400WhenGenerationIdNotPositive() throws Exception {
+      mockMvc.perform(post(EVENTS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(requestJson(0L, "해커톤", LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 11))))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     @DisplayName("isVisible 이 없으면 400 이다")
     void returns400WhenVisibleMissing() throws Exception {
       String json = """
