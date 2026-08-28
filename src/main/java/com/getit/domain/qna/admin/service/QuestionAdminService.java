@@ -48,7 +48,11 @@ public class QuestionAdminService {
       QnaStatus status, boolean siteOnly, Long lectureId, String keyword, Pageable pageable) {
     String trimmed = keyword == null || keyword.isBlank() ? null : keyword.trim();
     String keywordLike = trimmed == null ? null : "%" + trimmed + "%";
-    List<Long> authorIds = trimmed == null ? List.of() : findAuthorIdsByName(trimmed);
+    // 이름 매칭이 없어도 in 절이 빈 컬렉션이 되지 않도록 매칭 불가능한 값을 넣는다.
+    List<Long> authorIds = trimmed == null ? List.of(-1L) : findAuthorIdsByName(trimmed);
+    if (authorIds.isEmpty()) {
+      authorIds = List.of(-1L);
+    }
 
     Page<Question> page = questionRepository.search(status, siteOnly, lectureId, keywordLike, authorIds, pageable);
     List<Question> questions = page.getContent();
@@ -84,11 +88,7 @@ public class QuestionAdminService {
         .orElseThrow(() -> new BusinessException(QnaErrorCode.QUESTION_NOT_FOUND));
     UserAccount author = userAccountService.findActiveById(question.getAuthorId()).orElse(null);
 
-    AdminQuestionResult.LectureBrief lecture = question.getLectureId() == null ? null
-        : lectureQueryService.findTitlesByIds(List.of(question.getLectureId())).entrySet().stream()
-            .findFirst()
-            .map(entry -> new AdminQuestionResult.LectureBrief(entry.getKey(), entry.getValue()))
-            .orElse(null);
+    AdminQuestionResult.LectureBrief lecture = resolveLecture(question.getLectureId());
 
     AdminQuestionResult.AnswerView answerView = answerRepository.findByQuestionId(questionId)
         .map(answer -> new AdminQuestionResult.AnswerView(
@@ -137,6 +137,14 @@ public class QuestionAdminService {
     answer.update(request.content());
     answerRepository.flush();
     return AdminAnswerResult.UpdateResult.from(answer);
+  }
+
+  private AdminQuestionResult.LectureBrief resolveLecture(Long lectureId) {
+    if (lectureId == null) {
+      return null;
+    }
+    String title = lectureQueryService.findTitlesByIds(List.of(lectureId)).get(lectureId);
+    return title == null ? null : new AdminQuestionResult.LectureBrief(lectureId, title);
   }
 
   private List<Long> findAuthorIdsByName(String keyword) {
