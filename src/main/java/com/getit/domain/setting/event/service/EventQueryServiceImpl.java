@@ -23,13 +23,12 @@ public class EventQueryServiceImpl implements EventQueryService {
   private final GenerationQueryService generationQueryService;
 
   @Override
-  public List<EventView> findByMonth(int generationNo, int year, int month) {
+  public List<EventView> findByMonth(int generationNo, YearMonth month) {
     Long generationId = resolveGenerationId(generationNo);
     if (generationId == null) {
       return List.of();
     }
-    YearMonth target = YearMonth.of(year, month);
-    return eventRepository.findVisibleOverlapping(generationId, target.atDay(1), target.atEndOfMonth()).stream()
+    return eventRepository.findVisibleOverlapping(generationId, month.atDay(1), month.atEndOfMonth()).stream()
         .map(this::toView)
         .toList();
   }
@@ -40,7 +39,7 @@ public class EventQueryServiceImpl implements EventQueryService {
     if (generationId == null) {
       return List.of();
     }
-    return eventRepository.findVisibleUpcoming(generationId, LocalDate.now(ZONE_SEOUL)).stream()
+    return eventRepository.findUpcoming(generationId, LocalDate.now(ZONE_SEOUL)).stream()
         .map(this::toView)
         .toList();
   }

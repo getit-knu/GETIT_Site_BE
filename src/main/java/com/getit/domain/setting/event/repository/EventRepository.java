@@ -31,9 +31,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
   @Query("""
       select e from Event e
       where e.generationId = :generationId
-        and e.isVisible = true
         and e.startDate >= :from
       order by e.startDate asc, e.id asc
       """)
-  List<Event> findVisibleUpcoming(@Param("generationId") long generationId, @Param("from") LocalDate from);
+  List<Event> findUpcoming(@Param("generationId") long generationId, @Param("from") LocalDate from);
 }

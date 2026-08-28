@@ -9,6 +9,7 @@ import com.getit.domain.setting.event.repository.EventRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +65,7 @@ class EventQueryServiceImplTest {
       save(generationId, LocalDate.of(2026, 5, 15), LocalDate.of(2026, 5, 16), false, "비노출");
       save(99L, LocalDate.of(2026, 5, 15), LocalDate.of(2026, 5, 16), true, "다른 기수");
 
-      List<EventView> result = eventQueryService.findByMonth(GENERATION_NO, 2026, 5);
+      List<EventView> result = eventQueryService.findByMonth(GENERATION_NO, YearMonth.of(2026, 5));
 
       assertThat(result).extracting(EventView::title)
           .containsExactly("4월말~5월초", "5월 중순", "5월말~6월초");
@@ -75,7 +76,7 @@ class EventQueryServiceImplTest {
     void emptyWhenGenerationNotFound() {
       save(generationId, LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 12), true, "5월");
 
-      assertThat(eventQueryService.findByMonth(99, 2026, 5)).isEmpty();
+      assertThat(eventQueryService.findByMonth(99, YearMonth.of(2026, 5))).isEmpty();
     }
   }
 
@@ -84,8 +85,8 @@ class EventQueryServiceImplTest {
   class FindUpcoming {
 
     @Test
-    @DisplayName("오늘 이후 시작하는 노출 행사만 가까운 순으로 반환한다")
-    void returnsFutureVisibleEvents() {
+    @DisplayName("오늘 이후 시작하는 행사를 가까운 순으로 반환한다 (비노출 포함)")
+    void returnsFutureEventsIncludingHidden() {
       save(generationId, TODAY.plusDays(10), TODAY.plusDays(11), true, "먼 행사");
       save(generationId, TODAY.plusDays(2), TODAY.plusDays(3), true, "가까운 행사");
       save(generationId, TODAY.minusDays(2), TODAY.minusDays(1), true, "지난 행사");
@@ -93,7 +94,7 @@ class EventQueryServiceImplTest {
 
       List<EventView> result = eventQueryService.findUpcoming(GENERATION_NO);
 
-      assertThat(result).extracting(EventView::title).containsExactly("가까운 행사", "먼 행사");
+      assertThat(result).extracting(EventView::title).containsExactly("가까운 행사", "비노출", "먼 행사");
     }
 
     @Test
