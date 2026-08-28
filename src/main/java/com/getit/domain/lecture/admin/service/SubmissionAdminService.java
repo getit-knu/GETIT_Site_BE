@@ -97,11 +97,14 @@ public class SubmissionAdminService {
 
     SubmissionDetailResult.FileSummary fileSummary = submission.getFileId() == null
         ? null : toFileSummary(submission.getFileId());
-    List<SubmissionDetailResult.FeedbackItem> feedbacks =
-        feedbackRepository.findAllBySubmissionIdOrderByIdAsc(submissionId).stream()
-            .map(feedback -> SubmissionDetailResult.FeedbackItem.of(
-                feedback, findUser(feedback.getAdminId()).name()))
-            .toList();
+    List<Feedback> feedbackEntities = feedbackRepository.findAllBySubmissionIdOrderByIdAsc(submissionId);
+    Map<Long, String> adminNameById = feedbackEntities.stream()
+        .map(Feedback::getAdminId)
+        .distinct()
+        .collect(Collectors.toMap(Function.identity(), adminId -> findUser(adminId).name()));
+    List<SubmissionDetailResult.FeedbackItem> feedbacks = feedbackEntities.stream()
+        .map(feedback -> SubmissionDetailResult.FeedbackItem.of(feedback, adminNameById.get(feedback.getAdminId())))
+        .toList();
 
     List<RowCandidate> submittedCandidates = buildCandidates(lecture, assignment).stream()
         .filter(RowCandidate::submitted)
