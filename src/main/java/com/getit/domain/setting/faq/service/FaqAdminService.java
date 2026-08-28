@@ -38,7 +38,7 @@ public class FaqAdminService {
   /** 10.19 POST. order 생략 시 맨 뒤, 값이 있으면 [1, 기존 개수+1] 로 clamp 한 뒤 이후 항목을 뒤로 민다. */
   @Transactional
   public FaqResult createFaq(FaqRequest request) {
-    List<Faq> siblings = faqRepository.findAllByOrderByOrderAscIdAsc();
+    List<Faq> siblings = faqRepository.findAllForUpdate();
 
     int newOrder = request.order() == null
         ? siblings.size() + 1
@@ -71,18 +71,22 @@ public class FaqAdminService {
   /** 10.19 DELETE. 삭제된 순번 뒤 항목을 한 칸씩 당겨 order 결번을 막는다. */
   @Transactional
   public void deleteFaq(Long faqId) {
-    Faq faq = findFaq(faqId);
+    List<Faq> all = faqRepository.findAllForUpdate();
+    Faq faq = all.stream()
+        .filter(candidate -> candidate.getId().equals(faqId))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(FaqErrorCode.FAQ_NOT_FOUND));
     int deletedOrder = faq.getOrder();
 
     faqRepository.delete(faq);
 
-    faqRepository.findAllByOrderByOrderAscIdAsc().stream()
+    all.stream()
         .filter(sibling -> sibling.getOrder() > deletedOrder)
         .forEach(sibling -> sibling.updateOrder(sibling.getOrder() - 1));
   }
 
   private void moveOrder(Faq target, int requestedOrder) {
-    List<Faq> siblings = faqRepository.findAllByOrderByOrderAscIdAsc();
+    List<Faq> siblings = faqRepository.findAllForUpdate();
     int currentOrder = target.getOrder();
     int newOrder = clamp(requestedOrder, 1, siblings.size());
     if (newOrder < currentOrder) {

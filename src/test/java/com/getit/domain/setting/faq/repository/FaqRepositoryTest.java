@@ -43,4 +43,15 @@ class FaqRepositoryTest {
         .extracting(Faq::getId)
         .containsExactly(first.getId(), second.getId());
   }
+
+  @Test
+  @DisplayName("findAllForUpdate 도 order 오름차순으로 조회한다")
+  void findAllForUpdateReturnsOrdered() {
+    faqRepository.save(faq("B", 2));
+    faqRepository.save(faq("A", 1));
+
+    assertThat(faqRepository.findAllForUpdate())
+        .extracting(Faq::getQuestion)
+        .containsExactly("A", "B");
+  }
 }
