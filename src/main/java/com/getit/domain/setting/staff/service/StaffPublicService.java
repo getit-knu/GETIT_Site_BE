@@ -63,6 +63,10 @@ public class StaffPublicService {
    * 후보 전체의 fileId 를 모아 한 번에 조회한다({@code StaffAdminService.findProfileImageUrls}
    * 와 동일한 이유). {@code Map.of()} 는 null 키 조회에서 NPE 를 던지므로 fileId 가 없는 운영진을
    * 위해 {@link Collections#emptyMap()} 을 쓴다.
+   *
+   * <p>{@code Collectors.toMap(키, 값)} 2-인자 버전은 키가 중복되면 예외를 던진다 — 여기서는
+   * 같은 파일이 결과에 중복으로 잡혀도(정상적으로는 일어나지 않지만) 500 으로 죽는 대신 그중
+   * 하나만 쓰도록 병합 함수 {@code (a, b) -> a} 를 명시한다(PR #86 리뷰 지적).
    */
   private Map<Long, String> findProfileImageUrls(List<Staff> staffs) {
     List<Long> fileIds = staffs.stream().map(Staff::getFileId).filter(Objects::nonNull).distinct().toList();
@@ -70,6 +74,6 @@ public class StaffPublicService {
       return Collections.emptyMap();
     }
     return fileQueryService.findAllByIds(fileIds).stream()
-        .collect(Collectors.toMap(FileInfo::fileId, FileInfo::url));
+        .collect(Collectors.toMap(FileInfo::fileId, FileInfo::url, (a, b) -> a));
   }
 }

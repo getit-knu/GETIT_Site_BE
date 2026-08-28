@@ -6,6 +6,7 @@ import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -24,6 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>각 단계의 D-day·안내 메시지는 명세서가 {@code BEFORE_OPEN}·{@code DOCUMENT_OPEN} 두
  * 예시만 주고 나머지는 정하지 않아서, 다음 마일스톤까지 남은 일수를 보여주는 방식으로
  * 일관되게 판단해 채웠다(PR 리뷰 포인트).
+ *
+ * <p>{@code LocalDateTime.now()} 를 직접 부르지 않고 {@link Clock} 을 주입받는다 —
+ * 테스트에서 단계 경계값을 고정하지 못하면 테스트가 실행되는 실제 시각에 따라 결과가
+ * 달라지고, 자정을 사이에 두면 D-day 검증이 간헐적으로 실패할 수 있다(PR #86 Copilot
+ * 리뷰 지적). 서비스 테스트는 고정된 {@code Clock} 으로 교체해서 이 문제를 없앤다.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +38,7 @@ public class RecruitmentStatusService {
 
   private final RecruitmentScheduleRepository recruitmentScheduleRepository;
   private final GenerationQueryService generationQueryService;
+  private final Clock clock;
 
   public RecruitmentStatusResult getStatus() {
     Optional<GenerationSummary> activeGeneration = generationQueryService.findActive();
@@ -49,7 +56,7 @@ public class RecruitmentStatusService {
   }
 
   private RecruitmentStatusResult buildResult(GenerationSummary generation, RecruitmentSchedule schedule) {
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     RecruitmentPhase phase = schedule.resolvePhase(now);
     Long dDay = resolveDDay(phase, schedule, now.toLocalDate());
 
