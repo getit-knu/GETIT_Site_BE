@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # MySQL 백업. cron 이 매일 새벽에 실행한다.
 #
-# 설치: sudo bash deploy/install-backup.sh
-# 수동: bash /opt/getit/backup-db.sh
+# 설치 — install-backup.sh 가 /tmp/backup-db.sh 를 읽으므로 두 파일을 함께 보낸다.
+#   scp -i {키} deploy/backup-db.sh deploy/install-backup.sh azureuser@{IP}:/tmp/
+#   ssh -i {키} azureuser@{IP} 'sudo bash /tmp/install-backup.sh'
+#
+# 수동 실행: cd /opt/getit && ./backup-db.sh
 #
 # 지원서 · 평가 데이터가 들어가면 손실이 치명적이다. 컨테이너 볼륨만 믿지 않는다.
 

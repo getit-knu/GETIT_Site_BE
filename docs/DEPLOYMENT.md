@@ -26,11 +26,17 @@ App Service 였다면 `AzureBlobFileStorage` 구현이 끝날 때까지 배포�
 
 | 단계 | 상태 |
 |---|---|
-| Dockerfile | ✅ 로컬 빌드 · 기동 검증 완료 |
-| 이미지 빌드 · GHCR 푸시 | ✅ `main` 머지마다 자동 |
-| VM (40.82.154.5) | ⬜ Ubuntu 24.04, 아무것도 미설치 |
-| TLS · 도메인 | ⬜ |
-| 자동 배포 | ⬜ `VM_DEPLOY_ENABLED` 를 켜면 동작 |
+| Dockerfile | ✅ 빌드 · 기동 검증 완료 |
+| 이미지 빌드 · GHCR 푸시 | ✅ CI 통과 시 자동 |
+| VM (40.82.154.5) | ✅ docker · nginx · certbot · 방화벽 |
+| 도메인 · TLS | ✅ `api.getit.io.kr`, Let's Encrypt 자동 갱신 |
+| DB 백업 | ✅ 매일 04:00 (KST) |
+| **자동 배포** | ⬜ **`VM_DEPLOY_ENABLED` 미설정 — 아직 한 번도 돌지 않았다** |
+| 모니터링 | ⬜ 헬스체크 외 알림 없음 |
+| 백업 오프디스크 복사 | ⬜ DB 와 같은 디스크에 있다 |
+
+`VM_DEPLOY_ENABLED` 를 켜기 전까지 배포는 수동이다.
+CD 는 이미지만 만들어 GHCR 에 올리고 VM 은 건드리지 않는다.
 
 ---
 
@@ -109,7 +115,17 @@ Settings → Secrets and variables → Actions
 VM_DEPLOY_ENABLED = true            ← 이걸 켜는 순간 자동 배포 시작
 VM_HOST           = 40.82.154.5
 VM_USER           = azureuser
-HEALTHCHECK_URL   = https://{도메인}/actuator/health
+HEALTHCHECK_URL   = https://api.getit.io.kr/actuator/health
+VM_SSH_HOST_KEY   = 40.82.154.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG6yBTIvd8cPBrFfogc9eDbk7UhtZK3h2OyqlUQO5FM4
+```
+
+`VM_SSH_HOST_KEY` 는 접속할 서버가 정말 우리 VM 인지 확인하는 데 쓴다.
+없으면 CD 가 접속 직전에 받은 키를 그대로 믿는데, 중간자가 끼면
+compose 파일과 GHCR 토큰을 공격자 서버에 넘겨주게 된다.
+비워두면 경고를 남기고 동작은 한다. VM 을 새로 만들면 아래로 다시 받는다.
+
+```bash
+ssh-keyscan -t ed25519 40.82.154.5
 ```
 
 **Secrets**
@@ -141,9 +157,9 @@ Refresh Token 쿠키가 여기 걸린다.
 
 | 프론트 ↔ 백엔드 | 같은 사이트? | `REFRESH_COOKIE_SAME_SITE` |
 |---|---|---|
-| `getit.co.kr` ↔ `api.getit.co.kr` | ✅ | `Lax` (권장) |
-| `getit.vercel.app` ↔ `*.cloudapp.azure.com` | ❌ | `None` |
-| `localhost:5173` ↔ `*.cloudapp.azure.com` | ❌ | `None` |
+| **`getit.io.kr` ↔ `api.getit.io.kr`** | ✅ | **`Lax` ← 지금 구성** |
+| `getit.vercel.app` ↔ `api.getit.io.kr` | ❌ | `None` |
+| `localhost:5173` ↔ `api.getit.io.kr` | ❌ | `None` |
 
 **`Lax` 인데 교차 사이트면 재발급 요청에 쿠키가 실리지 않아 로그인이 유지되지 않는다.**
 증상이 "로그인은 되는데 새로고침하면 풀린다" 로 나타나서 원인을 찾기 어렵다.
@@ -152,36 +168,28 @@ Refresh Token 쿠키가 여기 걸린다.
 
 ---
 
-## 도메인을 산 뒤
-
-**하나만 사면 된다.** 서브도메인은 무제한이고 추가 비용이 없다.
+## 도메인 구성 (적용 완료)
 
 ```
-getit.co.kr        →  프론트엔드
-api.getit.co.kr    →  백엔드 (이 VM)
+getit.io.kr        →  프론트엔드 (별도 저장소)
+api.getit.io.kr    →  백엔드 (이 VM, 40.82.154.5)
 ```
 
-같은 등록 도메인이라 `SameSite=Lax` 를 쓸 수 있다. 보안 설정이 단순해진다.
+DNS 는 Cloudflare 가 관리한다. 같은 등록 도메인이라 `SameSite=Lax` 를 쓴다.
 
-**전환 절차**
+⚠️ **Cloudflare 프록시를 켤 때는 SSL/TLS 모드를 `Full (strict)` 로 둔다.**
+`Flexible` 이면 Cloudflare 가 VM 에 http 로 붙는데 nginx 가 https 로 되돌려 보내
+무한 리다이렉트가 된다.
+
+**도메인을 바꾸게 되면**
 
 ```bash
-# 1. 가비아 DNS 에 A 레코드 추가
-#    api.getit.co.kr  →  40.82.154.5
-
+# 1. Cloudflare DNS 에 A 레코드 추가 → 40.82.154.5
 # 2. 인증서 재발급 (nginx 구성도 함께 갱신된다)
-sudo bash issue-cert.sh api.getit.co.kr you@getit.co.kr
-
-# 3. .env 수정
-#    CORS_ALLOWED_ORIGINS     = https://getit.co.kr
-#    OAUTH2_REDIRECT_URI      = https://getit.co.kr/oauth/callback
-#    FILE_BASE_URL            = https://api.getit.co.kr/api/public/files
-#    REFRESH_COOKIE_SAME_SITE = Lax
+sudo bash issue-cert.sh {새 도메인} getit0official@gmail.com
+# 3. /opt/getit/.env 의 CORS_ALLOWED_ORIGINS · OAUTH2_REDIRECT_URI · FILE_BASE_URL 수정
 cd /opt/getit && docker compose up -d
-
-# 4. Google Console 리디렉션 URI 추가
-#    https://api.getit.co.kr/login/oauth2/code/google
-
+# 4. Google Console 리디렉션 URI 추가 → https://{새 도메인}/login/oauth2/code/google
 # 5. GitHub Variables 의 HEALTHCHECK_URL 갱신
 ```
 
@@ -261,7 +269,10 @@ docker compose logs app --tail 50
 
 | 항목 | 담당 | 비고 |
 |---|---|---|
-| DB 자동 백업 | B | cron + mysqldump, 또는 Azure Files 로 전송 |
+| **GitHub Variables · Secret 등록** | R | 이것만 하면 자동 배포가 켜진다 |
+| 첫 자동 배포 검증 | R | VM 의 GHCR 인증 경로가 아직 한 번도 안 돌았다 |
+| 롤백 리허설 | R | 절차만 있고 실제로 해본 적이 없다 |
+| 백업 오프디스크 복사 | B | 지금은 DB 와 같은 디스크. 디스크가 깨지면 둘 다 사라진다 |
+| 모니터링 | B | 헬스체크 외에 알림 없음 (UptimeRobot 정도면 충분) |
 | Redis | — | **만들지 않는다.** 코드에서 쓰지 않는다 |
-| 모니터링 | B | 헬스체크 외에 알림 없음 |
 | 프론트 배포 | R | 별도 저장소 |
