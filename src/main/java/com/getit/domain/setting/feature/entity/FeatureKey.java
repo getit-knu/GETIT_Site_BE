@@ -3,7 +3,7 @@ package com.getit.domain.setting.feature.entity;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-/** 토글 가능한 기능. label 은 공개 화면 표기용. (명세서 0.5 · 10.23) */
+// enum 추가하시면 seed 넣으셔야 합니다~
 @Getter
 @RequiredArgsConstructor
 public enum FeatureKey {
