@@ -2,6 +2,7 @@ package com.getit.domain.setting.generation.controller;
 
 import com.getit.domain.setting.generation.dto.GenerationResult;
 import com.getit.domain.setting.generation.dto.GenerationUpdateRequest;
+import com.getit.domain.setting.generation.dto.UpdateGenerationCommand;
 import com.getit.domain.setting.generation.service.GenerationAdminService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,7 @@ public class GenerationController {
   @Operation(summary = "진행 기수 · 연도 저장", description = "명세서 10.2")
   @PutMapping
   public ApiResponse<GenerationResult> updateGeneration(@Valid @RequestBody GenerationUpdateRequest request) {
-    return ApiResponse.success(generationAdminService.updateGeneration(request.generationNo(), request.year()));
+    return ApiResponse.success(generationAdminService.updateGeneration(
+        new UpdateGenerationCommand(request.generationNo(), request.year())));
   }
 }

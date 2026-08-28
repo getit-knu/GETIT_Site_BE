@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.setting.generation.dto.GenerationResult;
+import com.getit.domain.setting.generation.dto.UpdateGenerationCommand;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.exception.GenerationErrorCode;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
@@ -62,7 +63,7 @@ class GenerationAdminServiceTest {
     @Test
     @DisplayName("활성 기수가 하나도 없으면 새로 만들어서 활성화한다")
     void createsAndActivatesWhenNoneExists() {
-      GenerationResult saved = generationAdminService.updateGeneration(9, 2026);
+      GenerationResult saved = generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
 
       assertThat(saved.generationNo()).isEqualTo(9);
       assertThat(saved.year()).isEqualTo(2026);
@@ -76,7 +77,7 @@ class GenerationAdminServiceTest {
       previous.activate();
       generationRepository.save(previous);
 
-      generationAdminService.updateGeneration(9, 2026);
+      generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
 
       assertThat(generationRepository.findById(previous.getId()).orElseThrow().isActive()).isFalse();
       assertThat(generationRepository.findByIsActiveTrue())
@@ -91,11 +92,13 @@ class GenerationAdminServiceTest {
     void updatesExistingGenerationInfo() {
       generationRepository.save(Generation.create(9, 2025));
 
-      GenerationResult saved = generationAdminService.updateGeneration(9, 2026);
+      GenerationResult saved = generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
 
       assertThat(saved.year()).isEqualTo(2026);
       assertThat(saved.isActive()).isTrue();
-      assertThat(generationRepository.count()).isEqualTo(1);
+      // 활성화 로직을 직렬화하는 예약 행(generationNo=0)이 하나 더 생기므로, 9기가 중복
+      // 생성되지 않았는지는 "2건(예약 행 + 9기)"으로 확인한다.
+      assertThat(generationRepository.count()).isEqualTo(2);
     }
 
     @Test
@@ -105,10 +108,33 @@ class GenerationAdminServiceTest {
       active.activate();
       generationRepository.save(active);
 
-      GenerationResult saved = generationAdminService.updateGeneration(9, 2026);
+      GenerationResult saved = generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
 
       assertThat(saved.year()).isEqualTo(2026);
       assertThat(saved.isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("활성화 로직을 직렬화하는 예약 행(generationNo=0)을 만들지만 조회 결과에는 나타나지 않는다")
+    void createsActivationLockRowButExcludesItFromResults() {
+      generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
+
+      assertThat(generationRepository.findByGenerationNo(0)).isPresent();
+      GenerationResult active = generationAdminService.getActiveGeneration();
+      assertThat(active.generationNo()).isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("예약 행이 이미 있어도(두 번째 호출) 중복 생성 없이 정상 동작한다")
+    void reusesExistingActivationLockRowOnSubsequentCalls() {
+      generationAdminService.updateGeneration(new UpdateGenerationCommand(9, 2026));
+      long lockRowCountAfterFirstCall = generationRepository.count();
+
+      GenerationResult saved = generationAdminService.updateGeneration(new UpdateGenerationCommand(10, 2027));
+
+      assertThat(saved.generationNo()).isEqualTo(10);
+      // 예약 행(1) + 9기(1) 에서 10기(1) 하나만 늘어야 한다 — 예약 행이 중복 생성되면 안 된다.
+      assertThat(generationRepository.count()).isEqualTo(lockRowCountAfterFirstCall + 1);
     }
   }
 }

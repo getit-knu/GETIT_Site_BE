@@ -76,4 +76,13 @@ class GenerationRepositoryTest {
     assertThat(updatedAgain).isEqualTo(0);
     assertThat(generationRepository.findById(active.getId()).orElseThrow().isActive()).isFalse();
   }
+
+  @Test
+  @DisplayName("잠근 채로 기수 번호로 조회한다")
+  void findsByGenerationNoForUpdate() {
+    generationRepository.save(Generation.create(9, 2026));
+
+    assertThat(generationRepository.findByGenerationNoForUpdate(9)).isPresent();
+    assertThat(generationRepository.findByGenerationNoForUpdate(99)).isEmpty();
+  }
 }

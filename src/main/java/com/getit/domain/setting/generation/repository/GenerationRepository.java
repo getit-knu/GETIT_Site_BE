@@ -1,8 +1,10 @@
 package com.getit.domain.setting.generation.repository;
 
 import com.getit.domain.setting.generation.entity.Generation;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -28,4 +30,15 @@ public interface GenerationRepository extends JpaRepository<Generation, Long> {
   @Modifying(clearAutomatically = true)
   @Query("update Generation g set g.isActive = false where g.id = :id and g.isActive = true")
   int deactivateIfActive(@Param("id") Long id);
+
+  /**
+   * {@code generationNo} 로 행을 찾으면서 잠근다. (10.2, PR #76 Copilot 리뷰 지적)
+   *
+   * <p>{@code GenerationAdminService} 가 활성화 로직 전체를 직렬화하는 잠금 행을 잡는 데 쓴다 —
+   * 활성 기수가 하나도 없는 최초 상태에서는 {@code deactivateIfActive} 만으로 두 트랜잭션의
+   * 경합을 막지 못하기 때문이다(둘 다 "활성 기수 없음"을 보고 그대로 진행해버릴 수 있다).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select g from Generation g where g.generationNo = :generationNo")
+  Optional<Generation> findByGenerationNoForUpdate(@Param("generationNo") Integer generationNo);
 }

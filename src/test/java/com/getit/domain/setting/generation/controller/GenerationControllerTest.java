@@ -131,5 +131,27 @@ class GenerationControllerTest {
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
+
+    @Test
+    @DisplayName("generationNo 가 0 이하면 400 이다")
+    void returns400WhenGenerationNoNotPositive() throws Exception {
+      mockMvc.perform(put(GENERATION_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(updateRequestJson(0, 2026)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("year 가 음수면 400 이다")
+    void returns400WhenYearNegative() throws Exception {
+      mockMvc.perform(put(GENERATION_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(updateRequestJson(9, -1)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
   }
 }

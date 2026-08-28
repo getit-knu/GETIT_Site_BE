@@ -25,6 +25,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Generation extends BaseTimeEntity {
 
+  /**
+   * 활성화 로직을 직렬화하는 잠금 행 전용 예약 기수 번호. 실제 기수로는 절대 쓰이지 않는다
+   * ({@code GenerationUpdateRequest} 가 {@code @Positive} 로 0 이하 값을 항상 거부한다,
+   * PR #76 Copilot 리뷰 지적). 다른 도메인이 {@code generationNo} 로 기수를 조회할 때 이 값을
+   * 진짜 기수로 오인하지 않도록, 조회 계약({@code GenerationQueryService.findByGenerationNo})도
+   * 이 상수를 참조해서 걸러낸다.
+   */
+  public static final int RESERVED_ACTIVATION_LOCK_GENERATION_NO = 0;
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
