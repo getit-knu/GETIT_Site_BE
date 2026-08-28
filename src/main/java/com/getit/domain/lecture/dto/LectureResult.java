@@ -5,7 +5,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 
-/** 부원 강의 조회 응답. (API 명세서 4.1 ~ 4.3) */
 public class LectureResult {
 
   public record ListResult(

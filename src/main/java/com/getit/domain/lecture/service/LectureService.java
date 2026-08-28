@@ -41,19 +41,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 부원 강의 조회. (API 명세서 4.1 ~ 4.3)
- *
- * <p>공개(published) 강의만, 요청자가 속한 활성 기수 범위에서만 노출한다. 관리자 조회는
- * {@code admin.service.LectureAdminService} 를 따로 둔다.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class LectureService {
 
-  /** 로컬 스토리지라 presigned URL 이 아니다. 계약 유지용 고정값이며 실제 만료는 없다. */
   private static final int DOWNLOAD_URL_EXPIRES_IN = 300;
 
   private final LectureRepository lectureRepository;
@@ -70,7 +63,6 @@ public class LectureService {
       Long userId, Long trackId, Long subCategoryId, Pageable pageable) {
     GenerationSummary generation = requireActiveMember(userId);
 
-    // 정렬은 주차·id 로 고정한다(@Query 의 order by). 클라이언트가 보낸 sort 는 버린다.
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     Page<Lecture> lectures =
         lectureRepository.findPublishedPage(generation.id(), trackId, subCategoryId, pageOnly);
@@ -245,8 +237,6 @@ public class LectureService {
   }
 
   private GenerationSummary requireActiveMember(Long userId) {
-    // 부원 조회는 "활성 기수의 부원인가"만 따진다. 활성 기수가 없으면 그 조건을 만족할 수
-    // 없으므로 404 가 아니라 403 으로 막는다.
     GenerationSummary active = generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(CommonErrorCode.FORBIDDEN));
     UserAccount me = userAccountService.findActiveById(userId)
