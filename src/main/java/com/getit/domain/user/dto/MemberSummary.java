@@ -7,16 +7,18 @@ import com.getit.domain.user.entity.User;
  *
  * <p>{@code lecture} 의 8.6 제출 현황 화면(모집단 조회)에서 쓴다.
  *
- * <p>{@code groupId} 는 아직 넣지 않았다. 조(Group) 관리(9.6~9.11)가 구현되기 전이라 소스가 없다.
- * 필요해지면 그때 필드를 추가한다.
+ * <p>{@code groupId} 는 미배정이면 null 이다 (#30 당시엔 조(Group) 관리(9.6~9.11)가 구현되기
+ * 전이라 빠져 있었는데, W4 이슈 1(#59)에서 {@code User.groupId} 가 생겨서 이슈 #79 에서 추가함 —
+ * lecture(B) 요청).
  */
 public record MemberSummary(
     Long userId,
     String userName,
-    String major
+    String major,
+    Long groupId
 ) {
 
   public static MemberSummary from(User user) {
-    return new MemberSummary(user.getId(), user.getName(), user.getMajor());
+    return new MemberSummary(user.getId(), user.getName(), user.getMajor(), user.getGroupId());
   }
 }

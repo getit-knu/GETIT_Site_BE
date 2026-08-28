@@ -46,6 +46,20 @@ class UserQueryServiceImplTest {
     assertThat(members.get(0).userId()).isEqualTo(member.getId());
     assertThat(members.get(0).userName()).isEqualTo("김부원");
     assertThat(members.get(0).major()).isEqualTo("경영학과");
+    assertThat(members.get(0).groupId()).isNull();
+  }
+
+  @Test
+  @DisplayName("조에 배정된 부원은 groupId 를 함께 반환한다")
+  void includesGroupIdWhenAssigned() {
+    User member = memberOf(9, "google-sub-23", "p@getit.com", "경영학과");
+    member.assignToGroup(1L);
+    userRepository.flush();
+
+    List<MemberSummary> members = userQueryService.findActiveMembers(9);
+
+    assertThat(members).hasSize(1);
+    assertThat(members.get(0).groupId()).isEqualTo(1L);
   }
 
   @Test
