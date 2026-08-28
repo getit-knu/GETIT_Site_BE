@@ -30,7 +30,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -71,6 +70,7 @@ public class LectureService {
       Long userId, Long trackId, Long subCategoryId, Pageable pageable) {
     GenerationSummary generation = requireActiveMember(userId);
 
+    // 정렬은 주차·id 로 고정한다(@Query 의 order by). 클라이언트가 보낸 sort 는 버린다.
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     Page<Lecture> lectures =
         lectureRepository.findPublishedPage(generation.id(), trackId, subCategoryId, pageOnly);
@@ -212,7 +212,6 @@ public class LectureService {
     String fileName = null;
     if (submission.getFileId() != null) {
       FileInfo info = fileQueryService.findAllByIds(List.of(submission.getFileId())).stream()
-          .filter(file -> Objects.equals(file.fileId(), submission.getFileId()))
           .findFirst()
           .orElse(null);
       if (info == null) {
