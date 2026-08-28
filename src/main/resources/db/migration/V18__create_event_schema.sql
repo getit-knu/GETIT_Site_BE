@@ -1,6 +1,8 @@
 -- 행사 일정 스키마. 이슈 #97 Event 엔티티에 대응한다. (명세서 10.14 ~ 10.17)
+-- `event` 는 MySQL 비예약어라 인용 없이도 동작하지만, Event Scheduler 키워드와 겹쳐 혼동을
+-- 부르므로 식별자를 backtick 으로 감싼다. 엔티티 @Table(name = "`event`") 와 짝.
 
-CREATE TABLE event
+CREATE TABLE `event`
 (
     id             bigint       NOT NULL AUTO_INCREMENT,
 

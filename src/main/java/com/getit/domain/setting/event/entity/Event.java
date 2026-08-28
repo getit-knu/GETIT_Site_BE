@@ -19,7 +19,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "event")
+@Table(name = "`event`")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Event extends BaseTimeEntity {
