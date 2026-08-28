@@ -73,6 +73,12 @@ springdoc:
 
 server:
   port: 8080
+  # nginx 뒤에서 동작한다. 이 설정이 없으면 Spring 이 프록시의 X-Forwarded-* 를 무시하고
+  # 자기 커넥터 기준(http, 8080)으로 절대 URL 을 만든다.
+  #
+  # 그 결과 OAuth2 redirect_uri 가 http 로 나가 Google 이 redirect_uri_mismatch 로 거부한다.
+  # 로컬(프록시 없음)에서는 X-Forwarded-* 자체가 없으므로 영향이 없다.
+  forward-headers-strategy: framework
   servlet:
     encoding:
       charset: UTF-8
