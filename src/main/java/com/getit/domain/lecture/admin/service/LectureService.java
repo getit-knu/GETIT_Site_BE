@@ -7,14 +7,19 @@ import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureResult;
 import com.getit.domain.lecture.entity.Assignment;
+import com.getit.domain.lecture.entity.AssignmentSubmission;
+import com.getit.domain.lecture.entity.Feedback;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.LectureFile;
 import com.getit.domain.lecture.exception.LectureErrorCode;
 import com.getit.domain.lecture.repository.AssignmentRepository;
+import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.lecture.repository.FeedbackRepository;
 import com.getit.domain.lecture.repository.LectureFileRepository;
 import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.setting.category.service.CategoryQueryService;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
+import com.getit.domain.user.service.UserQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
@@ -36,8 +41,11 @@ public class LectureService {
   private final LectureRepository lectureRepository;
   private final LectureFileRepository lectureFileRepository;
   private final AssignmentRepository assignmentRepository;
+  private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+  private final FeedbackRepository feedbackRepository;
   private final GenerationQueryService generationQueryService;
   private final CategoryQueryService categoryQueryService;
+  private final UserQueryService userQueryService;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
 
@@ -66,11 +74,47 @@ public class LectureService {
     Map<Long, Assignment> assignmentsByLectureId = assignmentRepository.findAllByLectureIdIn(lectureIds).stream()
         .collect(Collectors.toMap(Assignment::getLectureId, Function.identity()));
 
+    long totalCount = countActiveMembers(resolvedGenerationId);
+    Map<Long, List<AssignmentSubmission>> submissionsByAssignmentId = findSubmissionsByAssignmentId(
+        assignmentsByLectureId.values().stream().map(Assignment::getId).toList());
+    Set<Long> feedbackDoneSubmissionIds = findFeedbackDoneSubmissionIds(submissionsByAssignmentId);
+
     List<LectureResult.LectureCard> cards = lectures.stream()
-        .map(lecture -> LectureResult.LectureCard.of(lecture, assignmentsByLectureId.get(lecture.getId())))
+        .map(lecture -> {
+          Assignment assignment = assignmentsByLectureId.get(lecture.getId());
+          List<AssignmentSubmission> submissions = assignment == null
+              ? List.of() : submissionsByAssignmentId.getOrDefault(assignment.getId(), List.of());
+          long feedbackDoneCount = submissions.stream()
+              .filter(submission -> feedbackDoneSubmissionIds.contains(submission.getId()))
+              .count();
+          return LectureResult.LectureCard.of(
+              lecture, assignment, submissions.size(), totalCount, feedbackDoneCount);
+        })
         .toList();
 
     return new LectureResult.ListResult(categoryQueryService.findAllTracksWithSubCategories(), cards);
+  }
+
+  private long countActiveMembers(Long generationId) {
+    Integer generationNo = generationQueryService.findById(generationId)
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.GENERATION_NOT_FOUND))
+        .generationNo();
+    return userQueryService.findActiveMembers(generationNo).size();
+  }
+
+  private Map<Long, List<AssignmentSubmission>> findSubmissionsByAssignmentId(List<Long> assignmentIds) {
+    return assignmentSubmissionRepository.findAllByAssignmentIdIn(assignmentIds).stream()
+        .collect(Collectors.groupingBy(AssignmentSubmission::getAssignmentId));
+  }
+
+  private Set<Long> findFeedbackDoneSubmissionIds(Map<Long, List<AssignmentSubmission>> submissionsByAssignmentId) {
+    List<Long> submissionIds = submissionsByAssignmentId.values().stream()
+        .flatMap(List::stream)
+        .map(AssignmentSubmission::getId)
+        .toList();
+    return feedbackRepository.findAllBySubmissionIdIn(submissionIds).stream()
+        .map(Feedback::getSubmissionId)
+        .collect(Collectors.toSet());
   }
 
   public LectureResult.DetailResult getLecture(Long lectureId) {
