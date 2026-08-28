@@ -32,11 +32,11 @@ class ProjectQueryServiceImplTest {
   @Test
   @DisplayName("findShowcase: 학기 필터 + order 순 + 페이지")
   void findShowcase() {
-    seed("B", "2025 Fall", false, 2);
-    seed("A", "2025 Fall", false, 1);
-    seed("C", "2024 Spring", false, 1);
+    seed("B", "2025-FALL", false, 2);
+    seed("A", "2025-FALL", false, 1);
+    seed("C", "2024-SPRING", false, 1);
 
-    var page = projectQueryService.findShowcase("2025 Fall", PageRequest.of(0, 9));
+    var page = projectQueryService.findShowcase("2025-FALL", PageRequest.of(0, 9));
 
     assertThat(page.getContent()).extracting(ProjectView::title).containsExactly("A", "B");
   }
@@ -44,19 +44,19 @@ class ProjectQueryServiceImplTest {
   @Test
   @DisplayName("findDistinctSemesters: 실존 학기만")
   void findDistinctSemesters() {
-    seed("A", "2025 Fall", false, 1);
-    seed("B", "2025 Fall", false, 2);
-    seed("C", "2024 Spring", false, 3);
+    seed("A", "2025-FALL", false, 1);
+    seed("B", "2025-FALL", false, 2);
+    seed("C", "2024-SPRING", false, 3);
 
-    assertThat(projectQueryService.findDistinctSemesters()).containsExactly("2025 Fall", "2024 Spring");
+    assertThat(projectQueryService.findDistinctSemesters()).containsExactly("2025-FALL", "2024-SPRING");
   }
 
   @Test
   @DisplayName("findFeatured: isFeatured 만 order 순으로")
   void findFeatured() {
-    seed("A", "2025 Fall", true, 2);
-    seed("B", "2025 Fall", true, 1);
-    seed("C", "2025 Fall", false, 1);
+    seed("A", "2025-FALL", true, 2);
+    seed("B", "2025-FALL", true, 1);
+    seed("C", "2025-FALL", false, 1);
 
     assertThat(projectQueryService.findFeatured()).extracting(ProjectView::title).containsExactly("B", "A");
   }

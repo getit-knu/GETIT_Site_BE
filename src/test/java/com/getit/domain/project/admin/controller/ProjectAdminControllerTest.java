@@ -63,7 +63,7 @@ class ProjectAdminControllerTest {
 
   private String body() throws Exception {
     return objectMapper.writeValueAsString(new ProjectRequest.Write(
-        "프로젝트", "팀", "2025 Fall", "설명", List.of("React"),
+        "프로젝트", "팀", "2025-FALL", "설명", List.of("React"),
         "https://code", "https://demo", null, true, null));
   }
 
@@ -101,7 +101,22 @@ class ProjectAdminControllerTest {
   @DisplayName("기술 스택 이름에 쉼표가 있으면 400 이다")
   void rejectsCommaInTechStack() throws Exception {
     String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
-        "프로젝트", "팀", "2025 Fall", null, List.of("React, Redux"),
+        "프로젝트", "팀", "2025-FALL", null, List.of("React, Redux"),
+        null, null, null, true, null));
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  }
+
+  @Test
+  @DisplayName("semester 형식이 YYYY-SEASON 이 아니면 400 이다")
+  void rejectsMalformedSemester() throws Exception {
+    String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
+        "프로젝트", "팀", "2025 Fall", null, List.of("React"),
         null, null, null, true, null));
 
     mockMvc.perform(post(PATH)
@@ -116,7 +131,7 @@ class ProjectAdminControllerTest {
   @DisplayName("삭제하면 204 다")
   void deletes() throws Exception {
     ProjectCommand command = new ProjectCommand(
-        "삭제대상", "팀", "2025 Fall", null, List.of(), null, null, false, null);
+        "삭제대상", "팀", "2025-FALL", null, List.of(), null, null, false, null);
     Long id = projectRepository.save(Project.create(command, 1)).getId();
 
     mockMvc.perform(delete(PATH + "/" + id).header("Authorization", adminToken()))

@@ -52,11 +52,11 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("학기로 거르고 order 순으로 반환한다")
     void filtersBySemesterOrderedByOrder() {
-      seed("B", "2025 Fall", 2);
-      seed("A", "2025 Fall", 1);
-      seed("C", "2024 Spring", 1);
+      seed("B", "2025-FALL", 2);
+      seed("A", "2025-FALL", 1);
+      seed("C", "2024-SPRING", 1);
 
-      var result = projectAdminService.getProjects("2025 Fall", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
 
       assertThat(result.content()).extracting(ProjectResult.Item::title).containsExactly("A", "B");
     }
@@ -66,9 +66,9 @@ class ProjectAdminServiceTest {
     void resolvesThumbnailUrl() {
       FileAsset file = fileAssetRepository.save(FileAsset.upload(
           "key", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L));
-      projectAdminService.createProject(write("썸네일", "2025 Fall", file.getId(), 1));
+      projectAdminService.createProject(write("썸네일", "2025-FALL", file.getId(), 1));
 
-      var result = projectAdminService.getProjects("2025 Fall", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
 
       assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("https://cdn/thumb.png");
     }
@@ -76,9 +76,9 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("fileId 가 없으면 thumbnailUrl 은 null")
     void nullThumbnailWhenNoFile() {
-      seed("파일없음", "2025 Fall", 1);
+      seed("파일없음", "2025-FALL", 1);
 
-      var result = projectAdminService.getProjects("2025 Fall", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
 
       assertThat(result.content().get(0).thumbnailUrl()).isNull();
     }
@@ -91,9 +91,9 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("order 를 생략하면 맨 뒤에 붙는다")
     void appendsWhenOrderOmitted() {
-      seed("기존", "2025 Fall", 4);
+      seed("기존", "2025-FALL", 4);
 
-      ProjectResult.Item created = projectAdminService.createProject(write("신규", "2025 Fall", null, null));
+      ProjectResult.Item created = projectAdminService.createProject(write("신규", "2025-FALL", null, null));
 
       assertThat(created.order()).isEqualTo(5);
     }
@@ -101,7 +101,7 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("order 를 주면 그 값을 쓴다")
     void usesExplicitOrder() {
-      ProjectResult.Item created = projectAdminService.createProject(write("신규", "2025 Fall", null, 9));
+      ProjectResult.Item created = projectAdminService.createProject(write("신규", "2025-FALL", null, 9));
 
       assertThat(created.order()).isEqualTo(9);
     }
@@ -114,19 +114,19 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("내용과 order 를 수정한다")
     void updates() {
-      Long id = seed("원래", "2025 Fall", 1).getId();
+      Long id = seed("원래", "2025-FALL", 1).getId();
 
-      ProjectResult.Item updated = projectAdminService.updateProject(id, write("변경", "2026 Spring", null, 3));
+      ProjectResult.Item updated = projectAdminService.updateProject(id, write("변경", "2026-SPRING", null, 3));
 
       assertThat(updated.title()).isEqualTo("변경");
-      assertThat(updated.semester()).isEqualTo("2026 Spring");
+      assertThat(updated.semester()).isEqualTo("2026-SPRING");
       assertThat(updated.order()).isEqualTo(3);
     }
 
     @Test
     @DisplayName("삭제한다")
     void deletes() {
-      Long id = seed("삭제대상", "2025 Fall", 1).getId();
+      Long id = seed("삭제대상", "2025-FALL", 1).getId();
 
       projectAdminService.deleteProject(id);
 

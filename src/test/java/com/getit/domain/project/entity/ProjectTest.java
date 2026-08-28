@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ProjectTest {
 
   private ProjectCommand command(String title, boolean isFeatured) {
-    return new ProjectCommand(title, "팀", "2025 Fall", "설명",
+    return new ProjectCommand(title, "팀", "2025-FALL", "설명",
         List.of("React", "Spring"), "https://code", "https://demo", isFeatured, null);
   }
 
