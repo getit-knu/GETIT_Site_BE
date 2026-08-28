@@ -47,7 +47,16 @@ public class ProjectPublicService {
   private ProjectShowcaseResult.Item toItem(ProjectView view, Map<Long, String> urlByFileId) {
     String thumbnailUrl = view.fileId() == null ? null : urlByFileId.get(view.fileId());
     return new ProjectShowcaseResult.Item(
-        view.id(), view.title(), view.teamName(), view.semester(), view.semester(),
+        view.id(), view.title(), view.teamName(), view.semester(), toSemesterLabel(view.semester()),
         view.description(), view.techStacks(), view.codeUrl(), view.demoUrl(), thumbnailUrl);
+  }
+
+  private static String toSemesterLabel(String semester) {
+    int dash = semester.indexOf('-');
+    if (dash < 0) {
+      return semester;
+    }
+    String season = semester.substring(dash + 1);
+    return semester.substring(0, dash) + " " + season.charAt(0) + season.substring(1).toLowerCase();
   }
 }
