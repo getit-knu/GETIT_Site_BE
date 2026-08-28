@@ -20,9 +20,7 @@ CREATE TABLE project
     updated_at    datetime(6)  NOT NULL,
 
     PRIMARY KEY (id),
-    -- 12.1 · 2.4: semester 로 필터 후 project_order 로 정렬(id tie-breaker).
     KEY idx_project_semester_order (semester, project_order, id),
-    -- 2.1 홈: is_featured 로 필터 후 project_order 로 정렬.
     KEY idx_project_featured_order (is_featured, project_order, id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

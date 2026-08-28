@@ -29,7 +29,6 @@ public class ProjectAdminService {
   private final ProjectRepository projectRepository;
   private final FileQueryService fileQueryService;
 
-  /** 12.1. */
   public PageResponse<ProjectResult.Item> getProjects(String semester, Pageable pageable) {
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     Page<Project> page = projectRepository.searchBySemester(semester, pageOnly);
@@ -37,7 +36,6 @@ public class ProjectAdminService {
     return PageResponse.from(page, project -> ProjectResult.Item.of(project, thumbnails.get(project.getId())));
   }
 
-  /** 12.2. order 생략 시 맨 뒤로 붙인다. */
   @Transactional
   public ProjectResult.Item createProject(ProjectRequest.Write request) {
     int order = request.order() == null ? projectRepository.findMaxOrder() + 1 : request.order();
@@ -45,7 +43,6 @@ public class ProjectAdminService {
     return toItem(saved);
   }
 
-  /** 12.3. */
   @Transactional
   public ProjectResult.Item updateProject(Long projectId, ProjectRequest.Write request) {
     Project project = findProject(projectId);
@@ -61,7 +58,6 @@ public class ProjectAdminService {
     return ProjectResult.Item.of(project, thumbnails.get(project.getId()));
   }
 
-  /** 12.4. */
   @Transactional
   public void deleteProject(Long projectId) {
     projectRepository.delete(findProject(projectId));
