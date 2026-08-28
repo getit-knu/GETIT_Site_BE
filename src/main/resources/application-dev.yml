@@ -4,6 +4,8 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    # 병렬 브랜치에서 번호가 어긋나 머지돼도 적용한다. 자세한 내용은 prod 설정 참조.
+    out-of-order: true
 
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?characterEncoding=UTF-8&serverTimezone=Asia/Seoul&rewriteBatchedStatements=true

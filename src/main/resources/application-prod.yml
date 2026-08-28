@@ -4,6 +4,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    # 번호가 낮은 마이그레이션이 뒤늦게 들어와도 적용한다.
+    #
+    # 여러 사람이 각자 브랜치에서 번호를 매기면 머지 순서가 번호 순서와 어긋난다.
+    # 실제로 V19 → V22 가 먼저 적용된 뒤 V20 · V21 이 머지돼 운영이 내려갔다.
+    # 이 설정이 없으면 Flyway 가 "resolved migration not applied" 로 기동을 거부한다.
+    #
+    # 대신 마이그레이션끼리 순서에 의존하지 않게 작성해야 한다.
+    # 앞선 마이그레이션이 만든 테이블을 전제하는 변경은 같은 PR 안에 함께 둔다.
+    out-of-order: true
 
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?characterEncoding=UTF-8&serverTimezone=Asia/Seoul&rewriteBatchedStatements=true
