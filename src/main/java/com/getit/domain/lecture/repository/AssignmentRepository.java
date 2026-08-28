@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
@@ -12,6 +14,10 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
   List<Assignment> findAllByLectureIdIn(List<Long> lectureIds);
 
-  List<Assignment> findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAscIdAsc(
-      List<Long> lectureIds, LocalDateTime from);
+  @Query("""
+      select a from Assignment a
+      where a.lectureId in :lectureIds and a.deadline >= :from
+      order by a.deadline asc, a.id asc
+      """)
+  List<Assignment> findOngoingByLectureIds(@Param("lectureIds") List<Long> lectureIds, @Param("from") LocalDateTime from);
 }

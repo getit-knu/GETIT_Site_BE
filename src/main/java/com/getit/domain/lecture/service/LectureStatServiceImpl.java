@@ -81,8 +81,7 @@ public class LectureStatServiceImpl implements LectureStatService {
       return List.of();
     }
     LocalDateTime todayStart = LocalDate.now(ZONE_SEOUL).atStartOfDay();
-    List<Assignment> ongoing = assignmentRepository
-        .findByLectureIdInAndDeadlineGreaterThanEqualOrderByDeadlineAscIdAsc(lectureIds, todayStart);
+    List<Assignment> ongoing = assignmentRepository.findOngoingByLectureIds(lectureIds, todayStart);
     if (ongoing.isEmpty()) {
       return List.of();
     }
