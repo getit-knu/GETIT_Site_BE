@@ -39,9 +39,7 @@ public class StaffController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ApiResponse<StaffResult> createStaff(@Valid @RequestBody StaffRequest request) {
-    return ApiResponse.success(staffAdminService.createStaff(
-        request.userId(), request.name(), request.staffRole(), request.section(), request.department(),
-        request.introduction(), request.fileId(), request.generationNo()));
+    return ApiResponse.success(staffAdminService.createStaff(request));
   }
 
   @Operation(summary = "운영진 수정", description = "명세서 10.21")
@@ -50,9 +48,7 @@ public class StaffController {
       @PathVariable Long id,
       @Valid @RequestBody StaffRequest request
   ) {
-    return ApiResponse.success(staffAdminService.updateStaff(
-        id, request.userId(), request.name(), request.staffRole(), request.section(), request.department(),
-        request.introduction(), request.fileId(), request.generationNo()));
+    return ApiResponse.success(staffAdminService.updateStaff(id, request));
   }
 
   @Operation(summary = "운영진 삭제", description = "명세서 10.21")
