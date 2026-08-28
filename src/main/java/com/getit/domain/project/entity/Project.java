@@ -34,17 +34,17 @@ public class Project extends BaseTimeEntity {
   @Column(nullable = false, length = 50)
   private String semester;
 
-  @Column(columnDefinition = "TEXT")
+  @Column(columnDefinition = "TEXT", nullable = true)
   private String description;
 
   @Convert(converter = TechStackListConverter.class)
-  @Column(name = "tech_stacks", length = 500)
+  @Column(name = "tech_stacks", length = 500, nullable = true)
   private List<String> techStacks;
 
-  @Column(name = "code_url", length = 512)
+  @Column(name = "code_url", length = 512, nullable = true)
   private String codeUrl;
 
-  @Column(name = "demo_url", length = 512)
+  @Column(name = "demo_url", length = 512, nullable = true)
   private String demoUrl;
 
   @Column(name = "is_featured", nullable = false)
@@ -53,7 +53,7 @@ public class Project extends BaseTimeEntity {
   @Column(name = "project_order", nullable = false)
   private int order;
 
-  @Column(name = "file_id")
+  @Column(name = "file_id", nullable = true)
   private Long fileId;
 
   @Builder(access = AccessLevel.PRIVATE)
