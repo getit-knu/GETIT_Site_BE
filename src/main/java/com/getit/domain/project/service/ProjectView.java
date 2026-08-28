@@ -24,7 +24,7 @@ public record ProjectView(
         project.getTeamName(),
         project.getSemester(),
         project.getDescription(),
-        project.getTechStacks() == null ? List.of() : project.getTechStacks(),
+        project.getTechStacks(),
         project.getCodeUrl(),
         project.getDemoUrl(),
         project.getFileId(),

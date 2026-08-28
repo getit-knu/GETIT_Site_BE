@@ -1,8 +1,7 @@
 package com.getit.domain.project.admin.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.getit.domain.project.entity.Project;
-import com.getit.domain.project.util.ProjectDateTimes;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 public class ProjectResult {
@@ -17,9 +16,8 @@ public class ProjectResult {
       String codeUrl,
       String demoUrl,
       String thumbnailUrl,
-      boolean isFeatured,
-      int order,
-      OffsetDateTime createdAt
+      @JsonProperty("isFeatured") boolean isFeatured,
+      int order
   ) {
 
     public static Item of(Project project, String thumbnailUrl) {
@@ -29,13 +27,12 @@ public class ProjectResult {
           project.getTeamName(),
           project.getSemester(),
           project.getDescription(),
-          project.getTechStacks() == null ? List.of() : project.getTechStacks(),
+          project.getTechStacks(),
           project.getCodeUrl(),
           project.getDemoUrl(),
           thumbnailUrl,
           project.isFeatured(),
-          project.getOrder(),
-          ProjectDateTimes.toOffset(project.getCreatedAt()));
+          project.getOrder());
     }
   }
 }
