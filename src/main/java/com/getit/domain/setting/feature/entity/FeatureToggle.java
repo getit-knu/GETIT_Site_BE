@@ -30,7 +30,7 @@ public class FeatureToggle extends BaseTimeEntity {
   @Column(nullable = false)
   private boolean enabled;
 
-  @Column
+  @Column(nullable = true)
   private Long updatedBy;
 
   @Builder(access = AccessLevel.PRIVATE)
