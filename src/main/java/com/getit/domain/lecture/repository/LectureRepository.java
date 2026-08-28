@@ -2,6 +2,7 @@ package com.getit.domain.lecture.repository;
 
 import com.getit.domain.lecture.entity.Lecture;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,8 @@ import org.springframework.data.repository.query.Param;
 public interface LectureRepository extends JpaRepository<Lecture, Long> {
 
   Optional<Lecture> findByIdAndDeletedAtIsNull(Long id);
+
+  List<Lecture> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
 
   @Query("""
       select l from Lecture l
