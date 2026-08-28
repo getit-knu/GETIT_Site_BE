@@ -28,9 +28,17 @@ install -o "$APP_USER" -g "$APP_USER" -m 0755 "$SRC" "$APP_DIR/backup-db.sh"
 echo "▸ $APP_DIR/backup-db.sh 설치됨"
 
 # 원격 복사 스크립트. 없어도 로컬 백업은 동작하므로 필수는 아니다.
+#
+# 재설치인데 /tmp 에 새 파일이 없으면, 이미 설치된 예전 업로더가 그대로 남아
+# 계속 실행된다. "원격 복사 없이 설치했다" 고 말하면 사실과 달라지므로 구분해서 알린다.
 if [ -f /tmp/upload-backup.sh ]; then
   install -o "$APP_USER" -g "$APP_USER" -m 0755 /tmp/upload-backup.sh "$APP_DIR/upload-backup.sh"
   echo "▸ $APP_DIR/upload-backup.sh 설치됨"
+elif [ -f "$APP_DIR/upload-backup.sh" ]; then
+  echo "▸ /tmp/upload-backup.sh 가 없어 갱신하지 않았습니다."
+  echo "  기존 $APP_DIR/upload-backup.sh 가 그대로 남아 계속 실행됩니다."
+  echo "  갱신하려면 deploy/upload-backup.sh 를 /tmp 로 함께 전송한 뒤 다시 실행하세요."
+  echo "  원격 복사를 끄려면 .env 의 AZURE_STORAGE_ACCOUNT 를 비우세요."
 else
   echo "▸ upload-backup.sh 가 없어 원격 복사 없이 설치합니다 (로컬 백업만)"
 fi

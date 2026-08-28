@@ -9,7 +9,14 @@
 # 다른 장애 도메인에 사본을 둬야 백업이라고 할 수 있다.
 #
 # 자격증명을 저장하지 않는다. VM 의 관리 ID(managed identity)로 토큰을 받아 쓴다.
-# .env 에 키를 넣으면 VM 이 털렸을 때 백업까지 함께 털린다.
+# 스토리지 키를 .env 에 넣으면 파일 하나가 새는 것만으로 어디서든 쓸 수 있는
+# 장기 자격증명이 유출된다. 관리 ID 토큰은 VM 안에서만 받을 수 있고 곧 만료된다.
+#
+# ⚠️ 다만 이것만으로 VM 침해를 막지는 못한다. 관리 ID 에 부여하는
+# Storage Blob Data Contributor 에는 삭제 권한이 포함돼 있어, VM 을 잡은 쪽은
+# IMDS 로 토큰을 계속 받아 원격 백업도 지울 수 있다.
+# 그래서 스토리지 쪽에 soft delete 와 버전 관리를 함께 켠다. 이 설정은
+# 데이터 평면 권한으로 끌 수 없어서, 지워져도 되돌릴 수 있다.
 #
 # 필요한 준비는 docs/DEPLOYMENT.md 의 "백업 오프디스크 복사" 참조.
 
@@ -42,11 +49,24 @@ fi
 
 SIZE=$(wc -c < "$FILE")
 
-# 단일 PUT 은 256MB 까지다. 그보다 커지면 블록 분할 업로드가 필요하다.
-if [ "$SIZE" -gt 209715200 ]; then
-  echo "[$(date '+%F %T')] 파일이 200MB 를 넘었습니다 (${SIZE}B). 분할 업로드 구현이 필요합니다." >&2
+# x-ms-version 2021-08-06 의 단일 Put Blob 한도는 5000MiB 다.
+# 그보다 커지면 Put Block + Put Block List 로 나눠 올려야 한다.
+PUT_BLOB_LIMIT=$((5000 * 1024 * 1024))
+if [ "$SIZE" -gt "$PUT_BLOB_LIMIT" ]; then
+  echo "[$(date '+%F %T')] 파일이 단일 업로드 한도(5000MiB)를 넘었습니다 (${SIZE}B)." >&2
+  echo "    블록 분할 업로드 구현이 필요합니다." >&2
   exit 1
 fi
+
+# 1GiB 를 넘으면 아직 올라가긴 하지만 시간이 오래 걸린다. 미리 알려둔다.
+if [ "$SIZE" -gt $((1024 * 1024 * 1024)) ]; then
+  echo "[$(date '+%F %T')] 백업이 1GiB 를 넘었습니다 (${SIZE}B). 분할 업로드 전환을 검토하세요." >&2
+fi
+
+# 제한 시간을 크기에 맞춘다. 고정값으로 두면 DB 가 커졌을 때
+# 업로드가 멀쩡히 진행 중인데도 매일 잘려서 실패한다.
+# 기준: 1MB 당 2초 + 여유 120초 (느린 회선에서도 넉넉하다).
+TIMEOUT=$((120 + SIZE / 1048576 * 2))
 
 # 관리 ID 토큰. VM 안에서만 받을 수 있고 만료가 짧아 유출 위험이 낮다.
 TOKEN=$(curl -s --max-time 10 -H Metadata:true \
@@ -71,7 +91,7 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$URL" \
   -H "Content-Type: application/gzip" \
   -H "Content-Length: $SIZE" \
   --data-binary "@$FILE" \
-  --max-time 300)
+  --max-time "$TIMEOUT")
 
 if [ "$CODE" != "201" ]; then
   echo "[$(date '+%F %T')] 업로드 실패 (HTTP $CODE): $BLOB" >&2
