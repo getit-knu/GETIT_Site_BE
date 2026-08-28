@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-public class LectureResult {
+public class LectureAdminResult {
 
   public record CreateResult(Long id, String title, Integer week, LocalDateTime createdAt) {
 

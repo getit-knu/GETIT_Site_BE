@@ -9,7 +9,7 @@ import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureRequest.AssignmentPart;
-import com.getit.domain.lecture.admin.dto.LectureResult;
+import com.getit.domain.lecture.admin.dto.LectureAdminResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
 import com.getit.domain.lecture.entity.Feedback;
@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 class LectureServiceTest {
 
   @Autowired
-  private LectureService lectureService;
+  private LectureAdminService lectureService;
 
   @Autowired
   private LectureFileRepository lectureFileRepository;
@@ -220,7 +220,7 @@ class LectureServiceTest {
               null, true, assignmentPart),
           100L);
 
-      LectureResult.DetailResult detail = lectureService.getLecture(lecture.getId());
+      LectureAdminResult.DetailResult detail = lectureService.getLecture(lecture.getId());
       assertThat(detail.assignment()).isNotNull();
       assertThat(detail.assignment().deadline()).isEqualTo(deadline);
       assertThat(detail.assignment().allowedTypes()).containsExactly(SubmissionType.LINK);
@@ -238,9 +238,9 @@ class LectureServiceTest {
       lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
       lectureService.createLecture(createRequest(null, otherTrack.getId(), null), 100L);
 
-      LectureResult.ListResult result = lectureService.getLectures(activeGenerationId, trackId, null);
+      LectureAdminResult.ListResult result = lectureService.getLectures(activeGenerationId, trackId, null);
 
-      assertThat(result.lectures()).extracting(LectureResult.LectureCard::title).containsExactly("HTML/CSS 기초");
+      assertThat(result.lectures()).extracting(LectureAdminResult.LectureCard::title).containsExactly("HTML/CSS 기초");
       assertThat(result.tracks()).hasSize(2);
     }
 
@@ -262,9 +262,9 @@ class LectureServiceTest {
           SubmissionStatus.SUBMITTED, LocalDateTime.now()));
       feedbackRepository.save(Feedback.create(submission.getId(), 999L, "잘했어요"));
 
-      LectureResult.ListResult result = lectureService.getLectures(activeGenerationId, trackId, null);
+      LectureAdminResult.ListResult result = lectureService.getLectures(activeGenerationId, trackId, null);
 
-      LectureResult.LectureCard card = result.lectures().get(0);
+      LectureAdminResult.LectureCard card = result.lectures().get(0);
       assertThat(card.submittedCount()).isEqualTo(1);
       assertThat(card.totalCount()).isEqualTo(2);
       assertThat(card.feedbackDoneCount()).isEqualTo(1);
@@ -288,7 +288,7 @@ class LectureServiceTest {
       Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
       lectureFileRepository.save(LectureFile.create("삭제된파일.pdf", lecture.getId(), 999_999L));
 
-      LectureResult.DetailResult detail = lectureService.getLecture(lecture.getId());
+      LectureAdminResult.DetailResult detail = lectureService.getLecture(lecture.getId());
 
       assertThat(detail.files()).isEmpty();
     }
@@ -302,7 +302,7 @@ class LectureServiceTest {
     void updatesFields() {
       Lecture lecture = lectureService.createLecture(createRequest(null, trackId, subCategoryId), 100L);
 
-      LectureResult.DetailResult detail = lectureService.updateLecture(
+      LectureAdminResult.DetailResult detail = lectureService.updateLecture(
           lecture.getId(), updateRequest(trackId, subCategoryId, null, null));
 
       assertThat(detail.week()).isEqualTo(2);
@@ -369,7 +369,7 @@ class LectureServiceTest {
       AssignmentPart assignmentPart = new AssignmentPart(
           "과제", "설명", deadline, Set.of(SubmissionType.FILE), null);
 
-      LectureResult.DetailResult detail = lectureService.updateLecture(
+      LectureAdminResult.DetailResult detail = lectureService.updateLecture(
           lecture.getId(), updateRequest(trackId, subCategoryId, null, assignmentPart));
 
       assertThat(detail.assignment()).isNotNull();
@@ -388,7 +388,7 @@ class LectureServiceTest {
               null, true, assignmentPart),
           100L);
 
-      LectureResult.DetailResult detail = lectureService.updateLecture(
+      LectureAdminResult.DetailResult detail = lectureService.updateLecture(
           lecture.getId(), updateRequest(trackId, subCategoryId, null, null));
 
       assertThat(detail.assignment()).isNull();
@@ -410,7 +410,7 @@ class LectureServiceTest {
       AssignmentPart newAssignment = new AssignmentPart(
           "새 과제", "새 설명", newDeadline, Set.of(SubmissionType.LINK), "URL 입력");
 
-      LectureResult.DetailResult detail = lectureService.updateLecture(
+      LectureAdminResult.DetailResult detail = lectureService.updateLecture(
           lecture.getId(), updateRequest(trackId, subCategoryId, null, newAssignment));
 
       assertThat(detail.assignment().title()).isEqualTo("새 과제");
