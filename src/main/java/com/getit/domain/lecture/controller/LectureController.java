@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,5 +34,14 @@ public class LectureController {
   ) {
     return ApiResponse.success(
         lectureService.getLectures(principal.getUserId(), trackId, subCategoryId, pageable));
+  }
+
+  @Operation(summary = "부원 강의 상세", description = "명세서 4.2")
+  @GetMapping("/{id}")
+  public ApiResponse<LectureResult.DetailResult> getLecture(
+      @PathVariable Long id,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ApiResponse.success(lectureService.getLecture(principal.getUserId(), id));
   }
 }
