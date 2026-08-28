@@ -2,8 +2,8 @@ package com.getit.domain.lecture.admin.controller;
 
 import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
-import com.getit.domain.lecture.admin.dto.LectureResult;
-import com.getit.domain.lecture.admin.service.LectureService;
+import com.getit.domain.lecture.admin.dto.LectureAdminResult;
+import com.getit.domain.lecture.admin.service.LectureAdminService;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,13 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/lectures")
 @RequiredArgsConstructor
-public class LectureController {
+public class LectureAdminController {
 
-  private final LectureService lectureService;
+  private final LectureAdminService lectureService;
 
   @Operation(summary = "강의 목록", description = "명세서 8.1")
   @GetMapping
-  public ApiResponse<LectureResult.ListResult> getLectures(
+  public ApiResponse<LectureAdminResult.ListResult> getLectures(
       @RequestParam(required = false) Long generationId,
       @RequestParam(required = false) Long trackId,
       @RequestParam(required = false) Long subCategoryId
@@ -44,23 +44,23 @@ public class LectureController {
   @Operation(summary = "강의 추가", description = "명세서 8.2")
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public ApiResponse<LectureResult.CreateResult> createLecture(
+  public ApiResponse<LectureAdminResult.CreateResult> createLecture(
       @Valid @RequestBody LectureRequest.Create request,
       @AuthenticationPrincipal CustomUserDetails principal
   ) {
     Lecture lecture = lectureService.createLecture(request, principal.getUserId());
-    return ApiResponse.success(LectureResult.CreateResult.from(lecture));
+    return ApiResponse.success(LectureAdminResult.CreateResult.from(lecture));
   }
 
   @Operation(summary = "강의 단건 조회", description = "명세서 8.3")
   @GetMapping("/{id}")
-  public ApiResponse<LectureResult.DetailResult> getLecture(@PathVariable Long id) {
+  public ApiResponse<LectureAdminResult.DetailResult> getLecture(@PathVariable Long id) {
     return ApiResponse.success(lectureService.getLecture(id));
   }
 
   @Operation(summary = "강의 수정", description = "명세서 8.4")
   @PutMapping("/{id}")
-  public ApiResponse<LectureResult.DetailResult> updateLecture(
+  public ApiResponse<LectureAdminResult.DetailResult> updateLecture(
       @PathVariable Long id,
       @Valid @RequestBody LectureRequest.Update request
   ) {

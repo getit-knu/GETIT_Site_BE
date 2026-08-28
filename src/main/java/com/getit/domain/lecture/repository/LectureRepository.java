@@ -3,6 +3,8 @@ package com.getit.domain.lecture.repository;
 import com.getit.domain.lecture.entity.Lecture;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -25,6 +27,33 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
       @Param("trackId") Long trackId,
       @Param("subCategoryId") Long subCategoryId
   );
+
+  @Query("""
+      select l from Lecture l
+      where l.generationId = :generationId
+        and l.published = true
+        and l.deletedAt is null
+        and (:trackId is null or l.trackId = :trackId)
+        and (:subCategoryId is null or l.subCategoryId = :subCategoryId)
+      order by l.week asc, l.id asc
+      """)
+  Page<Lecture> findPublishedPage(
+      @Param("generationId") Long generationId,
+      @Param("trackId") Long trackId,
+      @Param("subCategoryId") Long subCategoryId,
+      Pageable pageable
+  );
+
+  @Query("""
+      select l.subCategoryId as subCategoryId, count(l) as count
+      from Lecture l
+      where l.generationId = :generationId
+        and l.published = true
+        and l.deletedAt is null
+        and l.subCategoryId is not null
+      group by l.subCategoryId
+      """)
+  List<SubCategoryLectureCount> countPublishedBySubCategoryGrouped(@Param("generationId") Long generationId);
 
   long countByTrackIdAndDeletedAtIsNull(Long trackId);
 

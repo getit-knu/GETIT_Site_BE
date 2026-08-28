@@ -7,6 +7,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,6 +19,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Lecture extends SoftDeletableEntity {
+
+  private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,6 +59,9 @@ public class Lecture extends SoftDeletableEntity {
   @Column(name = "created_by", nullable = false)
   private Long createdBy;
 
+  @Column(name = "published_at")
+  private LocalDateTime publishedAt;
+
   @Builder(access = AccessLevel.PRIVATE)
   private Lecture(
       Integer week,
@@ -80,6 +87,9 @@ public class Lecture extends SoftDeletableEntity {
     this.trackId = trackId;
     this.subCategoryId = subCategoryId;
     this.createdBy = createdBy;
+    if (published) {
+      this.publishedAt = LocalDateTime.now(ZONE_SEOUL);
+    }
   }
 
   public static Lecture create(
@@ -130,6 +140,9 @@ public class Lecture extends SoftDeletableEntity {
     this.youtubeUrl = youtubeUrl;
     this.materialUrl = materialUrl;
     this.durationMinutes = durationMinutes;
+    if (!this.published && published) {
+      this.publishedAt = LocalDateTime.now(ZONE_SEOUL);
+    }
     this.published = published;
     this.generationId = generationId;
     this.trackId = trackId;

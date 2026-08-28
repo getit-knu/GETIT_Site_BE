@@ -5,7 +5,7 @@ import com.getit.domain.file.service.FileConnectionService;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
-import com.getit.domain.lecture.admin.dto.LectureResult;
+import com.getit.domain.lecture.admin.dto.LectureAdminResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
 import com.getit.domain.lecture.entity.Lecture;
@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class LectureService {
+public class LectureAdminService {
 
   private final LectureRepository lectureRepository;
   private final LectureFileRepository lectureFileRepository;
@@ -65,7 +65,7 @@ public class LectureService {
     return lecture;
   }
 
-  public LectureResult.ListResult getLectures(Long generationId, Long trackId, Long subCategoryId) {
+  public LectureAdminResult.ListResult getLectures(Long generationId, Long trackId, Long subCategoryId) {
     Long resolvedGenerationId = resolveGenerationId(generationId);
 
     List<Lecture> lectures = lectureRepository.findAllByFilters(resolvedGenerationId, trackId, subCategoryId);
@@ -78,7 +78,7 @@ public class LectureService {
         assignmentsByLectureId.values().stream().map(Assignment::getId).toList());
     Set<Long> feedbackDoneSubmissionIds = findFeedbackDoneSubmissionIds(submissionsByAssignmentId);
 
-    List<LectureResult.LectureCard> cards = lectures.stream()
+    List<LectureAdminResult.LectureCard> cards = lectures.stream()
         .map(lecture -> {
           Assignment assignment = assignmentsByLectureId.get(lecture.getId());
           List<AssignmentSubmission> submissions = assignment == null
@@ -86,12 +86,12 @@ public class LectureService {
           long feedbackDoneCount = submissions.stream()
               .filter(submission -> feedbackDoneSubmissionIds.contains(submission.getId()))
               .count();
-          return LectureResult.LectureCard.of(
+          return LectureAdminResult.LectureCard.of(
               lecture, assignment, submissions.size(), totalCount, feedbackDoneCount);
         })
         .toList();
 
-    return new LectureResult.ListResult(categoryQueryService.findAllTracksWithSubCategories(), cards);
+    return new LectureAdminResult.ListResult(categoryQueryService.findAllTracksWithSubCategories(), cards);
   }
 
   private long countActiveMembers(Long generationId) {
@@ -114,7 +114,7 @@ public class LectureService {
     return feedbackRepository.findSubmissionIdsWithFeedback(submissionIds);
   }
 
-  public LectureResult.DetailResult getLecture(Long lectureId) {
+  public LectureAdminResult.DetailResult getLecture(Long lectureId) {
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
 
@@ -130,20 +130,20 @@ public class LectureService {
       log.warn("강의자료 파일 조회 실패. lectureId={}, fileIds={}", lectureId,
           missingLectureFiles.stream().map(LectureFile::getFileId).toList());
     }
-    List<LectureResult.FileItem> files = lectureFilesByFileInfoFound.get(true).stream()
-        .map(lectureFile -> LectureResult.FileItem.of(
+    List<LectureAdminResult.FileItem> files = lectureFilesByFileInfoFound.get(true).stream()
+        .map(lectureFile -> LectureAdminResult.FileItem.of(
             lectureFile.getDisplayName(), fileInfoByFileId.get(lectureFile.getFileId())))
         .toList();
 
-    LectureResult.AssignmentResult assignment = assignmentRepository.findByLectureId(lectureId)
-        .map(LectureResult.AssignmentResult::from)
+    LectureAdminResult.AssignmentResult assignment = assignmentRepository.findByLectureId(lectureId)
+        .map(LectureAdminResult.AssignmentResult::from)
         .orElse(null);
 
-    return LectureResult.DetailResult.of(lecture, files, assignment);
+    return LectureAdminResult.DetailResult.of(lecture, files, assignment);
   }
 
   @Transactional
-  public LectureResult.DetailResult updateLecture(Long lectureId, LectureRequest.Update request) {
+  public LectureAdminResult.DetailResult updateLecture(Long lectureId, LectureRequest.Update request) {
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
 
