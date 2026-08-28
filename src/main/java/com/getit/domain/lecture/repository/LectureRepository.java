@@ -45,6 +45,15 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
   );
 
   @Query("""
+      select l from Lecture l
+      where l.generationId = :generationId
+        and l.published = true
+        and l.deletedAt is null
+      order by l.week asc, l.id asc
+      """)
+  List<Lecture> findPublishedByGeneration(@Param("generationId") Long generationId);
+
+  @Query("""
       select l.subCategoryId as subCategoryId, count(l) as count
       from Lecture l
       where l.generationId = :generationId
