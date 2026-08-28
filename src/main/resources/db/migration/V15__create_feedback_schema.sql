@@ -2,7 +2,7 @@ CREATE TABLE feedback
 (
     id            bigint       NOT NULL AUTO_INCREMENT,
 
-    content       TEXT         NOT NULL,
+    content       varchar(2000) NOT NULL,
 
     submission_id bigint       NOT NULL,
     admin_id      bigint       NOT NULL,

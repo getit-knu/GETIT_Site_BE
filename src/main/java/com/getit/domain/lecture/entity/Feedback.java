@@ -22,23 +22,23 @@ public class Feedback extends BaseTimeEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(columnDefinition = "TEXT", nullable = false)
+  @Column(nullable = false, length = 2000)
   private String content;
 
   @Column(name = "submission_id", nullable = false)
-  private Long submissionId;
+  private long submissionId;
 
   @Column(name = "admin_id", nullable = false)
-  private Long adminId;
+  private long adminId;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private Feedback(String content, Long submissionId, Long adminId) {
+  private Feedback(String content, long submissionId, long adminId) {
     this.content = content;
     this.submissionId = submissionId;
     this.adminId = adminId;
   }
 
-  public static Feedback create(Long submissionId, Long adminId, String content) {
+  public static Feedback create(long submissionId, long adminId, String content) {
     return Feedback.builder()
         .submissionId(submissionId)
         .adminId(adminId)
@@ -48,5 +48,5 @@ public class Feedback extends BaseTimeEntity {
 
   public void update(String content) { this.content = content; }
 
-  public boolean isWrittenBy(Long adminId) { return this.adminId.equals(adminId); }
+  public boolean isWrittenBy(long adminId) { return this.adminId == adminId; }
 }
