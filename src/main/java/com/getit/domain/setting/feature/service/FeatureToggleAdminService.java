@@ -46,6 +46,9 @@ public class FeatureToggleAdminService {
         .orElseThrow(() -> new BusinessException(FeatureErrorCode.FEATURE_NOT_FOUND));
 
     toggle.updateEnabled(enabled, updatedBy);
+    // @LastModifiedDate 는 flush 시점에 갱신된다. 응답 DTO 를 만들기 전에 flush 해야 변경 후
+    // updatedAt 이 담긴다 (FeedbackService.update 와 동일 — PR #102 리뷰 지적).
+    featureToggleRepository.flush();
 
     return FeatureResult.of(toggle, resolveUpdatedByName(updatedBy));
   }
