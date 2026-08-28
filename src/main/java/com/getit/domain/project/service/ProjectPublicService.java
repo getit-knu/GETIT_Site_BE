@@ -4,6 +4,7 @@ import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.project.dto.ProjectShowcaseResult;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -57,6 +58,7 @@ public class ProjectPublicService {
       return semester;
     }
     String season = semester.substring(dash + 1);
-    return semester.substring(0, dash) + " " + season.charAt(0) + season.substring(1).toLowerCase();
+    return semester.substring(0, dash) + " " + season.charAt(0)
+        + season.substring(1).toLowerCase(Locale.ROOT);
   }
 }
