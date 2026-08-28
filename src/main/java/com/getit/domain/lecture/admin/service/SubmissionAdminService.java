@@ -150,9 +150,7 @@ public class SubmissionAdminService {
         .collect(Collectors.toMap(AssignmentSubmission::getUserId, Function.identity()));
 
     List<Long> submissionIds = submissions.stream().map(AssignmentSubmission::getId).toList();
-    Set<Long> feedbackDoneSubmissionIds = feedbackRepository.findAllBySubmissionIdIn(submissionIds).stream()
-        .map(Feedback::getSubmissionId)
-        .collect(Collectors.toSet());
+    Set<Long> feedbackDoneSubmissionIds = feedbackRepository.findSubmissionIdsWithFeedback(submissionIds);
 
     return members.stream()
         .map(member -> toCandidate(member, submissionByUserId.get(member.userId()), feedbackDoneSubmissionIds))

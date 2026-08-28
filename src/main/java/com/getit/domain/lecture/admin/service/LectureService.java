@@ -8,7 +8,6 @@ import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureResult;
 import com.getit.domain.lecture.entity.Assignment;
 import com.getit.domain.lecture.entity.AssignmentSubmission;
-import com.getit.domain.lecture.entity.Feedback;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.LectureFile;
 import com.getit.domain.lecture.exception.LectureErrorCode;
@@ -112,9 +111,7 @@ public class LectureService {
         .flatMap(List::stream)
         .map(AssignmentSubmission::getId)
         .toList();
-    return feedbackRepository.findAllBySubmissionIdIn(submissionIds).stream()
-        .map(Feedback::getSubmissionId)
-        .collect(Collectors.toSet());
+    return feedbackRepository.findSubmissionIdsWithFeedback(submissionIds);
   }
 
   public LectureResult.DetailResult getLecture(Long lectureId) {
