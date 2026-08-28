@@ -139,4 +139,67 @@ class SubmissionAdminControllerTest {
           .andExpect(jsonPath("$.error.code").value("SUBMISSION_NOT_FOUND"));
     }
   }
+
+  @Nested
+  @DisplayName("GET /api/admin/lectures/{id}/submissions/navigate")
+  class Navigate {
+
+    private Long submit(Long assignment, String providerId) {
+      User member = User.createGuest(providerId, providerId + "@getit.com", providerId, null);
+      member.promoteToMember(9);
+      userRepository.save(member);
+      return assignmentSubmissionRepository.save(AssignmentSubmission.submit(
+          assignment, member.getId(), null, "https://github.com/user/repo", null,
+          SubmissionStatus.SUBMITTED, LocalDateTime.now())).getId();
+    }
+
+    @Test
+    @DisplayName("탐색에 성공하면 200과 이전·다음 제출물 ID를 반환한다")
+    void returnsNavigation() throws Exception {
+      Long first = submit(assignmentId, "nav-1");
+      Long second = submit(assignmentId, "nav-2");
+
+      mockMvc.perform(get("/api/admin/lectures/" + lectureId + "/submissions/navigate")
+              .param("currentSubmissionId", first.toString())
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.total").value(2))
+          .andExpect(jsonPath("$.data.nextSubmissionId").value(second));
+    }
+
+    @Test
+    @DisplayName("다른 강의의 제출물 ID면 404 이다")
+    void returns404WhenSubmissionBelongsToAnotherLecture() throws Exception {
+      Long otherLectureId = lectureRepository.save(Lecture.create(
+          2, "다른 강의", null, null, null, null, true,
+          generationRepository.findAll().get(0).getId(), null, null, 1L)).getId();
+      Long otherAssignmentId = assignmentRepository.save(Assignment.create(
+          otherLectureId, "다른 과제", "설명", LocalDateTime.now().plusDays(7),
+          Set.of(SubmissionType.LINK), null)).getId();
+      Long otherSubmissionId = submit(otherAssignmentId, "nav-other");
+
+      mockMvc.perform(get("/api/admin/lectures/" + lectureId + "/submissions/navigate")
+              .param("currentSubmissionId", otherSubmissionId.toString())
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("SUBMISSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      mockMvc.perform(get("/api/admin/lectures/" + lectureId + "/submissions/navigate")
+              .param("currentSubmissionId", "1"))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      mockMvc.perform(get("/api/admin/lectures/" + lectureId + "/submissions/navigate")
+              .param("currentSubmissionId", "1")
+              .header("Authorization", memberToken()))
+          .andExpect(status().isForbidden());
+    }
+  }
 }
