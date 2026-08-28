@@ -64,6 +64,27 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
       """)
   List<SubCategoryLectureCount> countPublishedBySubCategoryGrouped(@Param("generationId") Long generationId);
 
+  @Query("""
+      select l.id from Lecture l
+      where l.generationId = :generationId
+        and l.published = true
+        and l.deletedAt is null
+      """)
+  List<Long> findPublishedLectureIds(@Param("generationId") Long generationId);
+
+  @Query("""
+      select l from Lecture l
+      where l.generationId = :generationId
+        and l.published = true
+        and l.deletedAt is null
+        and exists (select 1 from Assignment a where a.lectureId = l.id)
+      order by l.week desc, l.id desc
+      """)
+  List<Lecture> findRecentPublishedWithAssignment(
+      @Param("generationId") Long generationId,
+      Pageable pageable
+  );
+
   long countByTrackIdAndDeletedAtIsNull(Long trackId);
 
   long countBySubCategoryIdAndDeletedAtIsNull(Long subCategoryId);
