@@ -64,6 +64,16 @@ fi
 
 echo "[$(date '+%F %T')] 백업 완료: $FILE ($(numfmt --to=iec "$SIZE"))"
 
+# 다른 장애 도메인으로 사본을 보낸다.
+# 이 디스크가 깨지면 DB 와 백업이 함께 사라지므로, 여기 있는 것만으로는 백업이 아니다.
+#
+# 원격 복사가 실패해도 로컬 백업은 이미 성공했다. 오늘 백업을 통째로 실패로
+# 만들지 않고, 로그에 남겨 다음 실행에서 눈에 띄게 한다.
+if [ -x "$APP_DIR/upload-backup.sh" ]; then
+  "$APP_DIR/upload-backup.sh" "$FILE" || \
+    echo "[$(date '+%F %T')] 원격 복사에 실패했습니다. 로컬 백업은 남아 있습니다." >&2
+fi
+
 # 오래된 백업 정리. 디스크가 29GB 밖에 없다.
 DELETED=$(find "$BACKUP_DIR" -name 'getit-*.sql.gz' -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
 [ "$DELETED" -gt 0 ] && echo "[$(date '+%F %T')] 오래된 백업 ${DELETED}건 삭제"

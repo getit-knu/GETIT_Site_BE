@@ -20,12 +20,20 @@ fi
 SRC=/tmp/backup-db.sh
 if [ ! -f "$SRC" ]; then
   echo "$SRC 가 없습니다. backup-db.sh 를 함께 전송했는지 확인하세요." >&2
-  echo "  scp -i {키} deploy/backup-db.sh deploy/install-backup.sh azureuser@{IP}:/tmp/" >&2
+  echo "  scp -i {키} deploy/backup-db.sh deploy/upload-backup.sh deploy/install-backup.sh azureuser@{IP}:/tmp/" >&2
   exit 1
 fi
 
 install -o "$APP_USER" -g "$APP_USER" -m 0755 "$SRC" "$APP_DIR/backup-db.sh"
 echo "▸ $APP_DIR/backup-db.sh 설치됨"
+
+# 원격 복사 스크립트. 없어도 로컬 백업은 동작하므로 필수는 아니다.
+if [ -f /tmp/upload-backup.sh ]; then
+  install -o "$APP_USER" -g "$APP_USER" -m 0755 /tmp/upload-backup.sh "$APP_DIR/upload-backup.sh"
+  echo "▸ $APP_DIR/upload-backup.sh 설치됨"
+else
+  echo "▸ upload-backup.sh 가 없어 원격 복사 없이 설치합니다 (로컬 백업만)"
+fi
 
 mkdir -p "$APP_DIR/backups"
 chown "$APP_USER:$APP_USER" "$APP_DIR/backups"
