@@ -103,6 +103,31 @@ jobs:
           echo "${{ steps.tag.outputs.value }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+          # 배포 게이트 상태를 남긴다.
+          #
+          # 배포 job 의 if 조건이 거짓이면 job 이 그냥 skip 되고 이유가 어디에도 남지 않는다.
+          # 가장 흔한 원인은 변수를 Environment 에 넣은 경우다. job 조건은 environment 가
+          # 붙기 전에 평가되므로 Environment 변수는 여기서 읽히지 않는다.
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ vars.VM_DEPLOY_ENABLED }}" = "true" ]; then
+            echo "**배포: 켜짐** — 이어서 VM 배포가 실행됩니다." >> $GITHUB_STEP_SUMMARY
+          else
+            {
+              echo "**배포: 꺼짐** — 이미지만 만들고 VM 은 건드리지 않습니다."
+              echo ""
+              echo "| 변수 | 읽힌 값 |"
+              echo "|---|---|"
+              echo "| \`VM_DEPLOY_ENABLED\` | \`${{ vars.VM_DEPLOY_ENABLED }}\` |"
+              echo "| \`VM_HOST\` | \`${{ vars.VM_HOST }}\` |"
+              echo "| \`VM_USER\` | \`${{ vars.VM_USER }}\` |"
+              echo "| \`HEALTHCHECK_URL\` | \`${{ vars.HEALTHCHECK_URL }}\` |"
+              echo ""
+              echo "값이 비어 있으면 **Repository variables** 가 아니라"
+              echo "Environment variables 에 등록됐을 가능성이 큽니다."
+              echo "Settings → Secrets and variables → Actions → Variables 탭 위쪽 영역입니다."
+            } >> $GITHUB_STEP_SUMMARY
+          fi
+
   # ---------------------------------------------------------------------------
   # VM 배포 — VM_DEPLOY_ENABLED 변수가 true 일 때만 동작한다.
   #
