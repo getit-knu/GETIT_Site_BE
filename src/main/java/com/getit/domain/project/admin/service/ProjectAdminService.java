@@ -56,6 +56,11 @@ public class ProjectAdminService {
     return toItem(project);
   }
 
+  private ProjectResult.Item toItem(Project project) {
+    Map<Long, String> thumbnails = resolveThumbnails(List.of(project));
+    return ProjectResult.Item.of(project, thumbnails.get(project.getId()));
+  }
+
   /** 12.4. */
   @Transactional
   public void deleteProject(Long projectId) {
@@ -65,12 +70,6 @@ public class ProjectAdminService {
   private Project findProject(Long projectId) {
     return projectRepository.findById(projectId)
         .orElseThrow(() -> new BusinessException(ProjectErrorCode.PROJECT_NOT_FOUND));
-  }
-
-  private ProjectResult.Item toItem(Project project) {
-    String thumbnailUrl = project.getFileId() == null ? null
-        : fileQueryService.findById(project.getFileId()).url();
-    return ProjectResult.Item.of(project, thumbnailUrl);
   }
 
   private Map<Long, String> resolveThumbnails(List<Project> projects) {
