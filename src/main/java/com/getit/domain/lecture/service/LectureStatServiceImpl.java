@@ -46,13 +46,13 @@ public class LectureStatServiceImpl implements LectureStatService {
   }
 
   @Override
-  public List<WeeklySubmissionStat> findWeeklyStats(int generationNo, int size) {
+  public List<WeeklySubmissionStat> findWeeklyStats(int generationNo, Long trackId, int size) {
     Long generationId = resolveGenerationId(generationNo).orElse(null);
     if (generationId == null || size <= 0) {
       return List.of();
     }
     List<Lecture> lectures = lectureRepository.findRecentPublishedWithAssignment(
-        generationId, PageRequest.of(0, size));
+        generationId, trackId, PageRequest.of(0, size));
     Map<Long, Assignment> assignmentByLectureId = assignmentByLectureId(lectures);
     Map<Long, Long> submittedByAssignmentId = submittedCountByAssignmentId(assignmentByLectureId.values());
 

@@ -77,11 +77,13 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
       where l.generationId = :generationId
         and l.published = true
         and l.deletedAt is null
+        and (:trackId is null or l.trackId = :trackId)
         and exists (select 1 from Assignment a where a.lectureId = l.id)
       order by l.week desc, l.id desc
       """)
   List<Lecture> findRecentPublishedWithAssignment(
       @Param("generationId") Long generationId,
+      @Param("trackId") Long trackId,
       Pageable pageable
   );
 

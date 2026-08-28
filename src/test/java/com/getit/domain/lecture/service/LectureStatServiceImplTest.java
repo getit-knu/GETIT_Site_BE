@@ -133,7 +133,7 @@ class LectureStatServiceImplTest {
       submit(a2, 1L);
       submit(a2, 2L);
 
-      var stats = lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, 2);
+      var stats = lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, null, 2);
 
       assertThat(stats).extracting(WeeklySubmissionStat::week).containsExactly(3, 2);
       assertThat(stats).extracting(WeeklySubmissionStat::submittedCount).containsExactly(0L, 2L);
@@ -145,7 +145,21 @@ class LectureStatServiceImplTest {
       lecture(1, true, activeGenerationId);
       assignment(lecture(2, true, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
 
-      var stats = lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, 5);
+      var stats = lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, null, 5);
+
+      assertThat(stats).extracting(WeeklySubmissionStat::week).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("trackId 를 주면 해당 트랙 강의만 반환한다")
+    void filtersByTrackId() {
+      assignment(lecture(1, true, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
+      Long otherTrackId = trackRepository.save(Track.create("기획", 2)).getId();
+      Lecture other = lectureRepository.save(Lecture.create(
+          2, "2주차", null, null, null, null, true, activeGenerationId, otherTrackId, null, 1L));
+      assignment(other.getId(), LocalDateTime.now().plusDays(1));
+
+      var stats = lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, otherTrackId, 5);
 
       assertThat(stats).extracting(WeeklySubmissionStat::week).containsExactly(2);
     }
@@ -155,7 +169,7 @@ class LectureStatServiceImplTest {
     void emptyWhenSizeNotPositive() {
       assignment(lecture(1, true, activeGenerationId).getId(), LocalDateTime.now().plusDays(1));
 
-      assertThat(lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, 0)).isEmpty();
+      assertThat(lectureStatService.findWeeklyStats(ACTIVE_GENERATION_NO, null, 0)).isEmpty();
     }
   }
 
