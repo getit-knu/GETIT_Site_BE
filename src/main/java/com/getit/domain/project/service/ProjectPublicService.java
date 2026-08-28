@@ -23,22 +23,12 @@ public class ProjectPublicService {
 
   public ProjectShowcaseResult getShowcase(String semester, Pageable pageable) {
     String normalized = semester == null || semester.isBlank() ? null : semester;
-    Page<ProjectView> page = projectQueryService.findShowcase(normalized, pageable);
+    Page<ProjectView> viewPage = projectQueryService.findShowcase(normalized, pageable);
 
-    Map<Long, String> urlByFileId = resolveThumbnails(page.getContent());
-    List<ProjectShowcaseResult.Item> content = page.getContent().stream()
-        .map(view -> toItem(view, urlByFileId))
-        .toList();
+    Map<Long, String> urlByFileId = resolveThumbnails(viewPage.getContent());
+    Page<ProjectShowcaseResult.Item> itemPage = viewPage.map(view -> toItem(view, urlByFileId));
 
-    return new ProjectShowcaseResult(
-        projectQueryService.findDistinctSemesters(),
-        content,
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        page.isFirst(),
-        page.isLast());
+    return ProjectShowcaseResult.of(projectQueryService.findDistinctSemesters(), itemPage);
   }
 
   private Map<Long, String> resolveThumbnails(List<ProjectView> views) {

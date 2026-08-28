@@ -1,5 +1,6 @@
 package com.getit.domain.project.controller;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,7 +46,7 @@ class ProjectPublicControllerTest {
     mockMvc.perform(get(PROJECTS_PATH).param("semester", "2025 Fall").param("size", "9"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.semesters").value(org.hamcrest.Matchers.contains("2025 Fall", "2024 Spring")))
+        .andExpect(jsonPath("$.data.semesters").value(contains("2025 Fall", "2024 Spring")))
         .andExpect(jsonPath("$.data.content.length()").value(2))
         .andExpect(jsonPath("$.data.content[0].title").value("A"))
         .andExpect(jsonPath("$.data.content[0].semester").value("2025 Fall"))
