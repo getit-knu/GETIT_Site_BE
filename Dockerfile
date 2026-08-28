@@ -32,6 +32,13 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # root 로 돌리지 않는다.
 RUN groupadd --system getit && useradd --system --gid getit --home /app getit
 
+# 업로드 경로를 이미지 안에 미리 만들어 소유권을 넘긴다.
+#
+# 도커는 named volume 을 마운트할 때, 그 경로가 이미지에 없으면 root 소유로 새로 만든다.
+# 그러면 uid 999 로 도는 앱이 LocalFileStorage 에서 파일을 쓰지 못하고 권한 오류로 실패한다.
+# 경로가 이미지에 있으면 도커가 그 소유권을 빈 볼륨에 그대로 복사한다.
+RUN mkdir -p /data/uploads && chown -R getit:getit /data
+
 COPY --from=builder --chown=getit:getit /build/extracted/dependencies/ ./
 COPY --from=builder --chown=getit:getit /build/extracted/spring-boot-loader/ ./
 COPY --from=builder --chown=getit:getit /build/extracted/snapshot-dependencies/ ./

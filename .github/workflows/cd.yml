@@ -1,27 +1,36 @@
 name: CD
 
-# main 에 머지되면 이미지를 만들어 GHCR 에 올리고 VM 에 배포한다.
+# main 에 머지되고 CI 가 통과하면 이미지를 만들어 GHCR 에 올리고 VM 에 배포한다.
 # 팀원은 PR 을 머지하는 것 외에 할 일이 없다.
+#
+# push 가 아니라 workflow_run 으로 받는 이유:
+# push 로 받으면 CD 와 CI 가 나란히 시작해서 CI 결과를 기다리지 않는다.
+# 테스트가 깨진 커밋이 그대로 운영에 올라갈 수 있다.
 on:
-  push:
+  workflow_run:
+    workflows: [ "CI" ]
+    types: [ completed ]
     branches: [ main ]
   # 특정 이미지로 되돌릴 때 쓴다.
   workflow_dispatch:
     inputs:
       image_tag:
-        description: '배포할 이미지 태그 (비우면 방금 만든 이미지)'
+        description: '배포할 이미지 태그 (비우면 새로 빌드해서 배포)'
         required: false
         type: string
 
 # 배포가 겹치면 나중 것이 먼저 끝나 이전 버전이 살아남을 수 있다.
 # 이미지 빌드와 달리 배포는 취소하지 않고 순서대로 처리한다.
 concurrency:
-  group: cd-${{ github.ref }}
+  group: cd-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # workflow_run 에서 github.sha 는 기본 브랜치의 최신 커밋이라
+  # CI 를 통과한 그 커밋과 다를 수 있다. 항상 검증된 커밋을 명시적으로 쓴다.
+  TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -31,6 +40,13 @@ jobs:
     name: 이미지 빌드 · 푸시
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # CI 가 통과한 커밋만 이미지로 만든다.
+    # 롤백(image_tag 지정)은 이미 있는 이미지를 쓰므로 빌드하지 않는다.
+    # 여기서 빌드하면 latest 가 되돌리려는 버전이 아니라 최신 main 을 가리키게 된다.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.image_tag == '')
+      || github.event.workflow_run.conclusion == 'success'
 
     permissions:
       contents: read
@@ -42,6 +58,9 @@ jobs:
     steps:
       - name: 체크아웃
         uses: actions/checkout@v5
+        with:
+          # workflow_run 은 기본적으로 기본 브랜치 최신을 받는다. 검증된 커밋으로 고정한다.
+          ref: ${{ env.TARGET_SHA }}
 
       - name: Buildx 설정
         uses: docker/setup-buildx-action@v3
@@ -59,7 +78,7 @@ jobs:
         run: |
           IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          echo "value=$IMAGE:sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "value=$IMAGE:sha-${{ env.TARGET_SHA }}" >> $GITHUB_OUTPUT
 
       - name: 빌드 · 푸시
         uses: docker/build-push-action@v6
@@ -71,7 +90,7 @@ jobs:
           # 컨테이너가 exec format error 로 재시작만 반복한다.
           platforms: linux/amd64
           tags: |
-            ${{ steps.tag.outputs.image }}:sha-${{ github.sha }}
+            ${{ steps.tag.outputs.image }}:sha-${{ env.TARGET_SHA }}
             ${{ steps.tag.outputs.image }}:latest
           # 다음 빌드에서 의존성 레이어를 재사용한다. 없으면 매번 Gradle 을 처음부터 돌린다.
           cache-from: type=gha
@@ -93,6 +112,7 @@ jobs:
   #                 VM_HOST           = 40.82.154.5
   #                 VM_USER           = azureuser
   #                 HEALTHCHECK_URL   = https://{도메인}/actuator/health
+  #                 VM_SSH_HOST_KEY   = ssh-keyscan 으로 미리 받아둔 호스트 키 (권장)
   #     Secrets   : VM_SSH_KEY        = pem 파일 내용 전체
   #
   # 자세한 절차는 docs/DEPLOYMENT.md 참조.
@@ -100,7 +120,14 @@ jobs:
   deploy:
     name: VM 배포
     needs: image
-    if: vars.VM_DEPLOY_ENABLED == 'true'
+    # image 를 건너뛴 롤백에서도 배포는 이어져야 하므로 always() 로 받고 조건을 직접 쓴다.
+    if: >-
+      always()
+      && vars.VM_DEPLOY_ENABLED == 'true'
+      && (github.event_name == 'workflow_dispatch'
+          || github.event.workflow_run.conclusion == 'success')
+      && (needs.image.result == 'success'
+          || (needs.image.result == 'skipped' && inputs.image_tag != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -115,6 +142,8 @@ jobs:
     steps:
       - name: 체크아웃
         uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
 
       - name: SSH 키 준비
         run: |
@@ -122,7 +151,17 @@ jobs:
           # printf 로 끝 개행을 보장한다. 개행이 없으면 ssh 가 키를 invalid format 으로 거부한다.
           printf '%s\n' "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ vars.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # 접속 직전에 ssh-keyscan 으로 받은 키를 그대로 믿으면 서버 신원을 확인할 수 없다.
+          # 중간자가 끼면 compose 파일과 GHCR 토큰을 공격자 서버에 넘겨주게 된다.
+          # 미리 확인한 호스트 키를 등록해 두면 그 경로가 막힌다.
+          if [ -n "${{ vars.VM_SSH_HOST_KEY }}" ]; then
+            printf '%s\n' "${{ vars.VM_SSH_HOST_KEY }}" > ~/.ssh/known_hosts
+          else
+            echo "::warning::VM_SSH_HOST_KEY 가 없어 첫 접속 키를 그대로 신뢰합니다. docs/DEPLOYMENT.md 를 참고해 등록하세요."
+            ssh-keyscan -H "${{ vars.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
           # 키가 실제로 읽히는지 먼저 확인한다. 배포 중간에 실패하면 원인 파악이 어렵다.
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             || { echo "::error::VM_SSH_KEY 를 읽을 수 없습니다. pem 전체를 그대로 넣었는지 확인하세요."; exit 1; }
@@ -159,8 +198,12 @@ jobs:
           docker compose pull app
           docker compose up -d --remove-orphans
 
-          # 오래된 이미지가 쌓이면 디스크가 찬다. 29GB 밖에 없다.
-          docker image prune -f --filter "until=168h" >/dev/null 2>&1 || true
+          # 오래된 이미지가 쌓이면 디스크가 찬다. 29GB 인데 이미지 하나가 600MB 다.
+          #
+          # -a 가 있어야 한다. 없으면 태그 없는(dangling) 이미지만 지우는데,
+          # 배포 이미지에는 전부 sha-* 태그가 붙어 있어 하나도 정리되지 않는다.
+          # 실행 중인 컨테이너가 쓰는 이미지는 -a 로도 지워지지 않는다.
+          docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
 
           docker logout ghcr.io >/dev/null 2>&1 || true
           docker compose ps
