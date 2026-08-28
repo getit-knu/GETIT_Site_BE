@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 요청 order 가 null 이면 생성은 맨 뒤에 붙이고, 수정은 순서를 건드리지 않는다.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class FaqAdminService {
 
   private final FaqRepository faqRepository;
