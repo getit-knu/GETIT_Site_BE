@@ -2,8 +2,8 @@ package com.getit.domain.lecture.dto;
 
 import com.getit.domain.lecture.entity.AssignmentSubmission;
 import com.getit.domain.lecture.entity.SubmissionStatus;
+import com.getit.domain.lecture.util.KstDateTimes;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 
 public class SubmissionResult {
 
@@ -21,8 +21,7 @@ public class SubmissionResult {
     public static Detail of(AssignmentSubmission submission, String fileUrl, String fileName) {
       return new Detail(
           submission.getId(), submission.getAssignmentId(), fileUrl, fileName, submission.getLinkUrl(),
-          submission.getComment(),
-          submission.getSubmittedAt().atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime(),
+          submission.getComment(), KstDateTimes.toOffset(submission.getSubmittedAt()),
           submission.getStatus());
     }
   }
