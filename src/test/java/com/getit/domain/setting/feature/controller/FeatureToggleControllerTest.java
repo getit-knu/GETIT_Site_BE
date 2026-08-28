@@ -76,6 +76,27 @@ class FeatureToggleControllerTest {
       mockMvc.perform(get(FEATURES_PATH).header("Authorization", token))
           .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("PUT: 토큰이 없으면 401 이다")
+    void rejectsAnonymousOnUpdate() throws Exception {
+      mockMvc.perform(put(FEATURES_PATH + "/STOCK_GAME")
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(enabledJson(true)))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("PUT: ADMIN 이 아니면 403 이다")
+    void rejectsNonAdminOnUpdate() throws Exception {
+      String token = "Bearer " + jwtProvider.createAccessToken(1L, "member@getit.com", Role.MEMBER);
+
+      mockMvc.perform(put(FEATURES_PATH + "/STOCK_GAME")
+              .header("Authorization", token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(enabledJson(true)))
+          .andExpect(status().isForbidden());
+    }
   }
 
   @Nested
