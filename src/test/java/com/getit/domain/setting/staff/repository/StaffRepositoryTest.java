@@ -24,15 +24,26 @@ class StaffRepositoryTest {
 
   @Test
   @DisplayName("기수의 운영진을 section → order 순으로 조회한다")
-  void findsByGenerationNoOrderBySectionAscOrderAsc() {
+  void findsByGenerationNoOrderBySectionAscOrderAscIdAsc() {
     staffRepository.save(staff(9, StaffSection.SW, 2, "이영희"));
     staffRepository.save(staff(9, StaffSection.EXECUTIVE, 1, "김철수"));
     staffRepository.save(staff(9, StaffSection.SW, 1, "홍길동"));
     staffRepository.save(staff(8, StaffSection.SW, 1, "지난 기수"));
 
-    assertThat(staffRepository.findByGenerationNoOrderBySectionAscOrderAsc(9))
+    assertThat(staffRepository.findByGenerationNoOrderBySectionAscOrderAscIdAsc(9))
         .extracting(Staff::getName)
         .containsExactly("김철수", "홍길동", "이영희");
+  }
+
+  @Test
+  @DisplayName("order 가 같으면 id 오름차순으로 정렬한다")
+  void tieBreaksById() {
+    Staff first = staffRepository.save(staff(9, StaffSection.SW, 1, "A"));
+    Staff second = staffRepository.save(staff(9, StaffSection.SW, 1, "B"));
+
+    assertThat(staffRepository.findByGenerationNoOrderBySectionAscOrderAscIdAsc(9))
+        .extracting(Staff::getId)
+        .containsExactly(first.getId(), second.getId());
   }
 
   @Test
@@ -53,16 +64,5 @@ class StaffRepositoryTest {
 
     assertThat(staffRepository.findByIdAndGenerationNo(saved.getId(), 9)).isPresent();
     assertThat(staffRepository.findByIdAndGenerationNo(saved.getId(), 8)).isEmpty();
-  }
-
-  @Test
-  @DisplayName("기수·section 별 인원 수를 센다")
-  void countsByGenerationNoAndSection() {
-    staffRepository.save(staff(9, StaffSection.SW, 1, "홍길동"));
-    staffRepository.save(staff(9, StaffSection.SW, 2, "이영희"));
-    staffRepository.save(staff(9, StaffSection.EXECUTIVE, 1, "김철수"));
-
-    assertThat(staffRepository.countByGenerationNoAndSection(9, StaffSection.SW)).isEqualTo(2);
-    assertThat(staffRepository.countByGenerationNoAndSection(9, StaffSection.STARTUP)).isZero();
   }
 }

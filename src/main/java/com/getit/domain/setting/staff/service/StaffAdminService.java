@@ -5,13 +5,13 @@ import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
+import com.getit.domain.setting.staff.dto.StaffRequest;
 import com.getit.domain.setting.staff.dto.StaffResult;
 import com.getit.domain.setting.staff.entity.Staff;
 import com.getit.domain.setting.staff.entity.StaffSection;
 import com.getit.domain.setting.staff.exception.StaffErrorCode;
 import com.getit.domain.setting.staff.repository.StaffRepository;
 import com.getit.global.exception.BusinessException;
-import com.getit.global.exception.CommonErrorCode;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +43,8 @@ public class StaffAdminService {
   /** 10.21 목록. */
   public List<StaffResult> getStaffs() {
     GenerationSummary activeGeneration = findActiveGeneration();
-    List<Staff> staffs = staffRepository.findByGenerationNoOrderBySectionAscOrderAsc(activeGeneration.generationNo());
+    List<Staff> staffs =
+        staffRepository.findByGenerationNoOrderBySectionAscOrderAscIdAsc(activeGeneration.generationNo());
 
     Map<Long, String> profileImageUrls = findProfileImageUrls(staffs);
 
@@ -54,42 +55,48 @@ public class StaffAdminService {
 
   /** 10.21 추가. order 는 해당 기수 · section 안에서 마지막 다음 순번으로 자동 부여한다. */
   @Transactional
-  public StaffResult createStaff(
-      Long userId, String name, String staffRole, StaffSection section, String department,
-      String introduction, Long fileId, Integer generationNo
-  ) {
-    validateActiveGeneration(generationNo);
-    if (fileId != null) {
-      validateAndConnectFile(fileId);
+  public StaffResult createStaff(StaffRequest request) {
+    validateActiveGeneration(request.generationNo());
+    if (request.fileId() != null) {
+      validateAndConnectFile(request.fileId());
     }
 
-    int nextOrder = (int) staffRepository.countByGenerationNoAndSection(generationNo, section) + 1;
-    Staff saved = staffRepository.save(
-        Staff.create(generationNo, nextOrder, section, staffRole, name, department, introduction, userId, fileId));
+    int nextOrder = nextOrderInSection(request.generationNo(), request.section());
+    Staff saved = staffRepository.save(Staff.create(
+        request.generationNo(), nextOrder, request.section(), request.staffRole(), request.name(),
+        request.department(), request.introduction(), request.userId(), request.fileId()));
 
-    return StaffResult.of(saved, resolveProfileImageUrl(fileId));
+    return StaffResult.of(saved, resolveProfileImageUrl(request.fileId()));
   }
 
   /**
-   * 10.21 수정. section 이 바뀌면 이전 section 의 순서를 건드리지 않고, 새 section 의 마지막
-   * 다음 순번으로 재배정한다({@code createStaff} 와 동일한 계산).
+   * 10.21 수정. section 이 바뀌면 이전 section 에서 빠지는 자리를 당기고(삭제와 동일 원리)
+   * 새 section 의 마지막 다음 순번으로 재배정한다.
+   *
+   * <p>파일 연결 갱신({@link #updateProfileFile})은 반드시 이 메서드의 마지막에 한다 —
+   * {@code FileConnectionService} 내부의 원자적 UPDATE 가 {@code clearAutomatically = true}
+   * 라 영속성 컨텍스트를 비우면서 이미 관리 중이던 {@code staff} 를 detach 시킨다. 그 전에
+   * {@code staff.update(...)} 로 바꾼 내용은 {@code flushAutomatically = true} 덕분에 비워지기
+   * 직전에 먼저 flush 되어 DB 에 반영되지만, 순서가 반대(파일 연결을 먼저)였다면 뒤이은
+   * {@code staff.update(...)} 가 detach 된 엔티티에 적용돼 조용히 유실됐다(PR #82 Copilot
+   * 리뷰 지적).
    */
   @Transactional
-  public StaffResult updateStaff(
-      Long staffId, Long userId, String name, String staffRole, StaffSection section, String department,
-      String introduction, Long fileId, Integer generationNo
-  ) {
-    validateActiveGeneration(generationNo);
-    Staff staff = findStaff(staffId, generationNo);
+  public StaffResult updateStaff(Long staffId, StaffRequest request) {
+    validateActiveGeneration(request.generationNo());
+    Staff staff = findStaff(staffId, request.generationNo());
+    Long previousFileId = staff.getFileId();
 
-    updateProfileFile(staff.getFileId(), fileId);
-    if (staff.getSection() != section) {
-      int nextOrder = (int) staffRepository.countByGenerationNoAndSection(generationNo, section) + 1;
-      staff.updateOrder(nextOrder);
+    if (staff.getSection() != request.section()) {
+      reassignToNewSection(staff, request.generationNo(), request.section());
     }
-    staff.update(section, staffRole, name, department, introduction, userId, fileId);
+    staff.update(
+        request.section(), request.staffRole(), request.name(), request.department(),
+        request.introduction(), request.userId(), request.fileId());
 
-    return StaffResult.of(staff, resolveProfileImageUrl(fileId));
+    updateProfileFile(previousFileId, request.fileId());
+
+    return StaffResult.of(staff, resolveProfileImageUrl(request.fileId()));
   }
 
   /** 10.21 삭제. 삭제된 순번 뒤 운영진을 한 칸씩 당겨서 order 중복을 막는다({@code ApplicationQuestionService}와 동일 이유). */
@@ -111,12 +118,15 @@ public class StaffAdminService {
 
   /**
    * 10.22. 배열 인덱스 순서대로 order 를 1부터 재부여한다. section 소속 운영진 전체가 중복 없이
-   * 정확히 한 번씩 포함되어야 한다({@code ApplicationQuestionService.reorderQuestions}와 동일 검증).
+   * 정확히 한 번씩 포함되어야 한다({@code ApplicationQuestionService.reorderQuestions}와 동일
+   * 검증). 다만 이 위반들은 요청 역직렬화 검증이 아니라 도메인 규칙 위반이라 {@code
+   * CommonErrorCode.VALIDATION_FAILED} 대신 전용 코드를 쓴다(PR #82 Copilot 리뷰 지적 —
+   * {@code ApplicationQuestionService} 는 아직 이 지적 이전에 작성돼 그대로 남아있다).
    */
   @Transactional
   public void reorderStaffs(StaffSection section, List<Long> orderedIds) {
     if (new HashSet<>(orderedIds).size() != orderedIds.size()) {
-      throw new BusinessException(CommonErrorCode.VALIDATION_FAILED, "중복된 운영진 id 가 있습니다.");
+      throw new BusinessException(StaffErrorCode.DUPLICATE_ORDER_ID);
     }
 
     GenerationSummary activeGeneration = findActiveGeneration();
@@ -125,13 +135,34 @@ public class StaffAdminService {
 
     Set<Long> orderedIdSet = new HashSet<>(orderedIds);
     if (orderedIds.size() != staffs.size() || !staffsById.keySet().equals(orderedIdSet)) {
-      throw new BusinessException(
-          CommonErrorCode.VALIDATION_FAILED, "해당 section 의 운영진 전체를 빠짐없이 보내야 합니다.");
+      throw new BusinessException(StaffErrorCode.INCOMPLETE_ORDER_SET);
     }
 
     for (int i = 0; i < orderedIds.size(); i++) {
       staffsById.get(orderedIds.get(i)).updateOrder(i + 1);
     }
+  }
+
+  private void reassignToNewSection(Staff staff, Integer generationNo, StaffSection newSection) {
+    int previousOrder = staff.getOrder();
+    StaffSection previousSection = staff.getSection();
+
+    staffRepository.findByGenerationNoAndSection(generationNo, previousSection).stream()
+        .filter(other -> !other.getId().equals(staff.getId()))
+        .filter(other -> other.getOrder() > previousOrder)
+        .forEach(other -> other.updateOrder(other.getOrder() - 1));
+
+    staff.updateOrder(nextOrderInSection(generationNo, newSection));
+  }
+
+  /**
+   * section 안의 마지막 다음 순번을 구한다. {@code findByGenerationNoAndSection} 이
+   * {@code PESSIMISTIC_WRITE} 로 잠그므로, 동시에 들어온 생성 · section 이동 요청은 이 조회에서
+   * 직렬화된다(PR #82 Copilot 리뷰 지적 — 이전에는 count 조회와 저장이 원자적이지 않아 두 요청이
+   * 같은 순번을 계산할 수 있었다).
+   */
+  private int nextOrderInSection(Integer generationNo, StaffSection section) {
+    return staffRepository.findByGenerationNoAndSection(generationNo, section).size() + 1;
   }
 
   /** 파일이 바뀌었을 때만 이전 파일 연결을 끊고 새 파일을 연결한다. */

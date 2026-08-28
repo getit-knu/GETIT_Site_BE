@@ -25,7 +25,7 @@ import org.hibernate.type.SqlTypes;
  * <p>{@code order} 는 {@code ApplicationQuestion} 과 같은 방식이다 — 생성 시 자동으로 다음 순번을
  * 부여하고, 별도 순서 변경(10.22)으로만 바꾼다. {@code section} 안에서만 순서가 유지된다.
  *
- * <p>{@code userId} · {@code fileId} 는 선택值이다. {@code userId} 가 없으면 표시 전용 프로필이고,
+ * <p>{@code userId} · {@code fileId} 는 선택값이다. {@code userId} 가 없으면 표시 전용 프로필이고,
  * {@code fileId} 가 없으면 기본 이미지로 노출한다(프론트 처리).
  */
 @Entity
@@ -39,11 +39,11 @@ public class Staff extends BaseTimeEntity {
   private Long id;
 
   @Column(nullable = false)
-  private Integer generationNo;
+  private int generationNo;
 
   /** order 는 SQL 예약어라 컬럼명을 분리한다. */
   @Column(name = "staff_order", nullable = false)
-  private Integer order;
+  private int order;
 
   @Enumerated(EnumType.STRING)
   @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -71,8 +71,8 @@ public class Staff extends BaseTimeEntity {
 
   @Builder(access = AccessLevel.PRIVATE)
   private Staff(
-      Integer generationNo,
-      Integer order,
+      int generationNo,
+      int order,
       StaffSection section,
       String staffRole,
       String name,
@@ -93,8 +93,8 @@ public class Staff extends BaseTimeEntity {
   }
 
   public static Staff create(
-      Integer generationNo,
-      Integer order,
+      int generationNo,
+      int order,
       StaffSection section,
       String staffRole,
       String name,
@@ -131,7 +131,7 @@ public class Staff extends BaseTimeEntity {
   }
 
   /** 10.22 순서 변경, 그리고 10.21 에서 section 이 바뀌어 재배정이 필요할 때 쓴다. */
-  public void updateOrder(Integer order) {
+  public void updateOrder(int order) {
     this.order = order;
   }
 }
