@@ -128,6 +128,9 @@ public class SubmissionAdminService {
       Long lectureId, Long currentSubmissionId, Boolean submittedFilter, Boolean feedbackDoneFilter, Long groupId) {
     Lecture lecture = findLecture(lectureId);
     Assignment assignment = findAssignmentByLectureId(lectureId);
+    if (!findSubmission(currentSubmissionId).getAssignmentId().equals(assignment.getId())) {
+      throw new BusinessException(LectureErrorCode.SUBMISSION_NOT_FOUND);
+    }
     List<RowCandidate> candidates = filterCandidates(
         buildCandidates(lecture, assignment), submittedFilter, feedbackDoneFilter, groupId).stream()
         .filter(RowCandidate::submitted)
