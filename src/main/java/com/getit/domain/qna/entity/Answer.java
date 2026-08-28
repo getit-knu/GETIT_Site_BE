@@ -26,11 +26,11 @@ public class Answer extends BaseTimeEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false, length = 2000)
-  private String content;
-
   @Column(name = "question_id", nullable = false)
   private long questionId;
+
+  @Column(nullable = false, length = 2000)
+  private String content;
 
   @Column(name = "admin_id", nullable = false)
   private long adminId;

@@ -15,7 +15,8 @@ CREATE TABLE question
 
     PRIMARY KEY (id),
     KEY idx_question_lecture_id (lecture_id),
-    KEY idx_question_status (status)
+    KEY idx_question_status (status),
+    KEY idx_question_created_at (created_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -24,8 +25,8 @@ CREATE TABLE answer
 (
     id          bigint        NOT NULL AUTO_INCREMENT,
 
-    content     varchar(2000) NOT NULL,
     question_id bigint        NOT NULL,
+    content     varchar(2000) NOT NULL,
     admin_id    bigint        NOT NULL,
 
     created_at  datetime(6)   NOT NULL,
