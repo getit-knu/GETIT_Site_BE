@@ -45,13 +45,29 @@ class OAuth2LoginFlowTest {
   }
 
   @Test
-  @DisplayName("STATELESS 정책이지만 authorization request 를 보관할 세션은 만들어진다")
-  void createsSessionForAuthorizationRequest() throws Exception {
+  @DisplayName("authorization request 를 세션이 아니라 쿠키에 담는다")
+  void storesAuthorizationRequestInCookie() throws Exception {
     MvcResult result = mockMvc.perform(get("/oauth2/authorization/google")).andReturn();
 
-    assertThat(result.getRequest().getSession(false))
-        .as("세션이 없으면 콜백에서 authorization request 를 못 찾아 로그인이 실패한다")
-        .isNotNull();
+    // 세션에 담으면 STATELESS 환경에서 콜백 때 찾지 못해
+    // authorization_request_not_found 로 로그인이 실패한다. 실제로 겪었던 문제다.
+    assertThat(result.getResponse().getCookie("oauth2_auth_request"))
+        .as("인증 요청 쿠키가 없으면 콜백에서 요청을 복원할 수 없다")
+        .isNotNull()
+        .satisfies(cookie -> {
+          assertThat(cookie.getValue()).isNotBlank();
+          assertThat(cookie.isHttpOnly()).isTrue();
+        });
+  }
+
+  @Test
+  @DisplayName("인증 요청 쿠키는 구글을 다녀올 동안만 살아 있다")
+  void authorizationRequestCookieIsShortLived() throws Exception {
+    MvcResult result = mockMvc.perform(get("/oauth2/authorization/google")).andReturn();
+
+    assertThat(result.getResponse().getCookie("oauth2_auth_request").getMaxAge())
+        .isPositive()
+        .isLessThanOrEqualTo(600);
   }
 
   @Test
