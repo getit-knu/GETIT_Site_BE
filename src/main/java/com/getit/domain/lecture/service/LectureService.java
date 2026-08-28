@@ -245,8 +245,10 @@ public class LectureService {
   }
 
   private GenerationSummary requireActiveMember(Long userId) {
+    // 부원 조회는 "활성 기수의 부원인가"만 따진다. 활성 기수가 없으면 그 조건을 만족할 수
+    // 없으므로 404 가 아니라 403 으로 막는다.
     GenerationSummary active = generationQueryService.findActive()
-        .orElseThrow(() -> new BusinessException(LectureErrorCode.ACTIVE_GENERATION_NOT_FOUND));
+        .orElseThrow(() -> new BusinessException(CommonErrorCode.FORBIDDEN));
     UserAccount me = userAccountService.findActiveById(userId)
         .orElseThrow(() -> new BusinessException(CommonErrorCode.FORBIDDEN));
     if (me.generationNo() == null || !me.generationNo().equals(active.generationNo())) {
