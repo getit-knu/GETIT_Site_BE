@@ -1,14 +1,14 @@
 package com.getit.domain.setting.faq.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.getit.domain.setting.faq.entity.Faq;
 
-/** FAQ 조회 · 저장 결과. (API 명세서 10.18 ~ 10.19) */
 public record FaqResult(
     Long id,
     Integer order,
     String question,
     String answer,
-    boolean isVisible
+    @JsonProperty("isVisible") boolean isVisible
 ) {
 
   public static FaqResult from(Faq faq) {
