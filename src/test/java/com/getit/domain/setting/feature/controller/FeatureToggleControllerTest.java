@@ -12,6 +12,7 @@ import com.getit.domain.setting.feature.entity.FeatureKey;
 import com.getit.domain.setting.feature.entity.FeatureToggle;
 import com.getit.domain.setting.feature.repository.FeatureToggleRepository;
 import com.getit.domain.user.entity.Role;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -88,7 +89,8 @@ class FeatureToggleControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data[0].key").value("STOCK_GAME"))
           .andExpect(jsonPath("$.data[1].key").value("MOCK_INVESTMENT"))
-          .andExpect(jsonPath("$.data[0].label").value(FeatureKey.STOCK_GAME.getLabel()));
+          .andExpect(jsonPath("$.data[0].label").value(FeatureKey.STOCK_GAME.getLabel()))
+          .andExpect(jsonPath("$.data[0].updatedAt").value(Matchers.endsWith("+09:00")));
     }
   }
 
