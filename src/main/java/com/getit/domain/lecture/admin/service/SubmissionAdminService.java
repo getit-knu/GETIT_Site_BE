@@ -101,7 +101,7 @@ public class SubmissionAdminService {
     Map<Long, String> adminNameById = feedbackEntities.stream()
         .map(Feedback::getAdminId)
         .distinct()
-        .collect(Collectors.toMap(Function.identity(), adminId -> findUser(adminId).name()));
+        .collect(Collectors.toMap(Function.identity(), this::findAdminName));
     List<SubmissionDetailResult.FeedbackItem> feedbacks = feedbackEntities.stream()
         .map(feedback -> SubmissionDetailResult.FeedbackItem.of(feedback, adminNameById.get(feedback.getAdminId())))
         .toList();
@@ -240,5 +240,11 @@ public class SubmissionAdminService {
   private UserAccount findUser(Long userId) {
     return userAccountService.findActiveById(userId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.SUBMISSION_NOT_FOUND));
+  }
+
+  private String findAdminName(Long adminId) {
+    return userAccountService.findActiveById(adminId)
+        .map(UserAccount::name)
+        .orElse("UNKNOWN");
   }
 }
