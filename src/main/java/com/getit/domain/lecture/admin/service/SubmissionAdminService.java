@@ -188,10 +188,11 @@ public class SubmissionAdminService {
   }
 
   private Page<Row> paginate(List<Row> rows, Pageable pageable) {
-    int start = (int) pageable.getOffset();
-    if (start >= rows.size()) {
+    long offset = pageable.getOffset();
+    if (offset >= rows.size()) {
       return new PageImpl<>(List.of(), pageable, rows.size());
     }
+    int start = (int) offset;
     int end = Math.min(start + pageable.getPageSize(), rows.size());
     return new PageImpl<>(rows.subList(start, end), pageable, rows.size());
   }
