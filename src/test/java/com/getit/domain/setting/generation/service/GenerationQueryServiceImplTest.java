@@ -78,4 +78,13 @@ class GenerationQueryServiceImplTest {
   void returnsEmptyForUnknownGenerationNo() {
     assertThat(generationQueryService.findByGenerationNo(999)).isEmpty();
   }
+
+  @Test
+  @DisplayName("활성화 로직 잠금용 예약 기수 번호는 행이 있어도 빈 Optional 을 반환한다")
+  void returnsEmptyForReservedActivationLockGenerationNo() {
+    generationRepository.save(Generation.create(Generation.RESERVED_ACTIVATION_LOCK_GENERATION_NO, 0));
+
+    assertThat(generationQueryService.findByGenerationNo(Generation.RESERVED_ACTIVATION_LOCK_GENERATION_NO))
+        .isEmpty();
+  }
 }
