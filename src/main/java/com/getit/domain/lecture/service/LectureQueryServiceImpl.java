@@ -3,7 +3,6 @@ package com.getit.domain.lecture.service;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.repository.LectureRepository;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +21,7 @@ public class LectureQueryServiceImpl implements LectureQueryService {
     if (lectureIds.isEmpty()) {
       return Map.of();
     }
-    return lectureRepository.findAllById(List.copyOf(lectureIds)).stream()
+    return lectureRepository.findAllByIdInAndDeletedAtIsNull(lectureIds).stream()
         .collect(Collectors.toMap(Lecture::getId, Lecture::getTitle));
   }
 }

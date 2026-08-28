@@ -42,4 +42,16 @@ class LectureQueryServiceImplTest {
   void emptyForEmptyInput() {
     assertThat(lectureQueryService.findTitlesByIds(List.of())).isEmpty();
   }
+
+  @Test
+  @DisplayName("삭제된 강의는 제외한다")
+  void excludesDeletedLecture() {
+    Long alive = lecture("살아있음");
+    Lecture deleted = lectureRepository.findById(lecture("삭제됨")).orElseThrow();
+    deleted.delete();
+    lectureRepository.flush();
+
+    assertThat(lectureQueryService.findTitlesByIds(List.of(alive, deleted.getId())))
+        .containsOnlyKeys(alive);
+  }
 }
