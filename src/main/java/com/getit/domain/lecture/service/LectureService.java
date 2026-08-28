@@ -110,7 +110,7 @@ public class LectureService {
         lecture.getYoutubeUrl(),
         lecture.getMaterialUrl(),
         resolveAuthor(lecture.getCreatedBy()),
-        KstDateTimes.toOffset(lecture.getCreatedAt()),
+        KstDateTimes.toOffset(lecture.getPublishedAt()),
         resolveMaterials(lectureId),
         assignment == null ? null : new LectureResult.AssignmentInfo(
             assignment.getId(), assignment.getTitle(), assignment.getDescription(),
