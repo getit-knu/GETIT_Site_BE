@@ -46,6 +46,15 @@ getit:
     refresh-token-validity: 14d
 
   file:
+    # 테스트는 Azure 를 쓰지 않는다. 값이 없으면 FileService 가 뜨지 않으므로 채워만 둔다.
+    # 이 파일은 메인 application.yml 을 통째로 가린다.
+    azure:
+      enabled: false
+      account: ""
+      container: uploads
+      upload-url-ttl: PT10M
+      download-url-ttl: PT5M
+      delegation-key-ttl: PT6H
     local:
       # 저장소를 더럽히지 않도록 임시 디렉터리를 쓴다.
       path: ${java.io.tmpdir}/getit-test-uploads

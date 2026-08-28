@@ -5,11 +5,19 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-// 추후 Azure Blob File Storage 추가 시 ConditionalOnProperty 어노테이션 사용
+/**
+ * 로컬 디스크 저장소. Azure 를 켜지 않은 환경(로컬 개발·테스트)에서 쓴다.
+ *
+ * <p>직접 업로드는 지원하지 않는다. {@code issueUploadTicket} 이 비어 있으므로
+ * 클라이언트는 명세 13.2 의 multipart 경로를 쓴다.
+ */
 @Component
+@ConditionalOnProperty(
+    prefix = "getit.file.azure", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
 
   private final Path rootDir;
@@ -44,6 +52,12 @@ public class LocalFileStorage implements FileStorage {
     } catch (IOException e) {
       throw new UncheckedIOException("파일 삭제 실패: key=" + key, e);
     }
+  }
+
+  /** 로컬은 정적 서빙 경로가 곧 읽기 주소다. 서명이 필요 없다. */
+  @Override
+  public String downloadUrl(String key) {
+    return baseUrl + "/" + key;
   }
 
   private Path resolve(String key) {

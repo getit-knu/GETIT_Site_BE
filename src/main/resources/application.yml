@@ -95,6 +95,19 @@ getit:
     refresh-token-validity: 14d
 
   file:
+    # Azure Blob 직접 업로드. 켜면 LocalFileStorage 대신 AzureBlobFileStorage 가 뜬다.
+    # 계정 키는 두지 않는다. VM 관리 ID 로 사용자 위임 SAS 를 발급한다.
+    azure:
+      enabled: ${FILE_AZURE_ENABLED:false}
+      account: ${AZURE_STORAGE_ACCOUNT:}
+      # 백업 컨테이너와 분리한다. 백업에는 개인정보가 들어 있어 권한 범위가 다르다.
+      container: ${AZURE_UPLOAD_CONTAINER:uploads}
+      # 업로드 주소는 사용자가 파일을 고르고 올릴 시간만 있으면 된다.
+      upload-url-ttl: ${FILE_UPLOAD_URL_TTL:PT10M}
+      # 읽기 주소는 더 짧게 둔다. 공유되면 그동안 누구나 열 수 있다.
+      download-url-ttl: ${FILE_DOWNLOAD_URL_TTL:PT5M}
+      # 위임 키를 매번 받으면 요청마다 Azure AD 왕복이 생긴다. 받아서 재사용한다.
+      delegation-key-ttl: ${FILE_DELEGATION_KEY_TTL:PT6H}
     local:
       # 업로드 파일을 저장할 경로. LocalFileWebConfig 가 이 경로를
       # /api/public/files/** 로 서빙한다.

@@ -84,7 +84,9 @@ nano /opt/getit/.env
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | Google Cloud Console |
 | `CORS_ALLOWED_ORIGINS` | 프론트 주소 |
 | `OAUTH2_REDIRECT_URI` | `{프론트 주소}/oauth/callback` |
-| `FILE_BASE_URL` | `https://{도메인}/api/public/files` |
+| `FILE_BASE_URL` | `https://{도메인}/api/public/files` (로컬 저장 시에만 쓰인다) |
+| `FILE_AZURE_ENABLED` | `true` 면 프론트가 Azure Blob 으로 직접 업로드 |
+| `AZURE_UPLOAD_CONTAINER` | `uploads` |
 | `REFRESH_COOKIE_SECURE` | `true` |
 | `REFRESH_COOKIE_SAME_SITE` | 아래 참조 |
 
@@ -374,6 +376,31 @@ ssh -i GETIT_key.pem azureuser@40.82.154.5 'cd /opt/getit && ./backup-db.sh'
 
 **원격 보관 기간**은 스토리지 계정의 수명 주기 관리 정책으로 건다.
 스크립트는 원격 파일을 지우지 않는다 — 백업을 지우는 코드는 버그가 나면 되돌릴 수 없다.
+
+### 업로드 파일 저장소
+
+DB 백업과 **같은 스토리지 계정, 다른 컨테이너**를 쓴다.
+백업에는 지원자 개인정보가 들어 있어 권한 범위가 다르므로 섞지 않는다.
+
+| 컨테이너 | 용도 |
+|---|---|
+| `db-backups` | DB 덤프. 사람만 읽는다 |
+| `uploads` | 강의 자료 · 과제 제출물 · 프로필 이미지 |
+
+`FILE_AZURE_ENABLED=true` 면 프론트가 Blob 으로 **직접** 올린다.
+파일 바이트가 VM 을 지나가지 않으므로 50MB 자료가 몰려도 애플리케이션이 영향을 받지 않고,
+디스크가 깨져도 파일이 사라지지 않는다.
+
+브라우저가 직접 올리려면 스토리지 계정에 CORS 가 필요하다. 이미 설정돼 있다.
+
+```
+허용 출처  https://getit.io.kr · https://www.getit.io.kr · http://localhost:5173
+허용 메서드 PUT · GET · HEAD · OPTIONS
+```
+
+프론트 주소가 바뀌면 CORS 도 함께 고쳐야 한다. 빠뜨리면 업로드만 조용히 실패한다.
+
+`false` 로 두면 VM 로컬 디스크에 저장한다. **이때는 파일이 백업되지 않는다.**
 
 **디스크** — 29GB 다. CD 가 배포마다 7일 지난 이미지를 정리하고,
 컨테이너 로그는 10MB × 3개로 제한했다.
