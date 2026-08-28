@@ -8,7 +8,5 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
   List<Feedback> findAllBySubmissionIdOrderByIdAsc(Long submissionId);
 
-  boolean existsBySubmissionId(Long submissionId);
-
   List<Feedback> findAllBySubmissionIdIn(List<Long> submissionIds);
 }
