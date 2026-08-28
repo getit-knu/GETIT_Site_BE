@@ -147,12 +147,16 @@ jobs:
     needs: image
     # image 를 건너뛴 롤백에서도 배포는 이어져야 하므로 always() 로 받고 조건을 직접 쓴다.
     #
+    # VM_DEPLOY_ENABLED 는 일부러 여기 넣지 않는다.
+    # job 조건이 거짓이면 GitHub 은 job 을 skip 시키고 아무 이유도 남기지 않아서,
+    # 배포가 왜 안 됐는지 알 방법이 없다. 실제로 이것 때문에 세 번을 헤맸다.
+    # 설정 확인은 아래 첫 스텝에서 값을 찍어가며 한다.
+    #
     # ⚠️ 모든 줄의 들여쓰기를 똑같이 맞춘다. `>-` 는 더 깊이 들여쓴 줄을 접지 않고
     # 줄바꿈을 그대로 남기는데, 그러면 조건식이 여러 줄짜리 문자열로 전달돼
-    # 조용히 거짓이 되고 배포가 skip 된다. 이유가 로그에 남지 않아 찾기 어렵다.
+    # 조용히 거짓이 되고 배포가 skip 된다.
     if: >-
       always()
-      && vars.VM_DEPLOY_ENABLED == 'true'
       && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
       && (needs.image.result == 'success' || (needs.image.result == 'skipped' && inputs.image_tag != ''))
     runs-on: ubuntu-latest
@@ -167,12 +171,47 @@ jobs:
       packages: read
 
     steps:
+      # 무엇이 읽혔는지 먼저 남긴다. 값이 비어 있으면 그게 원인이다.
+      # 시크릿은 값을 찍지 않고 있는지만 본다 (GitHub 이 마스킹하지만 로그에 남길 이유가 없다).
+      - name: 배포 설정 확인
+        id: gate
+        run: |
+          echo "VM_DEPLOY_ENABLED = '${{ vars.VM_DEPLOY_ENABLED }}'"
+          echo "VM_HOST           = '${{ vars.VM_HOST }}'"
+          echo "VM_USER           = '${{ vars.VM_USER }}'"
+          echo "HEALTHCHECK_URL   = '${{ vars.HEALTHCHECK_URL }}'"
+          echo "VM_SSH_HOST_KEY   = ${{ vars.VM_SSH_HOST_KEY != '' && '설정됨' || '비어 있음' }}"
+          echo "VM_SSH_KEY        = ${{ secrets.VM_SSH_KEY != '' && '설정됨' || '비어 있음' }}"
+
+          if [ "${{ vars.VM_DEPLOY_ENABLED }}" != "true" ]; then
+            echo "::warning::VM_DEPLOY_ENABLED 가 'true' 가 아니라 배포를 건너뜁니다. 이미지는 GHCR 에 올라가 있습니다."
+            echo "배포를 켜려면 Settings → Secrets and variables → Actions → **Repository variables** 에 VM_DEPLOY_ENABLED=true 를 등록하세요." >> $GITHUB_STEP_SUMMARY
+            echo "proceed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          for v in VM_HOST VM_USER HEALTHCHECK_URL; do
+            case "$v" in
+              VM_HOST) val="${{ vars.VM_HOST }}" ;;
+              VM_USER) val="${{ vars.VM_USER }}" ;;
+              HEALTHCHECK_URL) val="${{ vars.HEALTHCHECK_URL }}" ;;
+            esac
+            if [ -z "$val" ]; then
+              echo "::error::$v 가 비어 있습니다. Repository variables 를 확인하세요."
+              exit 1
+            fi
+          done
+
+          echo "proceed=true" >> $GITHUB_OUTPUT
+
       - name: 체크아웃
+        if: steps.gate.outputs.proceed == 'true'
         uses: actions/checkout@v5
         with:
           ref: ${{ env.TARGET_SHA }}
 
       - name: SSH 키 준비
+        if: steps.gate.outputs.proceed == 'true'
         run: |
           mkdir -p ~/.ssh
           # printf 로 끝 개행을 보장한다. 개행이 없으면 ssh 가 키를 invalid format 으로 거부한다.
@@ -195,11 +234,13 @@ jobs:
 
       # compose 파일도 함께 배포한다. 구성이 바뀌면 VM 에 수동으로 반영할 필요가 없다.
       - name: compose 파일 전송
+        if: steps.gate.outputs.proceed == 'true'
         run: |
           scp -i ~/.ssh/deploy_key deploy/docker-compose.yml \
             "${{ vars.VM_USER }}@${{ vars.VM_HOST }}:/opt/getit/docker-compose.yml"
 
       - name: 이미지 교체 · 재시작
+        if: steps.gate.outputs.proceed == 'true'
         env:
           IMAGE_TAG: ${{ inputs.image_tag || needs.image.outputs.tag }}
         run: |
@@ -239,6 +280,7 @@ jobs:
       # 컨테이너가 떴다고 애플리케이션이 뜬 것은 아니다.
       # Flyway 마이그레이션과 JVM 기동에 시간이 걸린다.
       - name: 헬스체크
+        if: steps.gate.outputs.proceed == 'true'
         run: |
           URL="${{ vars.HEALTHCHECK_URL }}"
           echo "확인 대상: $URL"
@@ -256,7 +298,7 @@ jobs:
           exit 1
 
       - name: 실패 시 로그 수집
-        if: failure()
+        if: failure() && steps.gate.outputs.proceed == 'true'
         run: |
           ssh -i ~/.ssh/deploy_key "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
             'cd /opt/getit && docker compose logs app --tail 100' || true
