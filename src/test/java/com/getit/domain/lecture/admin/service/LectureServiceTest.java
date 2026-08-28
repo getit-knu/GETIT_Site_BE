@@ -10,10 +10,17 @@ import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
 import com.getit.domain.lecture.admin.dto.LectureRequest.AssignmentPart;
 import com.getit.domain.lecture.admin.dto.LectureResult;
+import com.getit.domain.lecture.entity.Assignment;
+import com.getit.domain.lecture.entity.AssignmentSubmission;
+import com.getit.domain.lecture.entity.Feedback;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.entity.LectureFile;
+import com.getit.domain.lecture.entity.SubmissionStatus;
 import com.getit.domain.lecture.entity.SubmissionType;
 import com.getit.domain.lecture.exception.LectureErrorCode;
+import com.getit.domain.lecture.repository.AssignmentRepository;
+import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
+import com.getit.domain.lecture.repository.FeedbackRepository;
 import com.getit.domain.lecture.repository.LectureFileRepository;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
@@ -21,6 +28,8 @@ import com.getit.domain.setting.category.repository.SubCategoryRepository;
 import com.getit.domain.setting.category.repository.TrackRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.user.entity.User;
+import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,7 +64,20 @@ class LectureServiceTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+  @Autowired
+  private AssignmentRepository assignmentRepository;
+
+  @Autowired
+  private AssignmentSubmissionRepository assignmentSubmissionRepository;
+
+  @Autowired
+  private FeedbackRepository feedbackRepository;
+
+  @Autowired
+  private UserRepository userRepository;
+
   private Long activeGenerationId;
+  private Integer activeGenerationNo;
   private Long trackId;
   private Long subCategoryId;
 
@@ -64,10 +86,18 @@ class LectureServiceTest {
     Generation generation = Generation.create(9, 2026);
     generation.activate();
     activeGenerationId = generationRepository.save(generation).getId();
+    activeGenerationNo = 9;
 
     Track track = trackRepository.save(Track.create("SW", 1));
     trackId = track.getId();
     subCategoryId = subCategoryRepository.save(SubCategory.create("웹기초", 1, trackId)).getId();
+  }
+
+  private User createMember(String providerId, String name, String major) {
+    User user = User.createGuest(providerId, providerId + "@getit.com", name, null);
+    user.updateApplicantInfo(null, null, major, null, null);
+    user.promoteToMember(activeGenerationNo);
+    return userRepository.save(user);
   }
 
   private LectureRequest.Create createRequest(Long generationId, Long trackId, Long subCategoryId) {
@@ -212,6 +242,32 @@ class LectureServiceTest {
 
       assertThat(result.lectures()).extracting(LectureResult.LectureCard::title).containsExactly("HTML/CSS 기초");
       assertThat(result.tracks()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("제출/피드백 완료 건수를 계산한다")
+    void countsSubmittedAndFeedbackDone() {
+      User submitted = createMember("sub-1", "제출자", "컴퓨터공학과");
+      createMember("sub-2", "미제출자", "경영학과");
+      AssignmentPart assignmentPart = new AssignmentPart(
+          "자기소개 페이지 만들기", null, LocalDateTime.now().plusDays(7), Set.of(SubmissionType.LINK), null);
+      Lecture lecture = lectureService.createLecture(
+          new LectureRequest.Create(
+              null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
+              null, true, assignmentPart),
+          100L);
+      Assignment assignment = assignmentRepository.findByLectureId(lecture.getId()).orElseThrow();
+      AssignmentSubmission submission = assignmentSubmissionRepository.save(AssignmentSubmission.submit(
+          assignment.getId(), submitted.getId(), null, "https://github.com/user/repo", null,
+          SubmissionStatus.SUBMITTED, LocalDateTime.now()));
+      feedbackRepository.save(Feedback.create(submission.getId(), 999L, "잘했어요"));
+
+      LectureResult.ListResult result = lectureService.getLectures(activeGenerationId, trackId, null);
+
+      LectureResult.LectureCard card = result.lectures().get(0);
+      assertThat(card.submittedCount()).isEqualTo(1);
+      assertThat(card.totalCount()).isEqualTo(2);
+      assertThat(card.feedbackDoneCount()).isEqualTo(1);
     }
   }
 
