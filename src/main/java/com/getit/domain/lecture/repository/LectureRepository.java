@@ -118,6 +118,14 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
       """)
   List<SubCategoryLectureCount> countBySubCategoryIdsGrouped(@Param("subCategoryIds") List<Long> subCategoryIds);
 
+  @Query("""
+      select l.trackId as trackId, count(l) as count
+      from Lecture l
+      where l.trackId in :trackIds and l.deletedAt is null
+      group by l.trackId
+      """)
+  List<TrackLectureCount> countByTrackIdsGrouped(@Param("trackIds") List<Long> trackIds);
+
   @Modifying(clearAutomatically = true)
   @Query("update Lecture l set l.subCategoryId = null where l.subCategoryId in :subCategoryIds")
   void disconnectBySubCategoryIds(@Param("subCategoryIds") List<Long> subCategoryIds);
@@ -128,6 +136,11 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
 
   interface SubCategoryLectureCount {
     Long getSubCategoryId();
+    Long getCount();
+  }
+
+  interface TrackLectureCount {
+    Long getTrackId();
     Long getCount();
   }
 

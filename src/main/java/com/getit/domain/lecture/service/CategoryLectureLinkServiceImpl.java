@@ -2,6 +2,7 @@ package com.getit.domain.lecture.service;
 
 import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.lecture.repository.LectureRepository.SubCategoryLectureCount;
+import com.getit.domain.lecture.repository.LectureRepository.TrackLectureCount;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -25,6 +26,15 @@ public class CategoryLectureLinkServiceImpl implements CategoryLectureLinkServic
   @Override
   public long countLecturesBySubCategoryId(Long subCategoryId) {
     return lectureRepository.countBySubCategoryIdAndDeletedAtIsNull(subCategoryId);
+  }
+
+  @Override
+  public Map<Long, Long> countLecturesByTrackIds(List<Long> trackIds) {
+    Map<Long, Long> counts = lectureRepository.countByTrackIdsGrouped(trackIds).stream()
+        .collect(Collectors.toMap(TrackLectureCount::getTrackId, TrackLectureCount::getCount));
+
+    return trackIds.stream()
+        .collect(Collectors.toMap(Function.identity(), id -> counts.getOrDefault(id, 0L)));
   }
 
   @Override
