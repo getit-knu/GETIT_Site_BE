@@ -1,16 +1,22 @@
 package com.getit.domain.setting.event.repository;
 
 import com.getit.domain.setting.event.entity.Event;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
   List<Event> findByGenerationIdOrderByStartDateAscIdAsc(long generationId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select e from Event e where e.generationId = :generationId order by e.id asc")
+  List<Event> findByGenerationIdForUpdate(@Param("generationId") long generationId);
 
   Optional<Event> findByIdAndGenerationId(Long id, long generationId);
 
