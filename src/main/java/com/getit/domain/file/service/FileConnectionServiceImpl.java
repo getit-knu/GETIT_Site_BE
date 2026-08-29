@@ -4,8 +4,11 @@ import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
+import com.getit.domain.file.storage.StoredObject;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FileConnectionServiceImpl implements FileConnectionService {
 
   private final FileAssetRepository fileAssetRepository;
+  private final FileStorage fileStorage;
 
   @Override
   public void connectAll(List<Long> fileIds) {
@@ -52,6 +56,29 @@ public class FileConnectionServiceImpl implements FileConnectionService {
     validateAllFound(distinctFileIds, files);
 
     fileAssetRepository.updateStatusByIdIn(distinctFileIds, FileStatus.PENDING);
+  }
+
+  /**
+   * 저장소에 실물이 있는지, 신고한 크기를 넘지 않았는지 확인한다.
+   *
+   * <p>직접 업로드(명세 13.1)는 클라이언트가 신고한 크기로 주소를 발급한다. SAS 자체에는
+   * 크기 제한을 걸 수 없어서, 작게 신고하고 크게 올리거나 아예 올리지 않은 채로 fileId 만
+   * 연결할 수 있다(PR #126 Copilot 리뷰 지적). 연결은 되돌리기 어려우므로 여기서 막는다.
+   *
+   * <p>신고 크기는 이미 용도별 상한을 통과했다. 실물이 신고 크기 이하이면 상한도 지켜진다.
+   */
+  private void verifyUploaded(FileAsset file) {
+    Optional<StoredObject> stored = fileStorage.describe(file.getStoredKey());
+    if (stored.isEmpty()) {
+      log.warn("업로드되지 않은 파일 연결 시도. fileId={} key={}", file.getId(), file.getStoredKey());
+      throw new BusinessException(FileErrorCode.FILE_NOT_UPLOADED);
+    }
+    long actualSize = stored.get().size();
+    if (actualSize > file.getSize()) {
+      log.warn("신고 크기 초과. fileId={} 신고={} 실제={}", file.getId(), file.getSize(), actualSize);
+      throw new BusinessException(FileErrorCode.FILE_SIZE_MISMATCH);
+    }
+    file.syncSize(actualSize);
   }
 
   private void validateAllFound(List<Long> requestedFileIds, List<FileAsset> foundFiles) {
