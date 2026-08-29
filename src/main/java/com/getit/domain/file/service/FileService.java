@@ -38,7 +38,7 @@ public class FileService {
       throw new BusinessException(FileErrorCode.INVALID_FILE_SIZE);
     }
 
-    String key = UUID.randomUUID() + "." + extension;
+    String key = keyFor(purpose, extension);
     String url = fileStorage.upload(file, key);
 
     FileAsset saved = fileAssetRepository.save(

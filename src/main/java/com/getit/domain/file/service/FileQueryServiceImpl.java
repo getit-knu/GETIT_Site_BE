@@ -32,7 +32,7 @@ public class FileQueryServiceImpl implements FileQueryService {
    * {@code FileInfo.url()} 을 쓰는 강의·제출물·운영진 화면이 그대로 동작한다.
    */
   private FileInfo toInfo(FileAsset file) {
-    return FileInfo.from(file, fileStorage.downloadUrl(file.getStoredKey()).url());
+    return FileInfo.from(file, fileStorage.downloadUrl(file.getStoredKey()));
   }
 
   @Override

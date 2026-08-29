@@ -48,6 +48,8 @@ class FileQueryServiceImplTest {
     FileInfo info = fileQueryService.findById(1L);
 
     assertThat(info.url()).isEqualTo("https://signed/key.txt?sig=1");
+    // 만료를 버리면 소비자가 상수나 설정값을 따로 읽게 되고, 실제 서명 만료와 어긋난다.
+    assertThat(info.urlExpiresInSeconds()).isEqualTo(300);
     assertThat(info.originalName()).isEqualTo("original.txt");
     assertThat(info.size()).isEqualTo(10L);
   }
