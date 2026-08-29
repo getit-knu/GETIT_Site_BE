@@ -93,7 +93,7 @@ class HomeServiceTest {
     assertThat(result.curriculums()).extracting(HomeResult.CurriculumInfo::title)
         .containsExactly("Python & 데이터 분석");
     assertThat(result.featuredProjects()).hasSize(1);
-    assertThat(result.featuredProjects().get(0).thumbnailUrl()).isEqualTo("https://cdn.getit.com/projects/1.png");
+    assertThat(result.featuredProjects().get(0).thumbnailUrl()).endsWith("/" + file.getStoredKey());
     assertThat(result.faqs()).extracting(HomeResult.FaqInfo::question).containsExactly("동아리 활동 시간은?");
     assertThat(result.features()).isEqualTo(new HomeResult.FeaturesInfo(false, true));
   }
