@@ -1,5 +1,7 @@
 package com.getit.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.core.jackson.ModelResolver;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -16,6 +18,17 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   private static final String BEARER_SCHEME = "bearerAuth";
+
+  /**
+   * 스키마 이름 규칙을 바꾼다. 중첩 타입에 바깥 클래스 이름을 붙여 도메인 간 충돌을 없앤다.
+   *
+   * <p>springdoc 은 {@code ModelResolver} 를 직접 만들되 이미 등록된 빈이 있으면
+   * 그것을 쓴다. 여기서 갈아끼우면 문서 전체에 규칙이 적용된다.
+   */
+  @Bean
+  public ModelResolver modelResolver(ObjectMapper objectMapper) {
+    return new ModelResolver(objectMapper, new NestedAwareTypeNameResolver());
+  }
 
   @Bean
   public OpenAPI openAPI() {
