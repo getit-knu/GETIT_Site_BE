@@ -98,7 +98,7 @@ class StaffAdminServiceTest {
 
       List<StaffResult> results = staffAdminService.getStaffs();
 
-      assertThat(results.get(0).profileImageUrl()).isEqualTo(uploaded.getUrl());
+      assertThat(results.get(0).profileImageUrl()).endsWith("/" + uploaded.getStoredKey());
     }
   }
 

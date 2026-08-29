@@ -48,7 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class LectureService {
 
-  private static final int DOWNLOAD_URL_EXPIRES_IN = 300;
 
   private final LectureRepository lectureRepository;
   private final LectureFileRepository lectureFileRepository;
@@ -127,7 +126,7 @@ public class LectureService {
     FileInfo info = fileQueryService.findById(fileId);
 
     return new LectureResult.DownloadUrl(
-        info.url(), lectureFile.getDisplayName(), info.contentType(), DOWNLOAD_URL_EXPIRES_IN);
+        info.url(), lectureFile.getDisplayName(), info.contentType(), info.urlExpiresInSeconds());
   }
 
   private Lecture requireVisibleLecture(Long lectureId, GenerationSummary generation) {

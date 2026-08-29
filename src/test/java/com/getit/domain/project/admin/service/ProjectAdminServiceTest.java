@@ -70,7 +70,7 @@ class ProjectAdminServiceTest {
 
       var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
 
-      assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("https://cdn/thumb.png");
+      assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("http://localhost:8080/api/public/files/key");
     }
 
     @Test
