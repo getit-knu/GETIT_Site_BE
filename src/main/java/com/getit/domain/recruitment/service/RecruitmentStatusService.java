@@ -42,18 +42,21 @@ public class RecruitmentStatusService implements RecruitmentStatusQueryService {
 
   @Override
   public RecruitmentStatusResult getStatus() {
-    Optional<GenerationSummary> activeGeneration = generationQueryService.findActive();
-    if (activeGeneration.isEmpty()) {
+    return getStatus(generationQueryService.findActive().orElse(null));
+  }
+
+  @Override
+  public RecruitmentStatusResult getStatus(GenerationSummary activeGeneration) {
+    if (activeGeneration == null) {
       return closedResult();
     }
 
-    Optional<RecruitmentSchedule> schedule =
-        recruitmentScheduleRepository.findByGenerationId(activeGeneration.get().id());
+    Optional<RecruitmentSchedule> schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id());
     if (schedule.isEmpty()) {
       return closedResult();
     }
 
-    return buildResult(activeGeneration.get(), schedule.get());
+    return buildResult(activeGeneration, schedule.get());
   }
 
   private RecruitmentStatusResult buildResult(GenerationSummary generation, RecruitmentSchedule schedule) {

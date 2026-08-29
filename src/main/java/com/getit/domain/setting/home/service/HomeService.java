@@ -50,7 +50,7 @@ public class HomeService {
 
     return new HomeResult(
         toGenerationInfo(activeGeneration.orElse(null)),
-        toRecruitmentInfo(recruitmentStatusQueryService.getStatus()),
+        toRecruitmentInfo(recruitmentStatusQueryService.getStatus(activeGeneration.orElse(null))),
         toCurriculums(activeGeneration.orElse(null)),
         toFeaturedProjects(),
         toFaqs(),

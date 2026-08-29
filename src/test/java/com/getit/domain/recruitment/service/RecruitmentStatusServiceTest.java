@@ -6,6 +6,7 @@ import com.getit.domain.recruitment.dto.RecruitmentStatusResult;
 import com.getit.domain.recruitment.entity.RecruitmentPhase;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
+import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import java.time.Clock;
@@ -156,5 +157,28 @@ class RecruitmentStatusServiceTest {
     assertThat(status.phase()).isEqualTo(RecruitmentPhase.FINAL_ANNOUNCED);
     assertThat(status.dDay()).isNull();
     assertThat(status.message()).isEqualTo("최종 합격자가 발표되었습니다");
+  }
+
+  @Test
+  @DisplayName("getStatus(activeGeneration) 는 호출자가 이미 조회해둔 활성 기수로 조회한다 — findActive() 를 다시 부르지 않는다")
+  void returnsStatusUsingGivenActiveGeneration() {
+    Generation generation = activeGeneration();
+    recruitmentScheduleRepository.save(RecruitmentSchedule.create(
+        generation.getId(), NOW.minusDays(5), NOW.plusDays(20),
+        NOW.minusDays(5), NOW.plusDays(5), NOW.plusDays(10)));
+
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus(
+        new GenerationSummary(generation.getId(), generation.getGenerationNo(), generation.getYear()));
+
+    assertThat(status.phase()).isEqualTo(RecruitmentPhase.DOCUMENT_OPEN);
+    assertThat(status.applyEnabled()).isTrue();
+  }
+
+  @Test
+  @DisplayName("getStatus(null) 은 CLOSED 다 — 활성 기수가 없다는 뜻이다")
+  void returnsClosedWhenGivenGenerationIsNull() {
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus(null);
+
+    assertThat(status.phase()).isEqualTo(RecruitmentPhase.CLOSED);
   }
 }
