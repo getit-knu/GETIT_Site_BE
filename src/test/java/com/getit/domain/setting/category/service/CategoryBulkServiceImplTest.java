@@ -89,6 +89,80 @@ class CategoryBulkServiceImplTest {
   }
 
   @Test
+  @DisplayName("유지되는 트랙에서 빠진 소분류만 삭제하고 나머지는 재정렬한다")
+  void deletesSubCategoryRemovedFromKeptTrack() {
+    Track sw = track("SW", 1);
+    SubCategory keep = sub("유지", 1, sw.getId());
+    SubCategory drop = sub("삭제", 2, sw.getId());
+    SubCategory tail = sub("꼬리", 3, sw.getId());
+
+    categoryBulkService.replaceTree(List.of(
+        new TrackUpsert(sw.getId(), "SW", List.of(
+            new SubCategoryNode(tail.getId(), "꼬리"),
+            new SubCategoryNode(keep.getId(), "유지")))),
+        false);
+
+    assertThat(subCategoryRepository.findById(drop.getId())).isEmpty();
+    List<SubCategory> subs = subCategoryRepository.findAllByTrackIdOrderByOrderAsc(sw.getId());
+    assertThat(subs).extracting(SubCategory::getName).containsExactly("꼬리", "유지");
+    assertThat(subs).extracting(SubCategory::getOrder).containsExactly(1, 2);
+  }
+
+  @Test
+  @DisplayName("다른 트랙 소속 소분류 id 를 넘기면 SUBCATEGORY_NOT_FOUND")
+  void crossTrackSubCategoryIdThrows() {
+    Track sw = track("SW", 1);
+    Track startup = track("창업", 2);
+    SubCategory web = sub("웹기초", 1, sw.getId());
+
+    assertThatThrownBy(() -> categoryBulkService.replaceTree(List.of(
+        new TrackUpsert(sw.getId(), "SW", List.of()),
+        new TrackUpsert(startup.getId(), "창업", List.of(new SubCategoryNode(web.getId(), "웹기초")))),
+        false))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CategoryErrorCode.SUBCATEGORY_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("없는 소분류 id 를 수정하려 하면 SUBCATEGORY_NOT_FOUND")
+  void unknownSubCategoryIdThrows() {
+    Track sw = track("SW", 1);
+
+    assertThatThrownBy(() -> categoryBulkService.replaceTree(List.of(
+        new TrackUpsert(sw.getId(), "SW", List.of(new SubCategoryNode(999L, "없음")))),
+        false))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CategoryErrorCode.SUBCATEGORY_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("force=false: 삭제 대상 트랙 자체에 강의가 연결돼 있으면 CATEGORY_IN_USE")
+  void rejectsWhenDeletedTrackHasLecture() {
+    Track sw = track("SW", 1);
+    Track drop = track("삭제트랙", 2);
+    lectureUnder(drop.getId(), null);
+
+    assertThatThrownBy(() -> categoryBulkService.replaceTree(List.of(
+        new TrackUpsert(sw.getId(), "SW", List.of())), false))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CategoryErrorCode.CATEGORY_IN_USE);
+
+    assertThat(trackRepository.findById(drop.getId())).isPresent();
+  }
+
+  @Test
+  @DisplayName("빈 리스트 + 연결 강의 없으면 트랙·소분류 전부 삭제")
+  void emptyListDeletesAll() {
+    Track sw = track("SW", 1);
+    sub("웹기초", 1, sw.getId());
+
+    categoryBulkService.replaceTree(List.of(), false);
+
+    assertThat(trackRepository.count()).isZero();
+    assertThat(subCategoryRepository.count()).isZero();
+  }
+
+  @Test
   @DisplayName("force=true: 강의 연결을 해제하고 삭제한다")
   void forceDisconnectsAndDeletes() {
     Track sw = track("SW", 1);

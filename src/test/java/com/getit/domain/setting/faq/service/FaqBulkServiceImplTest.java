@@ -48,6 +48,36 @@ class FaqBulkServiceImplTest {
   }
 
   @Test
+  @DisplayName("수정은 question·answer·isVisible 을 전부 덮어쓴다")
+  void updateOverwritesAllFields() {
+    Faq faq = saved("원본", 1);
+
+    faqBulkService.replaceAll(List.of(new FaqUpsert(faq.getId(), "바뀐질문", "바뀐답변", false)));
+
+    Faq updated = faqRepository.findById(faq.getId()).orElseThrow();
+    assertThat(updated.getQuestion()).isEqualTo("바뀐질문");
+    assertThat(updated.getAnswer()).isEqualTo("바뀐답변");
+    assertThat(updated.isVisible()).isFalse();
+  }
+
+  @Test
+  @DisplayName("생성·삭제 없이 순서만 바꿔도 order 가 배열 인덱스로 재부여된다")
+  void reorderOnly() {
+    Faq a = saved("A", 1);
+    Faq b = saved("B", 2);
+    Faq c = saved("C", 3);
+
+    faqBulkService.replaceAll(List.of(
+        new FaqUpsert(c.getId(), "C", "답변", true),
+        new FaqUpsert(a.getId(), "A", "답변", true),
+        new FaqUpsert(b.getId(), "B", "답변", true)));
+
+    assertThat(faqRepository.findAllByOrderByOrderAscIdAsc())
+        .extracting(Faq::getQuestion).containsExactly("C", "A", "B");
+    assertThat(faqRepository.findById(c.getId()).orElseThrow().getOrder()).isEqualTo(1);
+  }
+
+  @Test
   @DisplayName("빈 리스트면 전부 삭제한다")
   void emptyListDeletesAll() {
     saved("a", 1);

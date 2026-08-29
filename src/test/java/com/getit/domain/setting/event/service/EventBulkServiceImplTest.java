@@ -83,6 +83,45 @@ class EventBulkServiceImplTest {
   }
 
   @Test
+  @DisplayName("기존 행사를 거꾸로 된 날짜로 수정하면 INVALID_EVENT_PERIOD 로 롤백")
+  void invalidPeriodOnUpdateRollsBack() {
+    Event event = saved(generationId, "원본", LocalDate.of(2026, 5, 1));
+
+    assertThatThrownBy(() -> eventBulkService.replaceAll(GENERATION_NO, List.of(
+        new EventUpsert(event.getId(), "수정", "장소",
+            LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 1), EventType.EVENT, true))))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", EventErrorCode.INVALID_EVENT_PERIOD);
+
+    assertThat(eventRepository.findById(event.getId()).orElseThrow().getTitle()).isEqualTo("원본");
+  }
+
+  @Test
+  @DisplayName("다른 기수 행사 id 를 넘기면 EVENT_NOT_FOUND")
+  void idFromOtherGenerationThrows() {
+    Event otherGen = saved(99L, "다른기수", LocalDate.of(2026, 5, 1));
+
+    assertThatThrownBy(() -> eventBulkService.replaceAll(GENERATION_NO, List.of(
+        new EventUpsert(otherGen.getId(), "훔치기", "장소",
+            LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 2), EventType.EVENT, true))))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", EventErrorCode.EVENT_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("빈 리스트면 그 기수 행사만 전부 삭제하고 다른 기수는 남긴다")
+  void emptyListDeletesOnlyThisGeneration() {
+    saved(generationId, "내것1", LocalDate.of(2026, 5, 1));
+    saved(generationId, "내것2", LocalDate.of(2026, 5, 2));
+    Event otherGen = saved(99L, "다른기수", LocalDate.of(2026, 5, 3));
+
+    eventBulkService.replaceAll(GENERATION_NO, List.of());
+
+    assertThat(eventRepository.findByGenerationIdOrderByStartDateAscIdAsc(generationId)).isEmpty();
+    assertThat(eventRepository.findById(otherGen.getId())).isPresent();
+  }
+
+  @Test
   @DisplayName("없는 기수면 ACTIVE_GENERATION_NOT_FOUND")
   void unknownGenerationThrows() {
     assertThatThrownBy(() -> eventBulkService.replaceAll(404, List.of()))
