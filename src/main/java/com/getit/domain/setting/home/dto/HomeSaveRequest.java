@@ -20,10 +20,10 @@ import java.util.List;
 public record HomeSaveRequest(
     @Valid @NotNull GenerationInfo generation,
     @Valid @NotNull ScheduleInfo schedule,
-    @NotNull List<@Valid TrackInfo> tracks,
-    @NotNull List<@Valid CurriculumInfo> curriculums,
-    @NotNull List<@Valid EventInfo> events,
-    @NotNull List<@Valid FaqInfo> faqs
+    @NotNull List<@NotNull @Valid TrackInfo> tracks,
+    @NotNull List<@NotNull @Valid CurriculumInfo> curriculums,
+    @NotNull List<@NotNull @Valid EventInfo> events,
+    @NotNull List<@NotNull @Valid FaqInfo> faqs
 ) {
 
   public record GenerationInfo(
@@ -42,7 +42,7 @@ public record HomeSaveRequest(
   public record TrackInfo(
       Long id,
       @NotBlank @Size(max = 50) String name,
-      @NotNull List<@Valid SubCategoryInfo> subCategories
+      @NotNull List<@NotNull @Valid SubCategoryInfo> subCategories
   ) { }
 
   public record SubCategoryInfo(

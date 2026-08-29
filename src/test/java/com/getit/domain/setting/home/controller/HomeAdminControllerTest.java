@@ -101,4 +101,20 @@ class HomeAdminControllerTest {
             .content("{}"))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  @DisplayName("배열에 null 요소가 섞이면 400 이다 — NPE 로 500 이 나면 안 된다")
+  void rejectsNullElementInArray() throws Exception {
+    Generation generation = Generation.create(9, 2026);
+    generation.activate();
+    generationRepository.save(generation);
+    String body = objectMapper.writeValueAsString(validRequest(generation))
+        .replaceFirst("\"faqs\":\\[\\{", "\"faqs\":[null,{");
+
+    mockMvc.perform(post(SAVE_PATH)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isBadRequest());
+  }
 }
