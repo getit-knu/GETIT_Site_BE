@@ -48,9 +48,9 @@ public class HomeSaveService {
   private final Clock clock;
 
   public HomeSaveResult save(HomeSaveRequest request, boolean force) {
-    GenerationSummary activeGeneration = validateActiveGeneration(request.generation().generationNo());
+    GenerationSummary activeGeneration = validateActiveGeneration(request.generation());
 
-    recruitmentScheduleWriteService.updateSchedule(toScheduleCommand(request.schedule()));
+    recruitmentScheduleWriteService.updateSchedule(activeGeneration, toScheduleCommand(request.schedule()));
     categoryBulkService.replaceTree(toTrackUpserts(request.tracks()), force);
     curriculumBulkService.replaceAll(activeGeneration.id(), toCurriculumUpserts(request.curriculums()));
     eventBulkService.replaceAll(activeGeneration.generationNo(), toEventUpserts(request.events()));
@@ -59,10 +59,17 @@ public class HomeSaveService {
     return new HomeSaveResult(OffsetDateTime.now(clock), activeGeneration.generationNo());
   }
 
-  private GenerationSummary validateActiveGeneration(Integer generationNo) {
+  /**
+   * 활성 기수를 딱 한 번 조회해 그 결과를 이후 모든 계약 호출에 그대로 넘긴다 — 각 계약이 스스로
+   * 다시 조회하게 두면, 저장 도중 활성 기수가 바뀌었을 때(동시 admin 작업) 한 요청이 서로 다른
+   * 두 기수에 걸쳐 반영될 수 있다(PR #136 Copilot 리뷰 지적). {@code generationNo}·{@code year}
+   * 둘 다 요청과 일치하는지 확인한다 — {@code year}만 어긋난 요청은 지금까지 조용히 통과했다.
+   */
+  private GenerationSummary validateActiveGeneration(HomeSaveRequest.GenerationInfo requested) {
     GenerationSummary activeGeneration = generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(HomeErrorCode.ACTIVE_GENERATION_NOT_FOUND));
-    if (!activeGeneration.generationNo().equals(generationNo)) {
+    if (!activeGeneration.generationNo().equals(requested.generationNo())
+        || !activeGeneration.year().equals(requested.year())) {
       throw new BusinessException(HomeErrorCode.GENERATION_NOT_ACTIVE);
     }
     return activeGeneration;

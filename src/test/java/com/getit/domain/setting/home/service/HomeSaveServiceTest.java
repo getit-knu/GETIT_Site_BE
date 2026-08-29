@@ -99,6 +99,21 @@ class HomeSaveServiceTest {
   }
 
   @Test
+  @DisplayName("요청의 year 가 활성 기수와 다르면 예외가 발생한다 — generationNo 만 확인하고 넘어가지 않는다")
+  void throwsWhenYearMismatch() {
+    Generation generation = activeGeneration();
+    HomeSaveRequest base = requestFor(generation);
+    HomeSaveRequest request = new HomeSaveRequest(
+        new HomeSaveRequest.GenerationInfo(generation.getGenerationNo(), generation.getYear() + 1),
+        base.schedule(), List.of(), List.of(), List.of(), List.of());
+
+    assertThatThrownBy(() -> homeSaveService.save(request, false))
+        .isInstanceOf(BusinessException.class)
+        .extracting("errorCode")
+        .isEqualTo(HomeErrorCode.GENERATION_NOT_ACTIVE);
+  }
+
+  @Test
   @DisplayName("활성 기수가 없으면 예외가 발생한다")
   void throwsWhenNoActiveGeneration() {
     HomeSaveRequest request = new HomeSaveRequest(
