@@ -8,6 +8,7 @@ import com.getit.domain.recruitment.dto.ScheduleUpdateCommand;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
+import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.exception.BusinessException;
@@ -176,6 +177,19 @@ class RecruitmentScheduleServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("updateSchedule(activeGeneration, command) 는 호출자가 이미 조회해둔 활성 기수로 저장한다")
+    void updatesUsingGivenActiveGeneration() {
+      GenerationSummary givenGeneration = new GenerationSummary(
+          activeGeneration.getId(), activeGeneration.getGenerationNo(), activeGeneration.getYear());
+
+      RecruitmentScheduleResult saved = recruitmentScheduleService.updateSchedule(
+          givenGeneration, cmd(dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)));
+
+      assertThat(saved.generationId()).isEqualTo(activeGeneration.getId());
+      assertThat(recruitmentScheduleRepository.findByGenerationId(activeGeneration.getId())).isPresent();
     }
   }
 }

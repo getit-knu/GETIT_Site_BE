@@ -35,14 +35,18 @@ public class RecruitmentScheduleService implements RecruitmentScheduleWriteServi
   @Override
   @Transactional
   public RecruitmentScheduleResult updateSchedule(ScheduleUpdateCommand command) {
+    return updateSchedule(findActiveGeneration(), command);
+  }
+
+  @Override
+  @Transactional
+  public RecruitmentScheduleResult updateSchedule(GenerationSummary activeGeneration, ScheduleUpdateCommand command) {
     LocalDateTime totalStartAt = command.totalStartAt();
     LocalDateTime totalEndAt = command.totalEndAt();
     LocalDateTime documentStartAt = command.documentStartAt();
     LocalDateTime documentEndAt = command.documentEndAt();
     LocalDateTime interviewStartAt = command.interviewStartAt();
     validateOrder(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
-
-    GenerationSummary activeGeneration = findActiveGeneration();
 
     RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
         .map(existing -> {
