@@ -104,8 +104,14 @@ AZURE_BACKUP_CONTAINER=db-backups
 
 # --- 파일 업로드 (비워두면 VM 로컬 디스크에 저장) ---
 # true 로 켜면 프론트가 Azure Blob 으로 직접 올린다. 파일이 VM 디스크에 남지 않는다.
+# 공개·비공개를 다른 계정에 둔다. 백업 계정(AZURE_STORAGE_ACCOUNT)과도 분리돼 있다.
 FILE_AZURE_ENABLED=false
+# 강의 자료 · 과제 제출물 — 비공개, 서명 주소로만 읽는다
+AZURE_UPLOAD_ACCOUNT=
 AZURE_UPLOAD_CONTAINER=uploads
+# 프로필 이미지 · 프로젝트 썸네일 — 공개, 고정 주소
+AZURE_PUBLIC_ACCOUNT=
+AZURE_PUBLIC_CONTAINER=public-assets
 ENVEOF
   chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
   chmod 600 "$APP_DIR/.env"

@@ -321,7 +321,9 @@ class LectureServiceTest {
       LectureResult.DownloadUrl result =
           lectureService.getMaterialDownloadUrl(memberId, lecture.getId(), file.getId());
 
-      assertThat(result.downloadUrl()).isEqualTo("https://cdn/key/1");
+      // 저장된 고정 주소가 아니라 저장소가 발급한 주소를 쓴다.
+      // 비공개 컨테이너의 고정 주소는 그대로는 열리지 않는다.
+      assertThat(result.downloadUrl()).isEqualTo("http://localhost:8080/api/public/files/key/1");
       assertThat(result.fileName()).isEqualTo("강의 자료.pdf");
       assertThat(result.expiresIn()).isEqualTo(300);
     }

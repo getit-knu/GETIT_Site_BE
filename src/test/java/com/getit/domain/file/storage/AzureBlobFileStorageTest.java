@@ -66,7 +66,7 @@ class AzureBlobFileStorageTest {
     given(blob.generateUserDelegationSas(any(), any())).willReturn("sv=2021&sig=abc");
 
     storage = new AzureBlobFileStorage(
-        serviceClient, "uploads",
+        serviceClient, "uploads", false,
         Clock.fixed(FIXED, ZoneOffset.UTC),
         UPLOAD_TTL, DOWNLOAD_TTL, KEY_TTL);
   }

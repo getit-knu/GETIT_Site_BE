@@ -99,9 +99,14 @@ getit:
     # 계정 키는 두지 않는다. VM 관리 ID 로 사용자 위임 SAS 를 발급한다.
     azure:
       enabled: ${FILE_AZURE_ENABLED:false}
-      account: ${AZURE_STORAGE_ACCOUNT:}
-      # 백업 컨테이너와 분리한다. 백업에는 개인정보가 들어 있어 권한 범위가 다르다.
-      container: ${AZURE_UPLOAD_CONTAINER:uploads}
+      # 공개·비공개를 다른 계정에 둔다. 보존 정책이 정반대라서다 —
+      # 백업은 오래되면 지워야 하고 업로드 파일은 절대 자동 삭제되면 안 된다.
+      # 수명 주기 정책은 계정 단위라, 섞어두면 규칙 하나로 제출물이 사라질 수 있다.
+      private-account: ${AZURE_UPLOAD_ACCOUNT:}
+      private-container: ${AZURE_UPLOAD_CONTAINER:uploads}
+      # 프로필 이미지·프로젝트 썸네일. 고정 주소라 브라우저 캐시가 걸린다.
+      public-account: ${AZURE_PUBLIC_ACCOUNT:}
+      public-container: ${AZURE_PUBLIC_CONTAINER:public-assets}
       # 업로드 주소는 사용자가 파일을 고르고 올릴 시간만 있으면 된다.
       upload-url-ttl: ${FILE_UPLOAD_URL_TTL:PT10M}
       # 읽기 주소는 더 짧게 둔다. 공유되면 그동안 누구나 열 수 있다.

@@ -77,7 +77,7 @@ class StaffPublicServiceTest {
 
     var swStaff = result.sections().get(1).staffs().get(0);
     assertThat(swStaff.introduction()).isEqualTo("한줄 소개를 작성해주세요");
-    assertThat(swStaff.profileImageUrl()).isEqualTo(uploaded.getUrl());
+    assertThat(swStaff.profileImageUrl()).endsWith("/" + uploaded.getStoredKey());
   }
 
   @Test
