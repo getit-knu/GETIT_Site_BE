@@ -34,12 +34,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RecruitmentStatusService {
+public class RecruitmentStatusService implements RecruitmentStatusQueryService {
 
   private final RecruitmentScheduleRepository recruitmentScheduleRepository;
   private final GenerationQueryService generationQueryService;
   private final Clock clock;
 
+  @Override
   public RecruitmentStatusResult getStatus() {
     Optional<GenerationSummary> activeGeneration = generationQueryService.findActive();
     if (activeGeneration.isEmpty()) {
