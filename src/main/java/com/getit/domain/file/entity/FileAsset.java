@@ -87,6 +87,14 @@ public class FileAsset extends SoftDeletableEntity {
 
   public void connect() { this.status = FileStatus.CONNECTED; }
 
+  /**
+   * 저장소에 실제로 올라온 크기로 맞춘다.
+   *
+   * <p>직접 업로드는 클라이언트가 신고한 크기로 레코드를 먼저 만든다. 신고값과 실제가
+   * 다를 수 있으므로 연결 시점에 실물 기준으로 고친다.
+   */
+  public void syncSize(long actualSize) { this.size = actualSize; }
+
   public void disconnect() { this.status = FileStatus.PENDING; }
 
   public boolean isInUse() { return status == FileStatus.CONNECTED; }

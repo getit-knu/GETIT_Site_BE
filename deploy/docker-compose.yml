@@ -71,6 +71,11 @@ services:
       # 업로드 파일은 호스트 볼륨에 남는다. 컨테이너를 지워도 유지된다.
       FILE_LOCAL_PATH: /data/uploads
       FILE_BASE_URL: ${FILE_BASE_URL}
+      # 여기 넘기지 않으면 .env 에 값을 넣어도 컨테이너 안에서는 기본값이 적용돼
+      # Azure 저장소가 영영 켜지지 않는다.
+      FILE_AZURE_ENABLED: ${FILE_AZURE_ENABLED:-false}
+      AZURE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
+      AZURE_UPLOAD_CONTAINER: ${AZURE_UPLOAD_CONTAINER:-uploads}
     volumes:
       - uploads:/data/uploads
     healthcheck:

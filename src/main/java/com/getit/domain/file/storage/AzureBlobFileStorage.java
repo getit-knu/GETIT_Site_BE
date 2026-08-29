@@ -3,6 +3,7 @@ package com.getit.domain.file.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -10,17 +11,14 @@ import java.util.Map;
 import java.util.Optional;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.core.exception.HttpResponseException;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobHttpHeaders;
+import com.azure.storage.blob.models.BlobProperties;
 import com.azure.storage.blob.models.UserDelegationKey;
 import com.azure.storage.blob.sas.BlobSasPermission;
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
@@ -33,15 +31,16 @@ import com.azure.storage.common.sas.SasProtocol;
  *
  * <h2>계정 키를 두지 않는다</h2>
  *
- * <p>인증은 VM 의 관리 ID 로 한다({@link DefaultAzureCredentialBuilder}). 서명도
- * 계정 키가 아니라 <b>사용자 위임 키</b>로 하므로, 설정 어디에도 장기 자격증명이 없다.
- * 키를 두면 설정 파일 하나가 새는 것만으로 저장소 전체가 열린다.
+ * <p>인증은 VM 의 관리 ID 로 한다. 서명도 계정 키가 아니라 <b>사용자 위임 키</b>로 하므로,
+ * 설정 어디에도 장기 자격증명이 없다. 키를 두면 설정 파일 하나가 새는 것만으로 저장소
+ * 전체가 열린다.
  *
  * <p>컨테이너는 비공개다. 그래서 읽을 때도 매번 짧게 사는 서명 주소를 발급한다.
+ *
+ * <p>시각은 {@link Clock} 을 주입받는다. 만료·갱신 경계를 시스템 시각에 직접 묶으면
+ * 테스트가 실행 시점에 따라 달라진다(PR #126 Copilot 리뷰 지적).
  */
 @Slf4j
-@Component
-@ConditionalOnProperty(prefix = "getit.file.azure", name = "enabled", havingValue = "true")
 public class AzureBlobFileStorage implements FileStorage {
 
   /** 브라우저가 블록 blob 업로드에 반드시 실어야 하는 헤더. 빠지면 400 이 난다. */
@@ -51,31 +50,33 @@ public class AzureBlobFileStorage implements FileStorage {
   /** 위임 키를 만료 직전까지 쓰지 않고 미리 갱신한다. 경계에서 실패하지 않게 한다. */
   private static final Duration KEY_RENEW_MARGIN = Duration.ofMinutes(30);
 
+  /** 서버 시계가 Azure 보다 빠르면 방금 만든 키가 즉시 만료로 거부된다. */
+  private static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
+
   private final BlobServiceClient serviceClient;
   private final BlobContainerClient container;
+  private final Clock clock;
   private final Duration uploadTtl;
   private final Duration downloadTtl;
   private final Duration delegationKeyTtl;
 
   private volatile UserDelegationKey delegationKey;
-  private volatile OffsetDateTime delegationKeyExpiry;
+  private volatile OffsetDateTime delegationKeyRenewAt;
 
   public AzureBlobFileStorage(
-      @Value("${getit.file.azure.account}") String account,
-      @Value("${getit.file.azure.container}") String containerName,
-      @Value("${getit.file.azure.upload-url-ttl}") Duration uploadTtl,
-      @Value("${getit.file.azure.download-url-ttl}") Duration downloadTtl,
-      @Value("${getit.file.azure.delegation-key-ttl}") Duration delegationKeyTtl
+      BlobServiceClient serviceClient,
+      String containerName,
+      Clock clock,
+      Duration uploadTtl,
+      Duration downloadTtl,
+      Duration delegationKeyTtl
   ) {
-    this.serviceClient = new BlobServiceClientBuilder()
-        .endpoint("https://%s.blob.core.windows.net".formatted(account))
-        .credential(new DefaultAzureCredentialBuilder().build())
-        .buildClient();
+    this.serviceClient = serviceClient;
     this.container = serviceClient.getBlobContainerClient(containerName);
+    this.clock = clock;
     this.uploadTtl = uploadTtl;
     this.downloadTtl = downloadTtl;
     this.delegationKeyTtl = delegationKeyTtl;
-    log.info("Azure Blob 저장소를 사용합니다. account={} container={}", account, containerName);
   }
 
   /**
@@ -104,8 +105,10 @@ public class AzureBlobFileStorage implements FileStorage {
   @Override
   public Optional<UploadTicket> issueUploadTicket(String key, String contentType) {
     BlobClient blob = container.getBlobClient(key);
-    String sas = sign(blob, new BlobSasPermission().setWritePermission(true).setCreatePermission(true),
-        uploadTtl);
+
+    // create 만 준다. write 까지 주면 만료 전까지 같은 주소로 몇 번이든 덮어쓸 수 있어,
+    // 연결 직전 검사를 통과한 뒤 다른 파일로 바꿔치기할 수 있다.
+    String sas = sign(blob, new BlobSasPermission().setCreatePermission(true), uploadTtl);
 
     return Optional.of(new UploadTicket(
         blob.getBlobUrl() + "?" + sas,
@@ -116,14 +119,26 @@ public class AzureBlobFileStorage implements FileStorage {
   }
 
   @Override
-  public String downloadUrl(String key) {
+  public SignedUrl downloadUrl(String key) {
     BlobClient blob = container.getBlobClient(key);
-    return blob.getBlobUrl() + "?"
-        + sign(blob, new BlobSasPermission().setReadPermission(true), downloadTtl);
+    String sas = sign(blob, new BlobSasPermission().setReadPermission(true), downloadTtl);
+    return new SignedUrl(blob.getBlobUrl() + "?" + sas, (int) downloadTtl.toSeconds());
+  }
+
+  @Override
+  public Optional<StoredObject> describe(String key) {
+    try {
+      BlobProperties properties = container.getBlobClient(key).getProperties();
+      return Optional.of(new StoredObject(properties.getBlobSize(), properties.getContentType()));
+    } catch (HttpResponseException e) {
+      // 아직 올리지 않았거나 이미 지워졌다. 호출한 쪽이 "없음" 으로 처리한다.
+      log.debug("blob 정보를 읽지 못했습니다. key={} status={}", key, e.getResponse().getStatusCode());
+      return Optional.empty();
+    }
   }
 
   private String sign(BlobClient blob, BlobSasPermission permission, Duration ttl) {
-    OffsetDateTime expiry = OffsetDateTime.now(ZoneOffset.UTC).plus(ttl);
+    OffsetDateTime expiry = now().plus(ttl);
     BlobServiceSasSignatureValues values = new BlobServiceSasSignatureValues(expiry, permission)
         // http 로 전달되면 서명이 그대로 노출된다.
         .setProtocol(SasProtocol.HTTPS_ONLY);
@@ -137,19 +152,23 @@ public class AzureBlobFileStorage implements FileStorage {
    * 키는 며칠 동안 유효하므로 만료 전까지 들고 쓴다.
    */
   private UserDelegationKey delegationKey() {
-    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    OffsetDateTime now = now();
     UserDelegationKey cached = delegationKey;
-    if (cached != null && delegationKeyExpiry != null && now.isBefore(delegationKeyExpiry)) {
+    if (cached != null && delegationKeyRenewAt != null && now.isBefore(delegationKeyRenewAt)) {
       return cached;
     }
     synchronized (this) {
-      if (delegationKey == null || delegationKeyExpiry == null || now.isAfter(delegationKeyExpiry)) {
+      if (delegationKey == null || delegationKeyRenewAt == null
+          || !now.isBefore(delegationKeyRenewAt)) {
         OffsetDateTime expiry = now.plus(delegationKeyTtl);
-        // 시작을 조금 당긴다. 서버 시계가 Azure 보다 빠르면 즉시 만료로 거부된다.
-        delegationKey = serviceClient.getUserDelegationKey(now.minusMinutes(5), expiry);
-        delegationKeyExpiry = expiry.minus(KEY_RENEW_MARGIN);
+        delegationKey = serviceClient.getUserDelegationKey(now.minus(CLOCK_SKEW), expiry);
+        delegationKeyRenewAt = expiry.minus(KEY_RENEW_MARGIN);
       }
       return delegationKey;
     }
+  }
+
+  private OffsetDateTime now() {
+    return OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC);
   }
 }

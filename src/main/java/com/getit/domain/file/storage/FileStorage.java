@@ -21,10 +21,22 @@ public interface FileStorage {
   }
 
   /**
-   * 파일을 읽을 수 있는 주소.
+   * 파일을 읽을 수 있는 주소와 그 유효 시간.
    *
    * <p>비공개 저장소는 짧게 사는 서명 주소를 준다. 저장된 고정 주소를 그대로 주면
    * 권한 없는 사람도 읽게 되므로, 요청 시점마다 새로 발급한다.
+   *
+   * <p>만료 시간을 함께 돌려준다. 설정에서 따로 읽으면 만료가 없는 구현과 값이 어긋난다.
    */
-  String downloadUrl(String key);
+  SignedUrl downloadUrl(String key);
+
+  /**
+   * 저장소에 실제로 올라온 파일의 크기와 형식. 없으면 비어 있다.
+   *
+   * <p>직접 업로드는 클라이언트가 신고한 값으로 주소를 발급한다. 신고값과 실제가 다를 수
+   * 있으므로, 리소스에 연결하기 전에 여기서 실물을 확인한다.
+   */
+  default Optional<StoredObject> describe(String key) {
+    return Optional.empty();
+  }
 }
