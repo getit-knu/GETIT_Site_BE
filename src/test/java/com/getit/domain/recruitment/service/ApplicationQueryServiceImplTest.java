@@ -76,4 +76,26 @@ class ApplicationQueryServiceImplTest {
           .containsExactly(target.getId());
     }
   }
+
+  @Nested
+  @DisplayName("countSubmittedByGenerationId")
+  class CountSubmittedByGenerationId {
+
+    @Test
+    @DisplayName("같은 기수의 DRAFT 를 제외한 지원서 수를 센다")
+    void countsExcludingDraft() {
+      finalPass(1L, 9L, "홍길동");
+      applicationRepository.save(Application.createDraft(
+          2L, 9L, "임시저장", "draft@gmail.com", "010-1234-5678", null, null, 2, "2021110001"));
+      finalPass(3L, 8L, "다른 기수");
+
+      assertThat(applicationQueryService.countSubmittedByGenerationId(9L)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 0이다")
+    void returnsZeroWhenNoMatch() {
+      assertThat(applicationQueryService.countSubmittedByGenerationId(999L)).isEqualTo(0);
+    }
+  }
 }
