@@ -32,7 +32,6 @@ public class EventAdminService {
   @Transactional
   public EventResult createEvent(EventRequest request) {
     GenerationSummary activeGeneration = validateActiveGeneration(request.generationId());
-    validatePeriod(request);
 
     Event saved = eventRepository.save(Event.create(request.toCommand(), activeGeneration.id()));
 
@@ -42,7 +41,6 @@ public class EventAdminService {
   @Transactional
   public EventResult updateEvent(Long eventId, EventRequest request) {
     GenerationSummary activeGeneration = validateActiveGeneration(request.generationId());
-    validatePeriod(request);
     Event event = findEvent(eventId, activeGeneration.id());
 
     event.update(request.toCommand());
@@ -56,12 +54,6 @@ public class EventAdminService {
     Event event = findEvent(eventId, activeGeneration.id());
 
     eventRepository.delete(event);
-  }
-
-  private void validatePeriod(EventRequest request) {
-    if (request.startDate().isAfter(request.endDate())) {
-      throw new BusinessException(EventErrorCode.INVALID_EVENT_PERIOD);
-    }
   }
 
   private Event findEvent(Long eventId, long activeGenerationId) {
