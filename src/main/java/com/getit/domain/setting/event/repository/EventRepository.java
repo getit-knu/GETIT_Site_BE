@@ -15,7 +15,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
   List<Event> findByGenerationIdOrderByStartDateAscIdAsc(long generationId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select e from Event e where e.generationId = :generationId")
+  @Query("select e from Event e where e.generationId = :generationId order by e.id asc")
   List<Event> findByGenerationIdForUpdate(@Param("generationId") long generationId);
 
   Optional<Event> findByIdAndGenerationId(Long id, long generationId);
