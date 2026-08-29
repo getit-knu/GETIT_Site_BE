@@ -24,6 +24,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
   /** 특정 기수의 활성 부원. (8.6 제출 현황 모집단, #30) */
   List<User> findByRoleAndStatusAndGenerationNo(Role role, UserStatus status, Integer generationNo);
 
+  /** 전체 활성 부원 수 — 기수 무관. (D5.1 summary.memberCount) */
+  long countByRoleAndStatus(Role role, UserStatus status);
+
+  /** 특정 기수의 활성 부원 수. (D5.3 totalMemberCount · D5.5 totalCount 모집단, {@code
+   * findByRoleAndStatusAndGenerationNo} 와 동일 조건이지만 개수만 필요할 때 리스트를 만들지 않는다) */
+  long countByRoleAndStatusAndGenerationNo(Role role, UserStatus status, Integer generationNo);
+
   /**
    * 특정 기수의 활성 사용자 전체. 조 배정 여부와 무관하다.
    * (9.6 조 관리 보드 — 조별 명단과 미배정 명단을 이 결과 하나를 groupId 로 나눠서 만든다)
