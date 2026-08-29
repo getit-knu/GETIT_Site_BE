@@ -22,6 +22,7 @@ import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.setting.home.dto.HomeResult;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @Transactional
 class HomeServiceTest {
+
+  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
   @Autowired
   private HomeService homeService;
@@ -63,11 +66,15 @@ class HomeServiceTest {
     Generation generation = Generation.create(9, 2026);
     generation.activate();
     generationRepository.save(generation);
+    // 실제 서비스(RecruitmentStatusService)는 Asia/Seoul Clock 으로 "지금"을 구한다 — JVM 기본
+    // 타임존이 다르면(CI 는 흔히 UTC) LocalDateTime.now() 로 만든 값과 어긋나 경계에서 phase 판정이
+    // 흔들릴 수 있어, 서비스와 같은 기준으로 한 번만 계산해서 재사용한다(PR #129 Copilot 리뷰 지적).
+    LocalDateTime now = LocalDateTime.now(SEOUL);
     recruitmentScheduleRepository.save(RecruitmentSchedule.create(
         generation.getId(),
-        LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(10),
-        LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(5),
-        LocalDateTime.now().plusDays(6)));
+        now.minusDays(1), now.plusDays(10),
+        now.minusDays(1), now.plusDays(5),
+        now.plusDays(6)));
     curriculumRepository.save(Curriculum.create(generation.getId(), 1, "Python & 데이터 분석", "부제"));
     FileAsset file = fileAssetRepository.save(
         FileAsset.upload("p1", "p1.png", "https://cdn.getit.com/projects/1.png", 100L, "image/png", 1L));
