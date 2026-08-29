@@ -6,6 +6,7 @@ import com.getit.domain.user.dto.MemberSummary;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.UserRepository;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,5 +67,39 @@ class UserQueryServiceImplTest {
   @DisplayName("해당 기수에 활성 부원이 없으면 빈 리스트를 반환한다")
   void returnsEmptyWhenNoActiveMembers() {
     assertThat(userQueryService.findActiveMembers(9)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("countActiveMembers 는 기수 무관 전체 활성 부원 수를 센다")
+  void countsActiveMembersAcrossGenerations() {
+    memberOf(9, "google-sub-30", "q@getit.com", "경영학과");
+    memberOf(8, "google-sub-31", "r@getit.com", "컴퓨터공학과");
+
+    assertThat(userQueryService.countActiveMembers()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("countActiveMembersInGeneration 은 해당 기수의 활성 부원 수만 센다")
+  void countsActiveMembersOfGeneration() {
+    memberOf(9, "google-sub-32", "s@getit.com", "경영학과");
+    memberOf(8, "google-sub-33", "t@getit.com", "컴퓨터공학과");
+
+    assertThat(userQueryService.countActiveMembersInGeneration(9)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("findNamesByIds 는 id 로 이름을 일괄 조회한다")
+  void returnsNamesByIds() {
+    User member = memberOf(9, "google-sub-34", "u@getit.com", "경영학과");
+
+    Map<Long, String> names = userQueryService.findNamesByIds(List.of(member.getId()));
+
+    assertThat(names).containsEntry(member.getId(), "김부원");
+  }
+
+  @Test
+  @DisplayName("findNamesByIds 는 빈 컬렉션이면 조회 없이 빈 맵을 반환한다")
+  void returnsEmptyMapForEmptyIds() {
+    assertThat(userQueryService.findNamesByIds(List.of())).isEmpty();
   }
 }

@@ -34,6 +34,9 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
    */
   Page<Application> findByGenerationIdAndStatusNot(Long generationId, ApplicationStatus status, Pageable pageable);
 
+  /** 대시보드 summary(D5.1) totalApplicants — DRAFT 를 제외한 지원서 수. */
+  long countByGenerationIdAndStatusNot(Long generationId, ApplicationStatus status);
+
   /**
    * 7.4 합불 처리를 원자적으로 반영한다. {@code requiredStatus} 인 행만 갱신되고, 영향받은
    * 행 수로 갱신 성공 여부를 판단한다 (PR #52 Copilot 리뷰 지적 — "SUBMITTED 확인 후 갱신"을

@@ -20,4 +20,7 @@ public interface ApplicationQueryService {
    * 요청에 있었지만 결과에 없는 id 는 호출부가 "승격 대상 아님"으로 skip 처리해야 한다.
    */
   List<ApplicationPromotionSummary> findFinalPassByIdsAndGenerationId(List<Long> applicationIds, Long generationId);
+
+  /** 특정 기수의 DRAFT 를 제외한 지원서 수. (D5.1 summary.totalApplicants) */
+  long countSubmittedByGenerationId(Long generationId);
 }
