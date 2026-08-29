@@ -1,9 +1,13 @@
 package com.getit.domain.setting.curriculum.repository;
 
 import com.getit.domain.setting.curriculum.entity.Curriculum;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface CurriculumRepository extends JpaRepository<Curriculum, Long> {
 
@@ -21,4 +25,9 @@ public interface CurriculumRepository extends JpaRepository<Curriculum, Long> {
    * .findByIdAndGenerationId} 와 동일한 이유 · 패턴).
    */
   Optional<Curriculum> findByIdAndGenerationId(Long id, Long generationId);
+
+  /** 10.20 일괄 저장에서 커리큘럼 목록을 통째 교체할 때. 동시 CRUD 와 직렬화(B 의 {@code TrackRepository.findAllForUpdate}와 동일 패턴). */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select c from Curriculum c where c.generationId = :generationId order by c.order asc")
+  List<Curriculum> findByGenerationIdForUpdate(@Param("generationId") long generationId);
 }

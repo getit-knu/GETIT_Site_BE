@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.recruitment.dto.RecruitmentScheduleResult;
+import com.getit.domain.recruitment.dto.ScheduleUpdateCommand;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
+import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.global.exception.BusinessException;
@@ -44,6 +46,13 @@ class RecruitmentScheduleServiceTest {
 
   private LocalDateTime dt(int month, int day) {
     return LocalDateTime.of(2026, month, day, 0, 0);
+  }
+
+  private ScheduleUpdateCommand cmd(
+      LocalDateTime totalStartAt, LocalDateTime totalEndAt,
+      LocalDateTime documentStartAt, LocalDateTime documentEndAt, LocalDateTime interviewStartAt
+  ) {
+    return new ScheduleUpdateCommand(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
   }
 
   @Nested
@@ -93,8 +102,8 @@ class RecruitmentScheduleServiceTest {
     @Test
     @DisplayName("일정이 없으면 새로 생성한다")
     void createsWhenNotExists() {
-      RecruitmentScheduleResult saved = recruitmentScheduleService.updateSchedule(
-          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15));
+      RecruitmentScheduleResult saved = recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)));
 
       assertThat(saved.generationId()).isEqualTo(activeGeneration.getId());
       assertThat(saved.interviewEndAt()).isEqualTo(dt(9, 30));
@@ -107,8 +116,8 @@ class RecruitmentScheduleServiceTest {
           activeGeneration.getId(),
           dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)));
 
-      RecruitmentScheduleResult updated = recruitmentScheduleService.updateSchedule(
-          dt(9, 5), dt(10, 15), dt(9, 5), dt(9, 15), dt(9, 20));
+      RecruitmentScheduleResult updated = recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 5), dt(10, 15), dt(9, 5), dt(9, 15), dt(9, 20)));
 
       assertThat(updated.totalEndAt()).isEqualTo(dt(10, 15));
       assertThat(updated.interviewEndAt()).isEqualTo(dt(10, 15));
@@ -118,8 +127,8 @@ class RecruitmentScheduleServiceTest {
     @Test
     @DisplayName("총 모집 시작일이 종료일보다 늦으면 검증 실패한다")
     void rejectsInvalidTotalPeriod() {
-      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(
-          dt(9, 30), dt(9, 1), dt(9, 1), dt(9, 10), dt(9, 15)))
+      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 30), dt(9, 1), dt(9, 1), dt(9, 10), dt(9, 15))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
@@ -128,8 +137,8 @@ class RecruitmentScheduleServiceTest {
     @Test
     @DisplayName("서류 마감일이 총 모집 종료일보다 늦으면 검증 실패한다")
     void rejectsDocumentPeriodOutOfTotalPeriod() {
-      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(
-          dt(9, 1), dt(9, 10), dt(9, 1), dt(9, 20), dt(9, 25)))
+      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 1), dt(9, 10), dt(9, 1), dt(9, 20), dt(9, 25))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
@@ -138,8 +147,8 @@ class RecruitmentScheduleServiceTest {
     @Test
     @DisplayName("면접 시작일이 서류 마감일보다 이르면 검증 실패한다")
     void rejectsInterviewBeforeDocumentEnd() {
-      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(
-          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 20), dt(9, 10)))
+      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 20), dt(9, 10))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
@@ -150,8 +159,8 @@ class RecruitmentScheduleServiceTest {
     void rejectsInterviewStartAfterTotalEnd() {
       // interviewEndAt 은 totalEndAt(9/30) 으로 강제 동기화된다.
       // interviewStartAt(10/5) 이 이보다 늦으면 종료일 < 시작일인 깨진 일정이 된다.
-      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(
-          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(10, 5)))
+      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(10, 5))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
@@ -163,11 +172,24 @@ class RecruitmentScheduleServiceTest {
       activeGeneration.deactivate();
       generationRepository.flush();
 
-      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(
-          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)))
+      assertThatThrownBy(() -> recruitmentScheduleService.updateSchedule(cmd(
+          dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.ACTIVE_GENERATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("updateSchedule(activeGeneration, command) 는 호출자가 이미 조회해둔 활성 기수로 저장한다")
+    void updatesUsingGivenActiveGeneration() {
+      GenerationSummary givenGeneration = new GenerationSummary(
+          activeGeneration.getId(), activeGeneration.getGenerationNo(), activeGeneration.getYear());
+
+      RecruitmentScheduleResult saved = recruitmentScheduleService.updateSchedule(
+          givenGeneration, cmd(dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)));
+
+      assertThat(saved.generationId()).isEqualTo(activeGeneration.getId());
+      assertThat(recruitmentScheduleRepository.findByGenerationId(activeGeneration.getId())).isPresent();
     }
   }
 }

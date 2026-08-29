@@ -2,6 +2,7 @@ package com.getit.domain.recruitment.controller;
 
 import com.getit.domain.recruitment.dto.RecruitmentScheduleResult;
 import com.getit.domain.recruitment.dto.RecruitmentScheduleUpdateRequest;
+import com.getit.domain.recruitment.dto.ScheduleUpdateCommand;
 import com.getit.domain.recruitment.service.RecruitmentScheduleService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,12 +34,12 @@ public class RecruitmentScheduleController {
   public ApiResponse<RecruitmentScheduleResult> updateSchedule(
       @Valid @RequestBody RecruitmentScheduleUpdateRequest request
   ) {
-    return ApiResponse.success(recruitmentScheduleService.updateSchedule(
+    return ApiResponse.success(recruitmentScheduleService.updateSchedule(new ScheduleUpdateCommand(
         request.totalStartAt(),
         request.totalEndAt(),
         request.documentStartAt(),
         request.documentEndAt(),
         request.interviewStartAt()
-    ));
+    )));
   }
 }

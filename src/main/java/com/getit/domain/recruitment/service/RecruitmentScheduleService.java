@@ -1,6 +1,7 @@
 package com.getit.domain.recruitment.service;
 
 import com.getit.domain.recruitment.dto.RecruitmentScheduleResult;
+import com.getit.domain.recruitment.dto.ScheduleUpdateCommand;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RecruitmentScheduleService {
+public class RecruitmentScheduleService implements RecruitmentScheduleWriteService {
 
   private final RecruitmentScheduleRepository recruitmentScheduleRepository;
   private final GenerationQueryService generationQueryService;
@@ -31,17 +32,21 @@ public class RecruitmentScheduleService {
     return RecruitmentScheduleResult.of(activeGeneration, schedule);
   }
 
+  @Override
   @Transactional
-  public RecruitmentScheduleResult updateSchedule(
-      LocalDateTime totalStartAt,
-      LocalDateTime totalEndAt,
-      LocalDateTime documentStartAt,
-      LocalDateTime documentEndAt,
-      LocalDateTime interviewStartAt
-  ) {
-    validateOrder(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
+  public RecruitmentScheduleResult updateSchedule(ScheduleUpdateCommand command) {
+    return updateSchedule(findActiveGeneration(), command);
+  }
 
-    GenerationSummary activeGeneration = findActiveGeneration();
+  @Override
+  @Transactional
+  public RecruitmentScheduleResult updateSchedule(GenerationSummary activeGeneration, ScheduleUpdateCommand command) {
+    LocalDateTime totalStartAt = command.totalStartAt();
+    LocalDateTime totalEndAt = command.totalEndAt();
+    LocalDateTime documentStartAt = command.documentStartAt();
+    LocalDateTime documentEndAt = command.documentEndAt();
+    LocalDateTime interviewStartAt = command.interviewStartAt();
+    validateOrder(totalStartAt, totalEndAt, documentStartAt, documentEndAt, interviewStartAt);
 
     RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
         .map(existing -> {
