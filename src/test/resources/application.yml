@@ -50,8 +50,10 @@ getit:
     # 이 파일은 메인 application.yml 을 통째로 가린다.
     azure:
       enabled: false
-      account: ""
-      container: uploads
+      private-account: ""
+      private-container: uploads
+      public-account: ""
+      public-container: public-assets
       upload-url-ttl: PT10M
       download-url-ttl: PT5M
       delegation-key-ttl: PT6H

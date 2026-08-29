@@ -86,7 +86,8 @@ nano /opt/getit/.env
 | `OAUTH2_REDIRECT_URI` | `{프론트 주소}/oauth/callback` |
 | `FILE_BASE_URL` | `https://{도메인}/api/public/files` (로컬 저장 시에만 쓰인다) |
 | `FILE_AZURE_ENABLED` | `true` 면 프론트가 Azure Blob 으로 직접 업로드 |
-| `AZURE_UPLOAD_CONTAINER` | `uploads` |
+| `AZURE_UPLOAD_ACCOUNT` · `AZURE_UPLOAD_CONTAINER` | `getituploads01` · `uploads` |
+| `AZURE_PUBLIC_ACCOUNT` · `AZURE_PUBLIC_CONTAINER` | `getitpublic01` · `public-assets` |
 | `REFRESH_COOKIE_SECURE` | `true` |
 | `REFRESH_COOKIE_SAME_SITE` | 아래 참조 |
 
@@ -379,19 +380,36 @@ ssh -i GETIT_key.pem azureuser@40.82.154.5 'cd /opt/getit && ./backup-db.sh'
 
 ### 업로드 파일 저장소
 
-DB 백업과 **같은 스토리지 계정, 다른 컨테이너**를 쓴다.
-백업에는 지원자 개인정보가 들어 있어 권한 범위가 다르므로 섞지 않는다.
+스토리지 계정을 **셋으로 나눈다.** 보존 정책과 공개 여부가 서로 다르기 때문이다.
 
-| 컨테이너 | 용도 |
-|---|---|
-| `db-backups` | DB 덤프. 사람만 읽는다 |
-| `uploads` | 강의 자료 · 과제 제출물 · 프로필 이미지 |
+| 계정 | 컨테이너 | 공개 | 보존 |
+|---|---|---|---|
+| `getitbackup01` | `db-backups` | ❌ | **자동 삭제됨** — 수명 주기 정책 대상 |
+| `getituploads01` | `uploads` | ❌ | 강의 자료 · 과제 제출물. **자동 삭제 금지** |
+| `getitpublic01` | `public-assets` | ✅ | 프로필 이미지 · 프로젝트 썸네일 |
 
-`FILE_AZURE_ENABLED=true` 면 프론트가 Blob 으로 **직접** 올린다.
-파일 바이트가 VM 을 지나가지 않으므로 50MB 자료가 몰려도 애플리케이션이 영향을 받지 않고,
-디스크가 깨져도 파일이 사라지지 않는다.
+**왜 백업과 업로드를 나눴나** — 수명 주기 정책은 계정 단위다. 한 계정에 두면
+백업 정리 규칙의 접두어를 잘못 적었을 때 과제 제출물이 사라진다. 되돌릴 수 없는 실수다.
 
-브라우저가 직접 올리려면 스토리지 계정에 CORS 가 필요하다. 이미 설정돼 있다.
+**왜 공개용을 나눴나** — 공개를 허용하는 순간 그 계정의 다른 컨테이너도 공개로 바꿀 수
+있는 상태가 된다. 비공개 계정은 계정 수준에서 잠겨 있어 설정 실수로도 열리지 않는다.
+
+⚠️ 계정을 나눠도 **권한 분리는 되지 않는다.** 백업 스크립트와 앱이 같은 VM 의 같은
+관리 ID 를 쓴다. 그건 soft delete 와 버전 관리가 막는 부분이다.
+
+**어디에 저장되는지는 `FilePurpose` 가 정한다.** 저장 키가 `public/` · `private/` 로
+시작해서, 키만 봐도 어느 저장소인지 알 수 있다.
+
+```
+LECTURE_MATERIAL · ASSIGNMENT      → private/{uuid}.ext  서명 주소 5분
+PROFILE_IMAGE · PROJECT_THUMBNAIL  → public/{uuid}.ext   고정 주소, 캐시 가능
+```
+
+`FILE_AZURE_ENABLED=true` 면 프론트가 Blob 으로 **직접** 올린다. 파일 바이트가 VM 을
+지나가지 않으므로 50MB 자료가 몰려도 애플리케이션이 영향을 받지 않고, 디스크가 깨져도
+파일이 사라지지 않는다.
+
+브라우저가 직접 올리려면 스토리지 계정에 CORS 가 필요하다. 세 계정 모두 설정돼 있다.
 
 ```
 허용 출처  https://getit.io.kr · https://www.getit.io.kr · http://localhost:5173
@@ -402,17 +420,15 @@ DB 백업과 **같은 스토리지 계정, 다른 컨테이너**를 쓴다.
 
 `false` 로 두면 VM 로컬 디스크에 저장한다. **이때는 파일이 백업되지 않는다.**
 
-🔴 **아직 켜면 안 된다.** 컨테이너가 비공개라 저장된 고정 주소로는 파일을 읽을 수 없는데,
-강의 자료·제출물·운영진 이미지를 내려주는 코드가 아직 그 고정 주소를 그대로 응답한다
-(`LectureService` · `SubmissionService` · `SubmissionAdminService` · `StaffAdminService`).
-지금 켜면 그 응답들이 전부 403 이 된다.
+**켜는 절차**
 
-각 소비자가 권한을 확인한 뒤 서명 주소를 받도록 바꾼 다음에 켠다.
-
-**디스크** — 29GB 다. CD 가 배포마다 7일 지난 이미지를 정리하고,
-컨테이너 로그는 10MB × 3개로 제한했다.
-
----
+```bash
+nano /opt/getit/.env
+#   FILE_AZURE_ENABLED=true
+#   AZURE_UPLOAD_ACCOUNT=getituploads01
+#   AZURE_PUBLIC_ACCOUNT=getitpublic01
+cd /opt/getit && docker compose up -d
+```
 
 ## 아직 남은 것
 

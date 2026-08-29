@@ -56,6 +56,9 @@ public class AzureBlobFileStorage implements FileStorage {
   private final BlobServiceClient serviceClient;
   private final BlobContainerClient container;
   private final Clock clock;
+
+  /** 공개 컨테이너면 읽기에 서명이 필요 없다. 고정 주소라 브라우저 캐시가 걸린다. */
+  private final boolean publiclyReadable;
   private final Duration uploadTtl;
   private final Duration downloadTtl;
   private final Duration delegationKeyTtl;
@@ -66,6 +69,7 @@ public class AzureBlobFileStorage implements FileStorage {
   public AzureBlobFileStorage(
       BlobServiceClient serviceClient,
       String containerName,
+      boolean publiclyReadable,
       Clock clock,
       Duration uploadTtl,
       Duration downloadTtl,
@@ -73,6 +77,7 @@ public class AzureBlobFileStorage implements FileStorage {
   ) {
     this.serviceClient = serviceClient;
     this.container = serviceClient.getBlobContainerClient(containerName);
+    this.publiclyReadable = publiclyReadable;
     this.clock = clock;
     this.uploadTtl = uploadTtl;
     this.downloadTtl = downloadTtl;
@@ -121,6 +126,10 @@ public class AzureBlobFileStorage implements FileStorage {
   @Override
   public SignedUrl downloadUrl(String key) {
     BlobClient blob = container.getBlobClient(key);
+    if (publiclyReadable) {
+      // 서명을 붙이면 5분마다 URL 이 바뀌어 캐시가 걸리지 않는다.
+      return SignedUrl.permanent(blob.getBlobUrl());
+    }
     String sas = sign(blob, new BlobSasPermission().setReadPermission(true), downloadTtl);
     return new SignedUrl(blob.getBlobUrl() + "?" + sas, (int) downloadTtl.toSeconds());
   }

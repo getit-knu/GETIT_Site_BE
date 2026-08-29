@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.getit.domain.file.dto.PresignedUploadRequest;
@@ -76,6 +79,42 @@ class FileDirectUploadTest {
     // 이 헤더가 빠지면 저장소가 400 으로 거부한다. 프론트가 반드시 실어야 한다.
     assertThat(response.headers()).containsEntry("x-ms-blob-type", "BlockBlob");
     assertThat(response.expiresIn()).isPositive();
+  }
+
+  @Test
+  @DisplayName("저장 키가 용도에 맞는 저장소를 가리킨다")
+  void keyCarriesVisibilityPrefix() {
+    given(fileStorage.issueUploadTicket(anyString(), anyString())).willReturn(Optional.of(ticket()));
+    FileAsset saved = FileAsset.upload("k", "n", "u", 1L, "image/png", UPLOADER_ID);
+    ReflectionTestUtils.setField(saved, "id", 1L);
+    given(fileAssetRepository.save(any())).willReturn(saved);
+
+    fileService.issueUploadUrl(
+        new PresignedUploadRequest("사진.png", "image/png", 100L, FilePurpose.PROFILE_IMAGE),
+        UPLOADER_ID);
+
+    ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+    verify(fileStorage).issueUploadTicket(key.capture(), anyString());
+    assertThat(key.getValue()).startsWith("public/");
+  }
+
+  @Test
+  @DisplayName("multipart 업로드도 같은 키 규칙을 쓴다")
+  void multipartUploadUsesSameKeyRule() {
+    // 여기만 접두어가 빠지면 프로필 이미지를 multipart 로 올렸을 때 비공개 저장소로 가서
+    // 공개 고정 URL 도, 캐시도 동작하지 않는다(PR #132 Copilot 리뷰 지적).
+    given(fileStorage.upload(any(), anyString())).willReturn("https://p/x.png");
+    FileAsset saved = FileAsset.upload("k", "n", "u", 1L, "image/png", UPLOADER_ID);
+    ReflectionTestUtils.setField(saved, "id", 1L);
+    given(fileAssetRepository.save(any())).willReturn(saved);
+
+    fileService.upload(
+        new MockMultipartFile("file", "사진.png", "image/png", new byte[] {1}),
+        FilePurpose.PROFILE_IMAGE, UPLOADER_ID);
+
+    ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+    verify(fileStorage).upload(any(), key.capture());
+    assertThat(key.getValue()).startsWith("public/");
   }
 
   @Test

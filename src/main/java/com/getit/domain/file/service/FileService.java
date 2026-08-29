@@ -38,7 +38,7 @@ public class FileService {
       throw new BusinessException(FileErrorCode.INVALID_FILE_SIZE);
     }
 
-    String key = UUID.randomUUID() + "." + extension;
+    String key = keyFor(purpose, extension);
     String url = fileStorage.upload(file, key);
 
     FileAsset saved = fileAssetRepository.save(
@@ -66,7 +66,7 @@ public class FileService {
       throw new BusinessException(FileErrorCode.INVALID_FILE_SIZE);
     }
 
-    String key = UUID.randomUUID() + "." + extension;
+    String key = keyFor(purpose, extension);
     UploadTicket ticket = fileStorage.issueUploadTicket(key, request.contentType())
         .orElseThrow(() -> new BusinessException(FileErrorCode.DIRECT_UPLOAD_NOT_SUPPORTED));
 
@@ -114,6 +114,16 @@ public class FileService {
 
     fileStorage.delete(file.getStoredKey());
     file.delete();
+  }
+
+  /**
+   * 저장 키. 앞에 용도별 구분자를 붙인다.
+   *
+   * <p>{@code downloadUrl(key)} 은 용도를 모른 채 불린다. 키만 보고 공개·비공개
+   * 저장소를 고를 수 있어야 해서 접두어로 드러낸다.
+   */
+  private String keyFor(FilePurpose purpose, String extension) {
+    return purpose.keyPrefix() + "/" + UUID.randomUUID() + "." + extension;
   }
 
   private String extensionOf(String originalName) {

@@ -74,8 +74,10 @@ services:
       # 여기 넘기지 않으면 .env 에 값을 넣어도 컨테이너 안에서는 기본값이 적용돼
       # Azure 저장소가 영영 켜지지 않는다.
       FILE_AZURE_ENABLED: ${FILE_AZURE_ENABLED:-false}
-      AZURE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
+      AZURE_UPLOAD_ACCOUNT: ${AZURE_UPLOAD_ACCOUNT:-}
       AZURE_UPLOAD_CONTAINER: ${AZURE_UPLOAD_CONTAINER:-uploads}
+      AZURE_PUBLIC_ACCOUNT: ${AZURE_PUBLIC_ACCOUNT:-}
+      AZURE_PUBLIC_CONTAINER: ${AZURE_PUBLIC_CONTAINER:-public-assets}
     volumes:
       - uploads:/data/uploads
     healthcheck:

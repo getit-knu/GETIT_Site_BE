@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.storage.SignedUrl;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.dto.LectureResult;
 import com.getit.domain.lecture.entity.Assignment;
@@ -311,7 +312,7 @@ class LectureServiceTest {
   class GetMaterialDownloadUrl {
 
     @Test
-    @DisplayName("연결된 자료면 평문 URL 과 expiresIn 300 을 반환한다")
+    @DisplayName("연결된 자료면 저장소가 발급한 주소와 그 실제 만료를 반환한다")
     void returnsPlainUrl() {
       Lecture lecture = lecture(true, activeGenerationId, memberId);
       FileAsset file = fileAssetRepository.save(FileAsset.upload(
@@ -321,9 +322,14 @@ class LectureServiceTest {
       LectureResult.DownloadUrl result =
           lectureService.getMaterialDownloadUrl(memberId, lecture.getId(), file.getId());
 
-      assertThat(result.downloadUrl()).isEqualTo("https://cdn/key/1");
+      // 저장된 고정 주소가 아니라 저장소가 발급한 주소를 쓴다.
+      // 비공개 컨테이너의 고정 주소는 그대로는 열리지 않는다.
+      assertThat(result.downloadUrl()).isEqualTo("http://localhost:8080/api/public/files/key/1");
       assertThat(result.fileName()).isEqualTo("강의 자료.pdf");
-      assertThat(result.expiresIn()).isEqualTo(300);
+      // 만료는 저장소가 말한 값을 그대로 내려준다. 상수로 박으면 TTL 설정을 바꿨을 때
+      // 응답의 expiresIn 이 실제 서명 만료와 어긋난다(PR #132 Copilot 리뷰 지적).
+      // 테스트는 로컬 저장소라 만료가 없다. Azure 비공개 컨테이너에서는 서명 TTL 이 온다.
+      assertThat(result.expiresIn()).isEqualTo(SignedUrl.NEVER_EXPIRES);
     }
 
     @Test

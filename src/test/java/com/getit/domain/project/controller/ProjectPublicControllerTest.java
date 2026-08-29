@@ -78,7 +78,7 @@ class ProjectPublicControllerTest {
 
     mockMvc.perform(get(PROJECTS_PATH))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://cdn.getit.com/live.png"))
+        .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("http://localhost:8080/api/public/files/k1"))
         .andExpect(jsonPath("$.data.content[1].thumbnailUrl").isEmpty())
         .andExpect(jsonPath("$.data.content[2].thumbnailUrl").isEmpty());
   }

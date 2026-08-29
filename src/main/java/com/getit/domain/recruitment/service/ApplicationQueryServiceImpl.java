@@ -31,4 +31,9 @@ public class ApplicationQueryServiceImpl implements ApplicationQueryService {
         .map(ApplicationPromotionSummary::from)
         .toList();
   }
+
+  @Override
+  public long countSubmittedByGenerationId(Long generationId) {
+    return applicationRepository.countByGenerationIdAndStatusNot(generationId, ApplicationStatus.DRAFT);
+  }
 }
