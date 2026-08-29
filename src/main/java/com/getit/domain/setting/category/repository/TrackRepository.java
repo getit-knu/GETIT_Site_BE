@@ -15,6 +15,6 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
   /** 10.20 일괄 저장에서 분류 트리를 통째 교체할 때. 동시 CRUD 와 직렬화. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select t from Track t order by t.order asc")
+  @Query("select t from Track t order by t.order asc, t.id asc")
   List<Track> findAllForUpdate();
 }

@@ -16,6 +16,6 @@ public interface SubCategoryRepository extends JpaRepository<SubCategory, Long> 
 
   /** 10.20 일괄 저장 전용. Track 잠금과 짝. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select s from SubCategory s order by s.trackId asc, s.order asc")
+  @Query("select s from SubCategory s order by s.trackId asc, s.order asc, s.id asc")
   List<SubCategory> findAllForUpdate();
 }
