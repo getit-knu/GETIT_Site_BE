@@ -171,7 +171,37 @@ class LectureServiceTest {
       assertThat(result.tabs())
           .filteredOn(tab -> tab.subCategoryId().equals(emptySubCategoryId))
           .singleElement()
-          .extracting(LectureResult.Tab::count).isEqualTo(0L);
+          .satisfies(tab -> {
+            assertThat(tab.count()).isEqualTo(0L);
+            assertThat(tab.trackId()).isEqualTo(trackId);
+            assertThat(tab.trackName()).isEqualTo("SW");
+            assertThat(tab.subCategoryName()).isEqualTo("빈 분류");
+          });
+    }
+
+    @Test
+    @DisplayName("각 탭에 부모 트랙의 trackId·trackName 이 담긴다")
+    void tabsCarryParentTrack() {
+      Long track2 = trackRepository.save(Track.create("AI", 2)).getId();
+      Long sub2 = subCategoryRepository.save(SubCategory.create("ML 입문", 1, track2)).getId();
+
+      LectureResult.ListResult result =
+          lectureService.getLectures(memberId, null, null, PageRequest.of(0, 12));
+
+      assertThat(result.tabs())
+          .filteredOn(tab -> tab.subCategoryId().equals(subCategoryId))
+          .singleElement()
+          .satisfies(tab -> {
+            assertThat(tab.trackId()).isEqualTo(trackId);
+            assertThat(tab.trackName()).isEqualTo("SW");
+          });
+      assertThat(result.tabs())
+          .filteredOn(tab -> tab.subCategoryId().equals(sub2))
+          .singleElement()
+          .satisfies(tab -> {
+            assertThat(tab.trackId()).isEqualTo(track2);
+            assertThat(tab.trackName()).isEqualTo("AI");
+          });
     }
 
     @Test

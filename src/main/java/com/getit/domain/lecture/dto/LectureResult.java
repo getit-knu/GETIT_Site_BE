@@ -25,7 +25,13 @@ public class LectureResult {
     }
   }
 
-  public record Tab(Long subCategoryId, String name, long count) { }
+  public record Tab(
+      Long trackId,
+      String trackName,
+      Long subCategoryId,
+      String subCategoryName,
+      long count
+  ) { }
 
   public record Content(
       Long id,
