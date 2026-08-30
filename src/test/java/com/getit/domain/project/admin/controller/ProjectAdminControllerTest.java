@@ -3,11 +3,14 @@ package com.getit.domain.project.admin.controller;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
@@ -47,6 +50,9 @@ class ProjectAdminControllerTest {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private FileAssetRepository fileAssetRepository;
 
   private Long adminId;
 
@@ -125,6 +131,27 @@ class ProjectAdminControllerTest {
             .content(json))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  }
+
+  @Test
+  @DisplayName("수정 응답에 fileId 가 포함된다 (이슈 #139)")
+  void updateResponseIncludesFileId() throws Exception {
+    ProjectCommand command = new ProjectCommand(
+        "원본", "팀", "2025-FALL", null, List.of(), null, null, false, null);
+    Long id = projectRepository.save(Project.create(command, 1)).getId();
+    Long fileId = fileAssetRepository.save(FileAsset.upload(
+        "thumb", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L)).getId();
+
+    String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
+        "수정", "팀", "2025-FALL", "설명", List.of("React"),
+        "https://code", "https://demo", fileId, true, null));
+
+    mockMvc.perform(put(PATH + "/" + id)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.fileId").value(fileId.intValue()));
   }
 
   @Test
