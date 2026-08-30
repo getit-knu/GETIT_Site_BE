@@ -1,7 +1,6 @@
 package com.getit.domain.file.service;
 
 import com.getit.domain.file.entity.FileAsset;
-import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.exception.FileErrorCode;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.file.storage.FileStorage;
@@ -43,7 +42,8 @@ public class FileConnectionServiceImpl implements FileConnectionService {
       throw new BusinessException(FileErrorCode.FILE_ALREADY_CONNECTED);
     }
 
-    fileAssetRepository.updateStatusByIdIn(distinctFileIds, FileStatus.CONNECTED);
+    files.forEach(this::verifyUploaded);
+    files.forEach(FileAsset::connect);
   }
 
   @Override
@@ -55,7 +55,7 @@ public class FileConnectionServiceImpl implements FileConnectionService {
     List<FileAsset> files = fileAssetRepository.findAllByIdInAndDeletedAtIsNull(distinctFileIds);
     validateAllFound(distinctFileIds, files);
 
-    fileAssetRepository.updateStatusByIdIn(distinctFileIds, FileStatus.PENDING);
+    files.forEach(FileAsset::disconnect);
   }
 
   /**

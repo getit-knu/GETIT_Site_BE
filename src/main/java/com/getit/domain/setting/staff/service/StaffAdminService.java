@@ -71,13 +71,11 @@ public class StaffAdminService {
    * 10.21 수정. section 이 바뀌면 이전 section 에서 빠지는 자리를 당기고(삭제와 동일 원리)
    * 새 section 의 마지막 다음 순번으로 재배정한다.
    *
-   * <p>파일 연결 갱신({@link #updateProfileFile})은 반드시 이 메서드의 마지막에 한다 —
-   * {@code FileConnectionService} 내부의 원자적 UPDATE 가 {@code clearAutomatically = true}
-   * 라 영속성 컨텍스트를 비우면서 이미 관리 중이던 {@code staff} 를 detach 시킨다. 그 전에
-   * {@code staff.update(...)} 로 바꾼 내용은 {@code flushAutomatically = true} 덕분에 비워지기
-   * 직전에 먼저 flush 되어 DB 에 반영되지만, 순서가 반대(파일 연결을 먼저)였다면 뒤이은
-   * {@code staff.update(...)} 가 detach 된 엔티티에 적용돼 조용히 유실됐다(PR #82 Copilot
-   * 리뷰 지적).
+   * <p>예전에는 파일 연결을 반드시 마지막에 해야 했다. {@code FileConnectionService} 의
+   * 상태 변경이 {@code clearAutomatically = true} 인 벌크 UPDATE 라, 영속성 컨텍스트를
+   * 비우면서 이미 관리 중이던 {@code staff} 를 detach 시켰기 때문이다(PR #82 Copilot 리뷰).
+   * 이슈 #160 에서 그 UPDATE 를 엔티티 변경으로 바꿔 <b>순서 제약은 사라졌다.</b>
+   * 아래 순서는 읽기 좋아서 그대로 두는 것일 뿐, 지켜야 하는 규칙이 아니다.
    */
   @Transactional
   public StaffResult updateStaff(Long staffId, StaffRequest request) {

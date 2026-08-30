@@ -3,7 +3,9 @@ package com.getit.domain.lecture.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.dto.SubmissionRequest;
@@ -63,6 +65,9 @@ class SubmissionServiceTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+  @Autowired
+  private FileStorage fileStorage;
+
   private static final Long USER_ID = 100L;
 
   private Long fileAssignmentId;
@@ -106,8 +111,7 @@ class SubmissionServiceTest {
   }
 
   private Long uploadFileBy(Long uploaderId) {
-    return fileAssetRepository.save(
-        FileAsset.upload("key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", uploaderId)).getId();
+    return TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", uploaderId).getId();
   }
 
   @Nested

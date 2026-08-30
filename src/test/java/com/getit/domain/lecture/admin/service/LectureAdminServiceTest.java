@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.lecture.admin.dto.LectureRequest;
@@ -63,6 +65,9 @@ class LectureServiceTest {
 
   @Autowired
   private FileAssetRepository fileAssetRepository;
+
+  @Autowired
+  private FileStorage fileStorage;
 
   @Autowired
   private AssignmentRepository assignmentRepository;
@@ -163,8 +168,7 @@ class LectureServiceTest {
     @Test
     @DisplayName("fileIds 를 연결하고 원본 파일명을 표시 이름으로 저장한다")
     void connectsFilesWithOriginalNameAsDisplayName() {
-      FileAsset file = fileAssetRepository.save(
-          FileAsset.upload("key/1", "1주차자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+      FileAsset file = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "1주차자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L);
 
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(
@@ -194,8 +198,7 @@ class LectureServiceTest {
     @Test
     @DisplayName("fileIds에 중복이 있어도 한 번만 연결한다")
     void deduplicatesFileIds() {
-      FileAsset file = fileAssetRepository.save(
-          FileAsset.upload("key/1", "1주차자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+      FileAsset file = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "1주차자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L);
 
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(
@@ -333,12 +336,9 @@ class LectureServiceTest {
     @Test
     @DisplayName("fileIds 를 전체교체한다 - 빠진 파일은 연결 해제, 새 파일만 연결한다")
     void replacesFilesEntirely() {
-      FileAsset keptFile = fileAssetRepository.save(
-          FileAsset.upload("key/1", "유지파일.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
-      FileAsset removedFile = fileAssetRepository.save(
-          FileAsset.upload("key/2", "삭제될파일.pdf", "https://cdn/key/2", 1024L, "application/pdf", 100L));
-      FileAsset addedFile = fileAssetRepository.save(
-          FileAsset.upload("key/3", "새파일.pdf", "https://cdn/key/3", 1024L, "application/pdf", 100L));
+      FileAsset keptFile = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "유지파일.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L);
+      FileAsset removedFile = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/2", "삭제될파일.pdf", "https://cdn/key/2", 1024L, "application/pdf", 100L);
+      FileAsset addedFile = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/3", "새파일.pdf", "https://cdn/key/3", 1024L, "application/pdf", 100L);
 
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(
@@ -437,8 +437,7 @@ class LectureServiceTest {
     @Test
     @DisplayName("연결된 파일은 연결 해제하지 않는다 (이력 보존)")
     void doesNotDisconnectFiles() {
-      FileAsset file = fileAssetRepository.save(
-          FileAsset.upload("key/1", "자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L));
+      FileAsset file = TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "자료.pdf", "https://cdn/key/1", 1024L, "application/pdf", 100L);
       Lecture lecture = lectureService.createLecture(
           new LectureRequest.Create(
               null, trackId, subCategoryId, 1, "HTML/CSS 기초", null, null, null, null,
