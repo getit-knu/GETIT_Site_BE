@@ -154,8 +154,9 @@ public class LectureService {
     List<LectureResult.Tab> tabs = new ArrayList<>();
     for (CategorySummary track : tracks) {
       for (CategorySummary.SubCategoryBrief sub : track.subCategories()) {
+        long count = countBySubCategoryId.getOrDefault(sub.id(), 0L);
         tabs.add(new LectureResult.Tab(
-            sub.id(), sub.name(), countBySubCategoryId.getOrDefault(sub.id(), 0L)));
+            track.id(), track.name(), sub.id(), sub.name(), sub.name(), count));
       }
     }
     return tabs;
