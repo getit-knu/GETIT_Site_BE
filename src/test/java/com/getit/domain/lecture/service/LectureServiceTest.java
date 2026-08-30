@@ -135,6 +135,23 @@ class LectureServiceTest {
     }
 
     @Test
+    @DisplayName("소분류 없이 트랙에만 달린 강의도 trackId 로 걸러진다")
+    void filtersByTrackIdEvenWithoutSubCategory() {
+      // sub_category_id 는 nullable 이라 트랙에 직접 달린 강의가 존재할 수 있다.
+      // 이 강의를 trackId 로 못 거르면 소분류 없는 트랙은 화면에서 도달할 방법이 없다 (이슈 #150).
+      Track lonely = trackRepository.save(Track.create("창업 빌드업", 2));
+      lectureRepository.save(Lecture.create(
+          1, "트랙 직속 강의", "## 본문", "https://youtu.be/x", "https://docs/x", 120,
+          true, activeGenerationId, lonely.getId(), null, memberId));
+
+      LectureResult.ListResult result =
+          lectureService.getLectures(memberId, lonely.getId(), null, PageRequest.of(0, 12));
+
+      assertThat(result.content()).singleElement()
+          .satisfies(c -> assertThat(c.title()).isEqualTo("트랙 직속 강의"));
+    }
+
+    @Test
     @DisplayName("과제 제출 레코드가 있으면 completed=true, 없으면 false, 과제 자체가 없으면 false")
     void completedReflectsSubmissionPresence() {
       Lecture submitted = lecture(true, activeGenerationId, memberId);
