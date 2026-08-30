@@ -261,7 +261,10 @@ class ApplicationAdminControllerTest {
               .content(scoresRequestJson(criterion.getId(), 45)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.totalScore").value(45))
-          .andExpect(jsonPath("$.data.scores[0].score").value(45));
+          // 응답이 종합 결과로 바뀌었다. 내 점수는 myScore 로 온다 (이슈 #151).
+          .andExpect(jsonPath("$.data.criteria[0].myScore").value(45))
+          .andExpect(jsonPath("$.data.criteria[0].evaluatorScores[0].score").value(45))
+          .andExpect(jsonPath("$.data.evaluatorCount").value(1));
     }
 
     @Test

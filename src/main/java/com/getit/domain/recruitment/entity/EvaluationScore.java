@@ -22,7 +22,8 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Table(name = "evaluation_score", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_evaluation_score_application_criterion", columnNames = {"application_id", "criterion_id"})
+    @UniqueConstraint(name = "uk_evaluation_score_app_criterion_evaluator",
+        columnNames = {"application_id", "criterion_id", "evaluator_id"})
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -38,20 +39,27 @@ public class EvaluationScore extends BaseTimeEntity {
   @Column(nullable = false)
   private Long criterionId;
 
+  /** 이 점수를 매긴 운영진. 평가자마다 자기 점수를 따로 갖는다. */
+  @Column(nullable = false)
+  private Long evaluatorId;
+
   @Column(nullable = false)
   private Integer score;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private EvaluationScore(Long applicationId, Long criterionId, Integer score) {
+  private EvaluationScore(Long applicationId, Long criterionId, Long evaluatorId, Integer score) {
     this.applicationId = applicationId;
     this.criterionId = criterionId;
+    this.evaluatorId = evaluatorId;
     this.score = score;
   }
 
-  public static EvaluationScore create(Long applicationId, Long criterionId, Integer score) {
+  public static EvaluationScore create(
+      Long applicationId, Long criterionId, Long evaluatorId, Integer score) {
     return EvaluationScore.builder()
         .applicationId(applicationId)
         .criterionId(criterionId)
+        .evaluatorId(evaluatorId)
         .score(score)
         .build();
   }

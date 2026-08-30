@@ -8,10 +8,11 @@ import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
-import com.getit.domain.recruitment.dto.EvaluationScoreSaveResult;
+import com.getit.domain.recruitment.dto.EvaluationSummaryResult;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.service.ApplicationAdminService;
 import com.getit.domain.recruitment.service.ApplicationEvaluationService;
+import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.global.dto.ApiResponse;
 import com.getit.global.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +24,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -64,13 +66,29 @@ public class ApplicationAdminController {
     return ApiResponse.success(applicationAdminService.getApplicantDetail(id));
   }
 
-  @Operation(summary = "서류 평가 점수 저장", description = "명세서 7.3")
-  @PutMapping("/{id}/scores")
-  public ApiResponse<EvaluationScoreSaveResult> saveScores(
+  @Operation(
+      summary = "서류 평가 점수 조회",
+      description = "운영진 전체의 종합 결과. 기준별 평가자 점수와 평균을 함께 준다.")
+  @GetMapping("/{id}/scores")
+  public ApiResponse<EvaluationSummaryResult> getScores(
       @PathVariable Long id,
-      @Valid @RequestBody EvaluationScoreSaveRequest request
+      @AuthenticationPrincipal CustomUserDetails principal
   ) {
-    return ApiResponse.success(applicationEvaluationService.saveScores(id, request.scores()));
+    return ApiResponse.success(
+        applicationEvaluationService.getScores(id, principal.getUserId()));
+  }
+
+  @Operation(
+      summary = "서류 평가 점수 저장",
+      description = "명세서 7.3. 로그인한 운영진 본인의 점수로 저장하고 종합 결과를 반환한다.")
+  @PutMapping("/{id}/scores")
+  public ApiResponse<EvaluationSummaryResult> saveScores(
+      @PathVariable Long id,
+      @Valid @RequestBody EvaluationScoreSaveRequest request,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ApiResponse.success(
+        applicationEvaluationService.saveScores(id, principal.getUserId(), request.scores()));
   }
 
   @Operation(summary = "서류 합불 처리", description = "명세서 7.4")
