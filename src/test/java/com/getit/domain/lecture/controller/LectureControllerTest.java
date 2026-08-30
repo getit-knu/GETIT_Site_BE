@@ -105,6 +105,18 @@ class LectureControllerTest {
       mockMvc.perform(get("/api/member/lectures").header("Authorization", token(outsiderId)))
           .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("tabs 항목이 trackId·trackName·subCategoryName·count 계약대로 직렬화된다")
+    void tabsSerializeTrackAndSubCategoryFields() throws Exception {
+      mockMvc.perform(get("/api/member/lectures").header("Authorization", token(memberId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.tabs[0].trackId").isNumber())
+          .andExpect(jsonPath("$.data.tabs[0].trackName").value("SW"))
+          .andExpect(jsonPath("$.data.tabs[0].subCategoryId").isNumber())
+          .andExpect(jsonPath("$.data.tabs[0].subCategoryName").value("WEB 기초"))
+          .andExpect(jsonPath("$.data.tabs[0].count").value(1));
+    }
   }
 
   @Nested
