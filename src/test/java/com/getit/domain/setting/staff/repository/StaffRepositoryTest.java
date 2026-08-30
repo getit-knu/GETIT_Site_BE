@@ -19,7 +19,7 @@ class StaffRepositoryTest {
   private StaffRepository staffRepository;
 
   private Staff staff(Integer generationNo, StaffSection section, Integer order, String name) {
-    return Staff.create(generationNo, order, section, "역할", name, "학과", null, null, null);
+    return Staff.create(generationNo, order, section, "역할", name, "학과", null, null, null, null, null);
   }
 
   @Test

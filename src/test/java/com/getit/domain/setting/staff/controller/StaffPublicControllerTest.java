@@ -41,7 +41,7 @@ class StaffPublicControllerTest {
     generation.activate();
     generationRepository.save(generation);
     staffRepository.save(
-        Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null));
+        Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null, null, null));
 
     mockMvc.perform(get(STAFFS_PATH))
         .andExpect(status().isOk())

@@ -63,6 +63,13 @@ public class Staff extends BaseTimeEntity {
   @Column(length = 255)
   private String introduction;
 
+  /** 계정이 없는 운영진도 있어 선택값이다. 비어 있으면 화면에서 아이콘을 감춘다. */
+  @Column(length = 512)
+  private String githubUrl;
+
+  @Column(length = 512)
+  private String instagramUrl;
+
   @Column
   private Long userId;
 
@@ -78,6 +85,8 @@ public class Staff extends BaseTimeEntity {
       String name,
       String department,
       String introduction,
+      String githubUrl,
+      String instagramUrl,
       Long userId,
       Long fileId
   ) {
@@ -88,6 +97,8 @@ public class Staff extends BaseTimeEntity {
     this.name = name;
     this.department = department;
     this.introduction = introduction;
+    this.githubUrl = githubUrl;
+    this.instagramUrl = instagramUrl;
     this.userId = userId;
     this.fileId = fileId;
   }
@@ -100,6 +111,8 @@ public class Staff extends BaseTimeEntity {
       String name,
       String department,
       String introduction,
+      String githubUrl,
+      String instagramUrl,
       Long userId,
       Long fileId
   ) {
@@ -111,6 +124,8 @@ public class Staff extends BaseTimeEntity {
         .name(name)
         .department(department)
         .introduction(introduction)
+        .githubUrl(githubUrl)
+        .instagramUrl(instagramUrl)
         .userId(userId)
         .fileId(fileId)
         .build();
@@ -119,7 +134,7 @@ public class Staff extends BaseTimeEntity {
   /** 10.21 수정. order 는 바꾸지 않는다 — section 이 바뀌면 서비스가 {@link #updateOrder} 로 따로 재배정한다. */
   public void update(
       StaffSection section, String staffRole, String name, String department,
-      String introduction, Long userId, Long fileId
+      String introduction, String githubUrl, String instagramUrl, Long userId, Long fileId
   ) {
     this.section = section;
     this.staffRole = staffRole;

@@ -64,7 +64,9 @@ public class StaffAdminService {
     int nextOrder = nextOrderInSection(request.generationNo(), request.section());
     Staff saved = staffRepository.save(Staff.create(
         request.generationNo(), nextOrder, request.section(), request.staffRole(), request.name(),
-        request.department(), request.introduction(), request.userId(), request.fileId()));
+        request.department(), request.introduction(),
+        request.githubUrl(), request.instagramUrl(),
+        request.userId(), request.fileId()));
 
     return StaffResult.of(saved, resolveProfileImageUrl(request.fileId()));
   }
@@ -92,7 +94,8 @@ public class StaffAdminService {
     }
     staff.update(
         request.section(), request.staffRole(), request.name(), request.department(),
-        request.introduction(), request.userId(), request.fileId());
+        request.introduction(), request.githubUrl(), request.instagramUrl(),
+        request.userId(), request.fileId());
 
     updateProfileFile(previousFileId, request.fileId());
 

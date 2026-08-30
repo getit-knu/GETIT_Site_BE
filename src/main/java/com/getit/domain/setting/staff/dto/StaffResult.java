@@ -12,6 +12,8 @@ public record StaffResult(
     StaffSection section,
     String department,
     String introduction,
+    String githubUrl,
+    String instagramUrl,
     String profileImageUrl,
     Integer order,
     Integer generationNo
@@ -29,6 +31,8 @@ public record StaffResult(
         staff.getSection(),
         staff.getDepartment(),
         staff.getIntroduction() != null ? staff.getIntroduction() : DEFAULT_INTRODUCTION,
+        staff.getGithubUrl(),
+        staff.getInstagramUrl(),
         profileImageUrl,
         staff.getOrder(),
         staff.getGenerationNo()

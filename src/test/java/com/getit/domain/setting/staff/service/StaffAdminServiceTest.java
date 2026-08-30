@@ -56,7 +56,7 @@ class StaffAdminServiceTest {
   private StaffRequest request(
       StaffSection section, String name, String staffRole, String department, Long fileId
   ) {
-    return new StaffRequest(null, name, staffRole, section, department, null, fileId, 9);
+    return new StaffRequest(null, name, staffRole, section, department, null, null, null, fileId, 9);
   }
 
   @Nested
@@ -67,11 +67,11 @@ class StaffAdminServiceTest {
     @DisplayName("활성 기수의 운영진을 section → order 순으로 반환한다")
     void returnsStaffsInOrder() {
       staffRepository.save(
-          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null));
+          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null, null, null));
       staffRepository.save(
-          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null));
+          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null, null, null));
       staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
 
       List<StaffResult> results = staffAdminService.getStaffs();
 
@@ -82,7 +82,7 @@ class StaffAdminServiceTest {
     @DisplayName("introduction 이 없으면 기본 문구로 채운다")
     void fillsDefaultIntroductionWhenMissing() {
       staffRepository.save(
-          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null));
+          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null, null, null));
 
       List<StaffResult> results = staffAdminService.getStaffs();
 
@@ -94,7 +94,7 @@ class StaffAdminServiceTest {
     void resolvesProfileImageUrl() {
       FileAsset uploaded = file("staff-1");
       staffRepository.save(Staff.create(
-          9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, uploaded.getId()));
+          9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, uploaded.getId()));
 
       List<StaffResult> results = staffAdminService.getStaffs();
 
@@ -110,7 +110,7 @@ class StaffAdminServiceTest {
     @DisplayName("운영진을 추가하고 order 를 자동으로 부여한다")
     void createsStaffWithAutoAssignedOrder() {
       staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
 
       StaffResult saved = staffAdminService.createStaff(
           request(StaffSection.SW, "이영희", "SW 운영진", "전자공학과 19", null));
@@ -119,10 +119,38 @@ class StaffAdminServiceTest {
     }
 
     @Test
+    @DisplayName("GitHub · Instagram 링크를 저장하고 돌려준다")
+    void savesSnsLinks() {
+      StaffRequest request = new StaffRequest(
+          null, "홍길동", "SW 운영진", StaffSection.SW, "컴퓨터공학과 21", null,
+          "https://github.com/hong", "https://instagram.com/hong", null, 9);
+
+      StaffResult result = staffAdminService.createStaff(request);
+
+      assertThat(result.githubUrl()).isEqualTo("https://github.com/hong");
+      assertThat(result.instagramUrl()).isEqualTo("https://instagram.com/hong");
+      assertThat(staffRepository.findById(result.id()).orElseThrow().getGithubUrl())
+          .isEqualTo("https://github.com/hong");
+    }
+
+    @Test
+    @DisplayName("링크를 비워도 등록된다")
+    void allowsMissingSnsLinks() {
+      // 계정이 없는 운영진도 있다. 필수로 두면 등록 자체가 막힌다.
+      StaffResult result = staffAdminService.createStaff(new StaffRequest(
+          null, "김철수", "SW 운영진", StaffSection.SW, "전자공학과 20", null,
+          null, null, null, 9));
+
+      assertThat(result.githubUrl()).isNull();
+      assertThat(result.instagramUrl()).isNull();
+    }
+
+    @Test
     @DisplayName("요청 generationNo 가 활성 기수와 다르면 예외가 발생한다")
     void throwsWhenGenerationMismatch() {
       StaffRequest mismatched = new StaffRequest(
-          null, "이영희", "SW 운영진", StaffSection.SW, "전자공학과 19", null, null, 999);
+          null, "이영희", "SW 운영진", StaffSection.SW, "전자공학과 19", null,
+          null, null, null, 999);
 
       assertThatThrownBy(() -> staffAdminService.createStaff(mismatched))
           .isInstanceOf(BusinessException.class)
@@ -147,7 +175,7 @@ class StaffAdminServiceTest {
     @DisplayName("section 이 그대로면 order 를 바꾸지 않는다")
     void keepsOrderWhenSectionUnchanged() {
       Staff staff = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
 
       StaffResult updated = staffAdminService.updateStaff(
           staff.getId(), request(StaffSection.SW, "홍길동", "부운영진", "컴퓨터공학과 21", null));
@@ -160,11 +188,11 @@ class StaffAdminServiceTest {
     @DisplayName("section 이 바뀌면 새 section 의 마지막 순번으로 재배정하고, 이전 section 의 결번은 당긴다")
     void reassignsOrderWhenSectionChangesAndFillsGapInPreviousSection() {
       staffRepository.save(
-          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null));
+          Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null, null, null));
       Staff moving = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
       Staff staysBehind = staffRepository.save(
-          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null));
+          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null, null, null));
 
       StaffResult updated = staffAdminService.updateStaff(
           moving.getId(), request(StaffSection.EXECUTIVE, "홍길동", "부회장", "컴퓨터공학과 21", null));
@@ -180,7 +208,7 @@ class StaffAdminServiceTest {
     void persistsFieldChangesEvenWhenFileChanges() {
       FileAsset newFile = file("staff-new");
       Staff staff = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
 
       staffAdminService.updateStaff(
           staff.getId(), request(StaffSection.SW, "이영희", "부운영진", "전자공학과 19", newFile.getId()));
@@ -200,7 +228,7 @@ class StaffAdminServiceTest {
     void throwsWhenBelongsToOtherGeneration() {
       Generation otherGeneration = generationRepository.save(Generation.create(8, 2025));
       Staff other = staffRepository.save(
-          Staff.create(8, 1, StaffSection.SW, "SW 운영진", "지난기수", "컴퓨터공학과", null, null, null));
+          Staff.create(8, 1, StaffSection.SW, "SW 운영진", "지난기수", "컴퓨터공학과", null, null, null, null, null));
       assertThat(otherGeneration).isNotNull();
 
       assertThatThrownBy(() -> staffAdminService.updateStaff(
@@ -219,9 +247,9 @@ class StaffAdminServiceTest {
     @DisplayName("삭제하고 뒤 순번을 한 칸씩 당긴다")
     void deletesAndShiftsRemainingOrder() {
       Staff first = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
       Staff second = staffRepository.save(
-          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null));
+          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null, null, null));
 
       staffAdminService.deleteStaff(first.getId());
 
@@ -237,9 +265,9 @@ class StaffAdminServiceTest {
     @DisplayName("section 안에서 배열 순서대로 order 를 재부여한다")
     void reordersWithinSection() {
       Staff first = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
       Staff second = staffRepository.save(
-          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null));
+          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null, null, null));
 
       staffAdminService.reorderStaffs(StaffSection.SW, List.of(second.getId(), first.getId()));
 
@@ -251,7 +279,7 @@ class StaffAdminServiceTest {
     @DisplayName("중복된 id 를 보내면 예외가 발생한다")
     void throwsWhenDuplicateIds() {
       Staff first = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
 
       assertThatThrownBy(() -> staffAdminService.reorderStaffs(
           StaffSection.SW, List.of(first.getId(), first.getId())))
@@ -264,9 +292,9 @@ class StaffAdminServiceTest {
     @DisplayName("section 소속 일부만 보내면 예외가 발생한다")
     void throwsWhenNotExhaustive() {
       Staff first = staffRepository.save(
-          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null));
+          Staff.create(9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, null, null, null));
       staffRepository.save(
-          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null));
+          Staff.create(9, 2, StaffSection.SW, "SW 운영진", "이영희", "전자공학과 19", null, null, null, null, null));
 
       assertThatThrownBy(() -> staffAdminService.reorderStaffs(StaffSection.SW, List.of(first.getId())))
           .isInstanceOf(BusinessException.class)

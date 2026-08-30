@@ -24,6 +24,9 @@ public record StaffRequest(
     @NotNull StaffSection section,
     @NotBlank @Size(max = 100) String department,
     @Size(max = 255) String introduction,
+    // 형식 검증은 하지 않는다. 프로젝트의 codeUrl · demoUrl 과 같은 방식이다.
+    @Size(max = 512) String githubUrl,
+    @Size(max = 512) String instagramUrl,
     Long fileId,
     @NotNull Integer generationNo
 ) { }
