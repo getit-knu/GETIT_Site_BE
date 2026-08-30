@@ -2,6 +2,7 @@ package com.getit.domain.project.admin.dto;
 
 import com.getit.domain.project.dto.ProjectCommand;
 import jakarta.validation.constraints.Min;
+import com.getit.global.validation.HttpUrl;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -17,8 +18,8 @@ public class ProjectRequest {
       @NotBlank @Pattern(regexp = "\\d{4}-(SPRING|SUMMER|FALL|WINTER)") String semester,
       String description,
       @Size(max = 10) List<@Size(max = 40) @Pattern(regexp = "[^,]+") String> techStacks,
-      @Size(max = 512) String codeUrl,
-      @Size(max = 512) String demoUrl,
+      @HttpUrl String codeUrl,
+      @HttpUrl String demoUrl,
       @Positive Long fileId,
       @NotNull Boolean isFeatured,
       @Min(1) Integer order
