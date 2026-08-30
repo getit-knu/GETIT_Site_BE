@@ -3,6 +3,7 @@ package com.getit.domain.lecture.admin.dto;
 import com.getit.domain.lecture.entity.SubmissionType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import com.getit.global.validation.HttpUrl;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -20,8 +21,8 @@ public class LectureRequest {
       @NotNull @Min(1) Integer week,
       @NotBlank @Size(max = 255) String title,
       String description,
-      @Size(max = 512) String youtubeUrl,
-      @Size(max = 512) String materialUrl,
+      @HttpUrl String youtubeUrl,
+      @HttpUrl String materialUrl,
       @Min(1) Integer durationMinutes,
       List<Long> fileIds,
       Boolean isPublished,
@@ -38,8 +39,8 @@ public class LectureRequest {
       @NotNull @Min(1) Integer week,
       @NotBlank @Size(max = 255) String title,
       String description,
-      @Size(max = 512) String youtubeUrl,
-      @Size(max = 512) String materialUrl,
+      @HttpUrl String youtubeUrl,
+      @HttpUrl String materialUrl,
       @Min(1) Integer durationMinutes,
       List<Long> fileIds,
       Boolean isPublished,
