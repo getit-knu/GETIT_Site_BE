@@ -15,6 +15,7 @@ public class ProjectResult {
       List<String> techStacks,
       String codeUrl,
       String demoUrl,
+      Long fileId,
       String thumbnailUrl,
       @JsonProperty("isFeatured") boolean isFeatured,
       int order
@@ -30,6 +31,7 @@ public class ProjectResult {
           project.getTechStacks(),
           project.getCodeUrl(),
           project.getDemoUrl(),
+          project.getFileId(),
           thumbnailUrl,
           project.isFeatured(),
           project.getOrder());
