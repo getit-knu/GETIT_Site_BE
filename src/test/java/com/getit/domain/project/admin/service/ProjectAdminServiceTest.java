@@ -108,6 +108,70 @@ class ProjectAdminServiceTest {
   }
 
   @Nested
+  @DisplayName("썸네일 fileId (이슈 #139)")
+  class ThumbnailFileId {
+
+    private Long saveFile(String key) {
+      return fileAssetRepository.save(FileAsset.upload(
+          key, key + ".png", "https://cdn/" + key + ".png", 10L, "image/png", 1L)).getId();
+    }
+
+    private String url(String key) {
+      return "http://localhost:8080/api/public/files/" + key;
+    }
+
+    @Test
+    @DisplayName("목록·수정 응답에 fileId 가 포함된다")
+    void responseIncludesFileId() {
+      Long fileId = saveFile("k1");
+      Long id = projectAdminService.createProject(write("썸네일", "2025-FALL", fileId, 1)).id();
+
+      var list = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
+      assertThat(list.content().get(0).fileId()).isEqualTo(fileId);
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, write("수정", "2025-FALL", fileId, 1));
+      assertThat(updated.fileId()).isEqualTo(fileId);
+    }
+
+    @Test
+    @DisplayName("같은 fileId 로 다시 저장하면 썸네일이 유지된다")
+    void keepsThumbnailWhenSameFileId() {
+      Long fileId = saveFile("keep");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", fileId, 1)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, write("제목만", "2025-FALL", fileId, 1));
+
+      assertThat(updated.fileId()).isEqualTo(fileId);
+      assertThat(updated.thumbnailUrl()).isEqualTo(url("keep"));
+    }
+
+    @Test
+    @DisplayName("fileId 를 생략하면 썸네일이 제거된다 (full replace)")
+    void clearsThumbnailWhenFileIdOmitted() {
+      Long fileId = saveFile("gone");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", fileId, 1)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, write("t", "2025-FALL", null, 1));
+
+      assertThat(updated.fileId()).isNull();
+      assertThat(updated.thumbnailUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("다른 fileId 로 저장하면 썸네일이 교체된다")
+    void replacesThumbnailWithNewFileId() {
+      Long oldFile = saveFile("old");
+      Long newFile = saveFile("new");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", oldFile, 1)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, write("t", "2025-FALL", newFile, 1));
+
+      assertThat(updated.fileId()).isEqualTo(newFile);
+      assertThat(updated.thumbnailUrl()).isEqualTo(url("new"));
+    }
+  }
+
+  @Nested
   @DisplayName("updateProject / deleteProject")
   class UpdateDelete {
 
