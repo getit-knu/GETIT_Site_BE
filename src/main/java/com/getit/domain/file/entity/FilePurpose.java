@@ -27,6 +27,10 @@ public enum FilePurpose {
       StorageVisibility.PUBLIC),
   PROJECT_THUMBNAIL(
       5 * 1024 * 1024L, Set.of("png", "jpg", "jpeg", "webp"),
+      StorageVisibility.PUBLIC),
+  /** 홈 화면 활동 사진 마퀴. 공개 페이지에 그대로 뜨므로 공개 저장소에 둔다. */
+  ACTIVITY_PHOTO(
+      5 * 1024 * 1024L, Set.of("png", "jpg", "jpeg", "webp"),
       StorageVisibility.PUBLIC);
 
   private final long maxSizeBytes;
