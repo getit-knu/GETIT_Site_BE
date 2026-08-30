@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
+import com.getit.domain.user.entity.College;
+import com.getit.domain.user.repository.CollegeRepository;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
@@ -48,6 +50,9 @@ class ApplicationAdminServiceTest {
   @Autowired
   private GenerationRepository generationRepository;
 
+  @Autowired
+  private CollegeRepository collegeRepository;
+
   private Generation activeGeneration;
 
   @BeforeEach
@@ -58,9 +63,13 @@ class ApplicationAdminServiceTest {
   }
 
   private Application draft(Long userId, String name) {
+    return draft(userId, name, null);
+  }
+
+  private Application draft(Long userId, String name, Long collegeId) {
     return applicationRepository.save(Application.createDraft(
         userId, activeGeneration.getId(), name, name + "@gmail.com", "010-1234-5678",
-        null, null, 2, "2021110000"));
+        collegeId, null, 2, "2021110000"));
   }
 
   private Application submitted(Long userId, String name) {
@@ -90,6 +99,54 @@ class ApplicationAdminServiceTest {
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("홍길동");
       assertThat(result.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("소속 단과대학 이름과 학년을 함께 내려준다")
+    void includesCollegeNameAndGrade() {
+      College college = collegeRepository.save(College.create("IT융합대학"));
+      Application application = draft(1L, "홍길동", college.getId());
+      application.submit(LocalDateTime.now());
+
+      PageResponse<ApplicantSummary> result =
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+
+      // 화면에 소속·학년 컬럼이 필요한데 id 만 내려주면 FE 가 채울 방법이 없다 (이슈 #142).
+      assertThat(result.content()).singleElement()
+          .satisfies(summary -> {
+            assertThat(summary.college()).isEqualTo("IT융합대학");
+            assertThat(summary.grade()).isEqualTo(2);
+          });
+    }
+
+    @Test
+    @DisplayName("소속을 고르지 않은 지원자는 단과대학이 null 이다")
+    void collegeIsNullWhenNotChosen() {
+      submitted(1L, "홍길동");
+
+      PageResponse<ApplicantSummary> result =
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+
+      // 임시저장 단계에서는 소속을 비워둘 수 있다. 여기서 터지면 목록 자체가 안 뜬다.
+      assertThat(result.content()).singleElement()
+          .satisfies(summary -> assertThat(summary.college()).isNull());
+    }
+
+    @Test
+    @DisplayName("여러 지원자의 소속을 한 번에 조회한다")
+    void resolvesCollegeNamesInBatch() {
+      College it = collegeRepository.save(College.create("IT융합대학"));
+      College biz = collegeRepository.save(College.create("경영대학"));
+      draft(1L, "가지원", it.getId()).submit(LocalDateTime.now());
+      draft(2L, "나지원", biz.getId()).submit(LocalDateTime.now());
+      draft(3L, "다지원", it.getId()).submit(LocalDateTime.now());
+
+      PageResponse<ApplicantSummary> result =
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+
+      // 행마다 조회하면 N+1 이 된다. 중복 제거한 id 로 한 번만 조회한다.
+      assertThat(result.content()).extracting(ApplicantSummary::college)
+          .containsExactlyInAnyOrder("IT융합대학", "경영대학", "IT융합대학");
     }
 
     @Test
