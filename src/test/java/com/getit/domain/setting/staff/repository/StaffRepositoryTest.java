@@ -2,6 +2,7 @@ package com.getit.domain.setting.staff.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.getit.domain.setting.staff.dto.StaffCommand;
 import com.getit.domain.setting.staff.entity.Staff;
 import com.getit.domain.setting.staff.entity.StaffSection;
 import com.getit.global.config.JpaAuditingConfig;
@@ -19,7 +20,7 @@ class StaffRepositoryTest {
   private StaffRepository staffRepository;
 
   private Staff staff(Integer generationNo, StaffSection section, Integer order, String name) {
-    return Staff.create(generationNo, order, section, "역할", name, "학과", null, null, null, null, null);
+    return Staff.create(generationNo, order, new StaffCommand(section,"역할",name,"학과",null,null,null,null,null));
   }
 
   @Test

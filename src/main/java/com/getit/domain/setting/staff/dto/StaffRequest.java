@@ -3,6 +3,7 @@ package com.getit.domain.setting.staff.dto;
 import com.getit.domain.setting.staff.entity.StaffSection;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -24,9 +25,22 @@ public record StaffRequest(
     @NotNull StaffSection section,
     @NotBlank @Size(max = 100) String department,
     @Size(max = 255) String introduction,
-    // 형식 검증은 하지 않는다. 프로젝트의 codeUrl · demoUrl 과 같은 방식이다.
-    @Size(max = 512) String githubUrl,
-    @Size(max = 512) String instagramUrl,
+    // http · https 만 받는다. 공개 화면이 이 값을 그대로 href 에 넣으므로,
+    // javascript: 같은 스킴을 허용하면 운영진 카드가 XSS · 피싱 통로가 된다
+    // (PR #158 Copilot 리뷰 지적). null 은 @Pattern 이 통과시킨다.
+    @Size(max = 512) @Pattern(regexp = URL_SCHEME, message = "http 또는 https 주소여야 합니다.")
+    String githubUrl,
+    @Size(max = 512) @Pattern(regexp = URL_SCHEME, message = "http 또는 https 주소여야 합니다.")
+    String instagramUrl,
     Long fileId,
     @NotNull Integer generationNo
-) { }
+) {
+
+  /** 스킴을 http · https 로 제한한다. */
+  private static final String URL_SCHEME = "^https?://\\S+$";
+
+  public StaffCommand toCommand() {
+    return new StaffCommand(
+        section, staffRole, name, department, introduction, githubUrl, instagramUrl, userId, fileId);
+  }
+}

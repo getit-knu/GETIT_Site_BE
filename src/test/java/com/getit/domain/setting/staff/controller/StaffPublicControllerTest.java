@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.setting.staff.dto.StaffCommand;
 import com.getit.domain.setting.staff.entity.Staff;
 import com.getit.domain.setting.staff.entity.StaffSection;
 import com.getit.domain.setting.staff.repository.StaffRepository;
@@ -41,7 +42,7 @@ class StaffPublicControllerTest {
     generation.activate();
     generationRepository.save(generation);
     staffRepository.save(
-        Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null, null, null));
+        Staff.create(9, 1, new StaffCommand(StaffSection.EXECUTIVE,"회장","김철수","경영학과 20",null,null,null,null,null)));
 
     mockMvc.perform(get(STAFFS_PATH))
         .andExpect(status().isOk())
