@@ -18,5 +18,5 @@ ALTER TABLE evaluation_score
 ALTER TABLE evaluation_score
     ADD UNIQUE KEY uk_evaluation_score_app_criterion_evaluator (application_id, criterion_id, evaluator_id);
 
--- 지원서 하나의 모든 평가자 점수를 한 번에 읽는 조회가 주 사용처다.
-CREATE INDEX idx_evaluation_score_application ON evaluation_score (application_id);
+-- application_id 단일 인덱스는 만들지 않는다. 위 유니크 키의 선행 컬럼이라
+-- findByApplicationId 조회가 그 인덱스를 그대로 쓴다.

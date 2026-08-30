@@ -41,13 +41,13 @@ public class EvaluationScore extends BaseTimeEntity {
 
   /** 이 점수를 매긴 운영진. 평가자마다 자기 점수를 따로 갖는다. */
   @Column(nullable = false)
-  private Long evaluatorId;
+  private long evaluatorId;
 
   @Column(nullable = false)
   private Integer score;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private EvaluationScore(Long applicationId, Long criterionId, Long evaluatorId, Integer score) {
+  private EvaluationScore(Long applicationId, Long criterionId, long evaluatorId, Integer score) {
     this.applicationId = applicationId;
     this.criterionId = criterionId;
     this.evaluatorId = evaluatorId;
@@ -55,7 +55,7 @@ public class EvaluationScore extends BaseTimeEntity {
   }
 
   public static EvaluationScore create(
-      Long applicationId, Long criterionId, Long evaluatorId, Integer score) {
+      Long applicationId, Long criterionId, long evaluatorId, Integer score) {
     return EvaluationScore.builder()
         .applicationId(applicationId)
         .criterionId(criterionId)

@@ -8,6 +8,7 @@ import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreSaveRequest;
+import com.getit.domain.recruitment.dto.EvaluationSubmission;
 import com.getit.domain.recruitment.dto.EvaluationSummaryResult;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.service.ApplicationAdminService;
@@ -88,7 +89,8 @@ public class ApplicationAdminController {
       @AuthenticationPrincipal CustomUserDetails principal
   ) {
     return ApiResponse.success(
-        applicationEvaluationService.saveScores(id, principal.getUserId(), request.scores()));
+        applicationEvaluationService.saveScores(
+            new EvaluationSubmission(id, principal.getUserId(), request.scores())));
   }
 
   @Operation(summary = "서류 합불 처리", description = "명세서 7.4")

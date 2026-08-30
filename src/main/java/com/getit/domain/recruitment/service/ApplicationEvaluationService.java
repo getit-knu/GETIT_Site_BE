@@ -3,6 +3,7 @@ package com.getit.domain.recruitment.service;
 import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
+import com.getit.domain.recruitment.dto.EvaluationSubmission;
 import com.getit.domain.recruitment.dto.EvaluationSummaryResult;
 import com.getit.domain.user.service.UserQueryService;
 import com.getit.domain.recruitment.entity.Application;
@@ -18,10 +19,11 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,17 +55,16 @@ public class ApplicationEvaluationService {
    * 있었다).
    */
   @Transactional
-  public EvaluationSummaryResult saveScores(
-      Long applicationId, Long evaluatorId, List<EvaluationScoreItem> items) {
-    Application application = findSubmittedApplication(applicationId);
+  public EvaluationSummaryResult saveScores(EvaluationSubmission submission) {
+    Application application = findSubmittedApplication(submission.applicationId());
 
-    for (EvaluationScoreItem item : items) {
+    for (EvaluationScoreItem item : submission.items()) {
       EvaluationCriterion criterion = findCriterionInGeneration(item.criterionId(), application.getGenerationId());
       validateScore(item.score(), criterion.getMaxScore());
-      upsertScore(applicationId, item.criterionId(), evaluatorId, item.score());
+      upsertScore(submission.applicationId(), item.criterionId(), submission.evaluatorId(), item.score());
     }
 
-    return buildSummary(application, evaluatorId);
+    return buildSummary(application, submission.evaluatorId());
   }
 
   /**
@@ -198,16 +199,14 @@ public class ApplicationEvaluationService {
       return;
     }
 
-    try {
-      evaluationScoreRepository.saveAndFlush(
-          EvaluationScore.create(applicationId, criterionId, evaluatorId, score));
-    } catch (DataIntegrityViolationException e) {
-      // 같은 평가자가 동시에 두 번 저장한 경우다. 다시 찾아 덮어쓴다.
-      evaluationScoreRepository
-          .findByApplicationIdAndCriterionIdAndEvaluatorId(applicationId, criterionId, evaluatorId)
-          .orElseThrow(() -> e)
-          .updateScore(score);
-    }
+    // 유니크 위반을 잡아 다시 조회·수정하던 코드가 있었으나 걷어냈다. 제약 위반 뒤에는
+    // 영속성 컨텍스트와 트랜잭션이 이미 실패 상태라 같은 트랜잭션 안에서 복구할 수 없다
+    // (PR #154 Copilot 리뷰 지적). 되지 않는 복구는 문제를 감추기만 한다.
+    //
+    // 남는 경우는 "같은 평가자가 같은 기준을 동시에 두 번 저장" 뿐이다. 화면에서 두 번
+    // 눌렀을 때인데, 이때는 500 이 아니라 충돌로 드러나는 편이 낫다.
+    evaluationScoreRepository.save(
+        EvaluationScore.create(applicationId, criterionId, evaluatorId, score));
   }
 
   private EvaluationCriterion findCriterionInGeneration(Long criterionId, Long generationId) {
@@ -232,7 +231,16 @@ public class ApplicationEvaluationService {
   private EvaluationSummaryResult buildSummary(Application application, Long requesterId) {
     List<EvaluationCriterion> criteria =
         evaluationCriterionRepository.findByGenerationId(application.getGenerationId());
-    List<EvaluationScore> scores = evaluationScoreRepository.findByApplicationId(application.getId());
+    // 기준을 지워도 점수는 남는다(FK · cascade 가 없다). 지운 기준의 점수를 함께 세면
+    // 현재 기준을 다 매기지 않은 평가자도 개수가 맞아 완료로 잡히고, 옛 점수가 총점에
+    // 섞인다 (PR #154 Copilot 리뷰 지적). 현재 기준의 점수만 남긴다.
+    Set<Long> currentCriterionIds = criteria.stream()
+        .map(EvaluationCriterion::getId)
+        .collect(Collectors.toSet());
+    List<EvaluationScore> scores = evaluationScoreRepository.findByApplicationId(application.getId())
+        .stream()
+        .filter(score -> currentCriterionIds.contains(score.getCriterionId()))
+        .toList();
 
     Map<Long, String> evaluatorNames = userQueryService.findNamesByIds(
         scores.stream().map(EvaluationScore::getEvaluatorId).collect(Collectors.toSet()));
@@ -285,7 +293,7 @@ public class ApplicationEvaluationService {
         : given.stream().mapToInt(EvaluationScore::getScore).average().orElseThrow();
 
     Integer myScore = given.stream()
-        .filter(score -> score.getEvaluatorId().equals(requesterId))
+        .filter(score -> Objects.equals(score.getEvaluatorId(), requesterId))
         .map(EvaluationScore::getScore)
         .findFirst()
         .orElse(null);
