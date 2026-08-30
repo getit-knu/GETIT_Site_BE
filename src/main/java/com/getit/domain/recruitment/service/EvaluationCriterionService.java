@@ -5,21 +5,25 @@ import com.getit.domain.recruitment.dto.EvaluationCriterionResult;
 import com.getit.domain.recruitment.entity.EvaluationCriterion;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
+import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 서류 평가 기준 조회 · 설정. (API 명세서 6.8 · 6.9 · 6.10 · 6.11) */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class EvaluationCriterionService {
 
   private final EvaluationCriterionRepository evaluationCriterionRepository;
+  private final EvaluationScoreRepository evaluationScoreRepository;
   private final GenerationQueryService generationQueryService;
 
   public EvaluationCriteriaSummary getCriteria() {
@@ -65,13 +69,25 @@ public class EvaluationCriterionService {
     return EvaluationCriterionResult.from(criterion);
   }
 
-  /** 6.11. 삭제 후 뒤 순서를 한 칸씩 당겨서 order 중복을 막는다 (ApplicationQuestion 과 동일 이유). */
+  /**
+   * 6.11. 삭제 후 뒤 순서를 한 칸씩 당겨서 order 중복을 막는다 (ApplicationQuestion 과 동일 이유).
+   *
+   * <p>그 기준으로 매겨진 점수도 함께 지운다. {@code evaluation_score} 에 FK 도 cascade 도
+   * 없어서 예전에는 기준만 사라지고 점수가 남았다. 남은 행은 어떤 조회로도 닿을 수 없는데
+   * 기수가 반복되면 계속 쌓이고, 집계에서 걸러내는 방어에 의존하게 된다 (이슈 #157).
+   *
+   * <p>총점은 저장하지 않고 조회 시 계산하므로 따로 재계산할 것이 없다.
+   */
   @Transactional
   public void deleteCriterion(Long criterionId) {
     GenerationSummary activeGeneration = findActiveGeneration();
     EvaluationCriterion criterion = findCriterion(criterionId, activeGeneration.id());
     int deletedOrder = criterion.getOrder();
 
+    long deletedScores = evaluationScoreRepository.deleteByCriterionId(criterionId);
+    if (deletedScores > 0) {
+      log.info("평가 기준 삭제로 점수 {}건 함께 삭제. criterionId={}", deletedScores, criterionId);
+    }
     evaluationCriterionRepository.delete(criterion);
 
     evaluationCriterionRepository.findByGenerationId(activeGeneration.id()).stream()

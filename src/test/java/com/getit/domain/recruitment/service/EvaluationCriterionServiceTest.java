@@ -1,5 +1,7 @@
 package com.getit.domain.recruitment.service;
 
+import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
+import com.getit.domain.recruitment.entity.EvaluationScore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -29,6 +31,9 @@ class EvaluationCriterionServiceTest {
 
   @Autowired
   private EvaluationCriterionRepository evaluationCriterionRepository;
+
+  @Autowired
+  private EvaluationScoreRepository evaluationScoreRepository;
 
   @Autowired
   private GenerationRepository generationRepository;
@@ -202,6 +207,36 @@ class EvaluationCriterionServiceTest {
   @DisplayName("deleteCriterion")
   class DeleteCriterion {
 
+
+    @Test
+    @DisplayName("그 기준으로 매긴 점수도 함께 삭제된다")
+    void deletesScoresOfCriterion() {
+      EvaluationCriterionResult target = evaluationCriterionService.createCriterion(
+          "전공 적합성", "가이드 라인", 50);
+      EvaluationCriterionResult kept = evaluationCriterionService.createCriterion(
+          "지원 동기", "가이드 라인", 50);
+      evaluationScoreRepository.save(EvaluationScore.create(1L, target.id(), 101L, 40));
+      evaluationScoreRepository.save(EvaluationScore.create(1L, target.id(), 102L, 45));
+      evaluationScoreRepository.save(EvaluationScore.create(1L, kept.id(), 101L, 30));
+
+      evaluationCriterionService.deleteCriterion(target.id());
+
+      // 남으면 어떤 조회로도 닿지 않는 행이 기수마다 쌓인다 (이슈 #157).
+      assertThat(evaluationScoreRepository.findByApplicationId(1L))
+          .extracting(EvaluationScore::getCriterionId)
+          .containsExactly(kept.id());
+    }
+
+    @Test
+    @DisplayName("점수가 없는 기준도 그냥 삭제된다")
+    void deletesCriterionWithoutScores() {
+      EvaluationCriterionResult created = evaluationCriterionService.createCriterion(
+          "전공 적합성", "가이드 라인", 20);
+
+      evaluationCriterionService.deleteCriterion(created.id());
+
+      assertThat(evaluationCriterionRepository.findById(created.id())).isEmpty();
+    }
     @Test
     @DisplayName("기준을 삭제한다")
     void deletesCriterion() {
