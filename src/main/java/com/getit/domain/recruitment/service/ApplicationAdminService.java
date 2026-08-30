@@ -9,6 +9,7 @@ import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
+import com.getit.domain.user.service.CollegeQueryService;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.util.ExcelExporter;
@@ -16,6 +17,9 @@ import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +52,7 @@ public class ApplicationAdminService {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   private final ApplicationRepository applicationRepository;
+  private final CollegeQueryService collegeQueryService;
   private final ApplicationAnswerRepository applicationAnswerRepository;
   private final GenerationQueryService generationQueryService;
 
@@ -71,7 +76,13 @@ public class ApplicationAdminService {
         : applicationRepository.findByGenerationIdAndStatusNot(
             targetGenerationId, ApplicationStatus.DRAFT, enforcedOrder);
 
-    return PageResponse.from(applications, ApplicantSummary::from);
+    Map<Long, String> collegeNames = collegeQueryService.findNamesByIds(
+        applications.getContent().stream()
+            .map(Application::getCollegeId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet()));
+
+    return PageResponse.from(applications, a -> ApplicantSummary.from(a, collegeNames));
   }
 
   /**
