@@ -89,6 +89,12 @@ class ApplicationAdminControllerTest {
         null, null, 2, "2021110000"));
   }
 
+  /** 두 Nested 가 함께 쓴다. */
+  private String scoresRequestJson(Long criterionId, int score) throws Exception {
+      return objectMapper.writeValueAsString(
+        new EvaluationScoreSaveRequest(List.of(new EvaluationScoreItem(criterionId, score))));
+  }
+
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
     application.submit(LocalDateTime.now());
@@ -240,13 +246,55 @@ class ApplicationAdminControllerTest {
   }
 
   @Nested
+  @DisplayName("GET " + APPLICATIONS_PATH + "/{id}/scores")
+  class GetScores {
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      mockMvc.perform(get(APPLICATIONS_PATH + "/1/scores"))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      String token = "Bearer " + jwtProvider.createAccessToken(1L, "member@getit.com", Role.MEMBER);
+
+      mockMvc.perform(get(APPLICATIONS_PATH + "/1/scores").header("Authorization", token))
+          .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("저장한 뒤 다시 조회하면 내 점수와 종합 결과가 나온다")
+    void readsBackSavedScores() throws Exception {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 1, "전공 적합성", "가이드 라인", 60));
+
+      mockMvc.perform(put(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(scoresRequestJson(criterion.getId(), 45)))
+          .andExpect(status().isOk());
+
+      // 이 조회가 없어서 상세를 다시 열면 점수가 사라진 것처럼 보였다 (이슈 #151).
+      // 요청자 id 가 토큰에서 제대로 전달돼야 myScore 가 채워진다.
+      mockMvc.perform(get(APPLICATIONS_PATH + "/" + application.getId() + "/scores")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.success").value(true))
+          .andExpect(jsonPath("$.data.criteria[0].myScore").value(45))
+          .andExpect(jsonPath("$.data.criteria[0].evaluatorScores[0].score").value(45))
+          .andExpect(jsonPath("$.data.evaluatorCount").value(1))
+          .andExpect(jsonPath("$.data.totalScore").value(45.0));
+    }
+  }
+
+  @Nested
   @DisplayName("PUT " + APPLICATIONS_PATH + "/{id}/scores")
   class SaveScores {
 
-    private String scoresRequestJson(Long criterionId, int score) throws Exception {
-      return objectMapper.writeValueAsString(
-          new EvaluationScoreSaveRequest(List.of(new EvaluationScoreItem(criterionId, score))));
-    }
 
     @Test
     @DisplayName("점수를 저장한다")
@@ -261,7 +309,10 @@ class ApplicationAdminControllerTest {
               .content(scoresRequestJson(criterion.getId(), 45)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.totalScore").value(45))
-          .andExpect(jsonPath("$.data.scores[0].score").value(45));
+          // 응답이 종합 결과로 바뀌었다. 내 점수는 myScore 로 온다 (이슈 #151).
+          .andExpect(jsonPath("$.data.criteria[0].myScore").value(45))
+          .andExpect(jsonPath("$.data.criteria[0].evaluatorScores[0].score").value(45))
+          .andExpect(jsonPath("$.data.evaluatorCount").value(1));
     }
 
     @Test

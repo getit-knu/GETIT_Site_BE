@@ -11,5 +11,6 @@ public interface EvaluationScoreRepository extends JpaRepository<EvaluationScore
   List<EvaluationScore> findByApplicationId(Long applicationId);
 
   /** upsert(7.3) 시 이미 저장된 점수가 있는지 확인하는 데 쓴다. */
-  Optional<EvaluationScore> findByApplicationIdAndCriterionId(Long applicationId, Long criterionId);
+  Optional<EvaluationScore> findByApplicationIdAndCriterionIdAndEvaluatorId(
+      Long applicationId, Long criterionId, Long evaluatorId);
 }

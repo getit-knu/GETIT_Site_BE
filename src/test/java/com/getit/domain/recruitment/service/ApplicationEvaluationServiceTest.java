@@ -6,7 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
-import com.getit.domain.recruitment.dto.EvaluationScoreSaveResult;
+import com.getit.domain.recruitment.dto.EvaluationSubmission;
+import com.getit.domain.recruitment.dto.EvaluationSummaryResult;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.entity.EvaluationCriterion;
@@ -30,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @Transactional
 class ApplicationEvaluationServiceTest {
+
+  private static final Long EVALUATOR_A = 101L;
+  private static final Long EVALUATOR_B = 102L;
 
   @Autowired
   private ApplicationEvaluationService applicationEvaluationService;
@@ -83,16 +87,16 @@ class ApplicationEvaluationServiceTest {
       EvaluationCriterion scored = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
       criterion(activeGeneration.getId(), 2, "지원 동기", 40);
 
-      EvaluationScoreSaveResult result = applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(scored.getId(), 50)));
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(scored.getId(), 50))));
 
       assertThat(result.applicationId()).isEqualTo(application.getId());
       assertThat(result.totalScore()).isNull();
-      assertThat(result.scores()).hasSize(2);
-      assertThat(result.scores()).filteredOn(s -> s.criterionId().equals(scored.getId()))
-          .extracting(s -> s.score()).containsExactly(50);
-      assertThat(result.scores()).filteredOn(s -> !s.criterionId().equals(scored.getId()))
-          .extracting(s -> s.score()).containsExactly((Integer) null);
+      assertThat(result.criteria()).hasSize(2);
+      assertThat(result.criteria()).filteredOn(s -> s.criterionId().equals(scored.getId()))
+          .extracting(s -> s.myScore()).containsExactly(50);
+      assertThat(result.criteria()).filteredOn(s -> !s.criterionId().equals(scored.getId()))
+          .extracting(s -> s.myScore()).containsExactly((Integer) null);
     }
 
     @Test
@@ -102,11 +106,10 @@ class ApplicationEvaluationServiceTest {
       EvaluationCriterion first = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
       EvaluationCriterion second = criterion(activeGeneration.getId(), 2, "지원 동기", 40);
 
-      EvaluationScoreSaveResult result = applicationEvaluationService.saveScores(
-          application.getId(),
-          List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30)));
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30))));
 
-      assertThat(result.totalScore()).isEqualTo(80);
+      assertThat(result.totalScore()).isEqualTo(80.0);
     }
 
     @Test
@@ -115,13 +118,71 @@ class ApplicationEvaluationServiceTest {
       Application application = submitted(1L, "홍길동");
       EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
 
-      applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 30)));
-      EvaluationScoreSaveResult result = applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 45)));
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 30))));
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 45))));
 
-      assertThat(result.totalScore()).isEqualTo(45);
+      assertThat(result.totalScore()).isEqualTo(45.0);
       assertThat(evaluationScoreRepository.findByApplicationId(application.getId())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("다른 운영진이 같은 기준을 매겨도 먼저 매긴 점수가 남는다")
+    void keepsScoresOfOtherEvaluators() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 30))));
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_B, List.of(new EvaluationScoreItem(criterion.getId(), 50))));
+
+      // 예전에는 B 가 저장하는 순간 A 의 30 점이 흔적 없이 사라졌다 (이슈 #151).
+      assertThat(evaluationScoreRepository.findByApplicationId(application.getId())).hasSize(2);
+      assertThat(result.criteria()).singleElement()
+          .satisfies(c -> {
+            assertThat(c.evaluatorScores()).extracting(e -> e.score())
+                .containsExactlyInAnyOrder(30, 50);
+            assertThat(c.averageScore()).isEqualTo(40.0);
+            assertThat(c.myScore()).isEqualTo(50);
+          });
+    }
+
+    @Test
+    @DisplayName("총점은 평가자별 총점의 평균이고 평가자 수를 함께 준다")
+    void totalIsAverageOfEvaluatorTotals() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion first = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      EvaluationCriterion second = criterion(activeGeneration.getId(), 2, "지원 동기", 40);
+
+      // A: 50 + 30 = 80,  B: 60 + 40 = 100  →  평균 90
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30))));
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_B, List.of(new EvaluationScoreItem(first.getId(), 60), new EvaluationScoreItem(second.getId(), 40))));
+
+      assertThat(result.totalScore()).isEqualTo(90.0);
+      assertThat(result.evaluatorCount()).isEqualTo(2);
+      assertThat(result.myTotalScore()).isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("일부 기준만 매긴 평가자는 평균에 넣지 않는다")
+    void excludesIncompleteEvaluatorsFromAverage() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion first = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      EvaluationCriterion second = criterion(activeGeneration.getId(), 2, "지원 동기", 40);
+
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(first.getId(), 50), new EvaluationScoreItem(second.getId(), 30))));
+      // B 는 하나만 매겼다. 이 총점(60)을 A 의 80 과 나란히 평균 내면 실제보다 낮게 나온다.
+      EvaluationSummaryResult result = applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_B, List.of(new EvaluationScoreItem(first.getId(), 60))));
+
+      assertThat(result.totalScore()).isEqualTo(80.0);
+      assertThat(result.evaluatorCount()).isEqualTo(1);
+      assertThat(result.myTotalScore()).isNull();
     }
 
     @Test
@@ -130,8 +191,8 @@ class ApplicationEvaluationServiceTest {
       Application application = submitted(1L, "홍길동");
       EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 61))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 61)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.SCORE_EXCEEDS_MAX);
@@ -144,8 +205,8 @@ class ApplicationEvaluationServiceTest {
       Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
       EvaluationCriterion otherCriterion = criterion(otherGeneration.getId(), 1, "지난 기수 기준", 60);
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(otherCriterion.getId(), 10))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(otherCriterion.getId(), 10)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.CRITERION_NOT_FOUND);
@@ -156,8 +217,8 @@ class ApplicationEvaluationServiceTest {
     void throwsWhenCriterionNotFound() {
       Application application = submitted(1L, "홍길동");
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(999L, 10))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(999L, 10)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.CRITERION_NOT_FOUND);
@@ -169,8 +230,8 @@ class ApplicationEvaluationServiceTest {
       Application application = draft(1L, "홍길동");
       EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 10)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
@@ -183,8 +244,8 @@ class ApplicationEvaluationServiceTest {
       EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
       applicationEvaluationService.decide(application.getId(), true);
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 10)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_SCORABLE);
@@ -200,11 +261,90 @@ class ApplicationEvaluationServiceTest {
       application.submit(LocalDateTime.now());
       EvaluationCriterion criterion = criterion(otherGeneration.getId(), 1, "전공 적합성", 60);
 
-      assertThatThrownBy(() -> applicationEvaluationService.saveScores(
-          application.getId(), List.of(new EvaluationScoreItem(criterion.getId(), 10))))
+      assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 10)))))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(RecruitmentErrorCode.APPLICATION_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("getScores")
+  class GetScores {
+
+    @Test
+    @DisplayName("저장한 점수를 다시 읽을 수 있다")
+    void readsBackSavedScores() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 42))));
+
+      // 이 조회가 없어서 상세를 다시 열면 매긴 점수가 사라진 것처럼 보였다 (이슈 #151).
+      EvaluationSummaryResult result =
+          applicationEvaluationService.getScores(application.getId(), EVALUATOR_A);
+
+      assertThat(result.criteria()).singleElement()
+          .satisfies(c -> assertThat(c.myScore()).isEqualTo(42));
+    }
+
+    @Test
+    @DisplayName("보는 사람이 다르면 myScore 는 비고 평균은 그대로다")
+    void myScoreIsPerRequester() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion criterion = criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(criterion.getId(), 42))));
+
+      EvaluationSummaryResult result =
+          applicationEvaluationService.getScores(application.getId(), EVALUATOR_B);
+
+      assertThat(result.criteria()).singleElement()
+          .satisfies(c -> {
+            assertThat(c.myScore()).isNull();
+            assertThat(c.averageScore()).isEqualTo(42.0);
+          });
+    }
+
+    @Test
+    @DisplayName("지운 기준의 옛 점수는 집계에 섞이지 않는다")
+    void ignoresScoresOfDeletedCriteria() {
+      Application application = submitted(1L, "홍길동");
+      EvaluationCriterion old = criterion(activeGeneration.getId(), 1, "옛 기준", 60);
+      applicationEvaluationService.saveScores(new EvaluationSubmission(
+          application.getId(), EVALUATOR_A, List.of(new EvaluationScoreItem(old.getId(), 55))));
+
+      // 기준을 지워도 점수 행은 남는다 (FK · cascade 가 없다).
+      evaluationCriterionRepository.delete(old);
+      criterion(activeGeneration.getId(), 1, "새 기준", 60);
+
+      EvaluationSummaryResult result =
+          applicationEvaluationService.getScores(application.getId(), EVALUATOR_A);
+
+      // 개수만 세면 새 기준을 안 매긴 평가자도 완료로 잡히고 55 점이 총점에 섞인다.
+      assertThat(result.totalScore()).isNull();
+      assertThat(result.evaluatorCount()).isZero();
+      assertThat(result.criteria()).singleElement()
+          .satisfies(c -> {
+            assertThat(c.criterionName()).isEqualTo("새 기준");
+            assertThat(c.myScore()).isNull();
+          });
+    }
+
+    @Test
+    @DisplayName("아무도 채점하지 않았으면 총점은 null 이고 평가자 수는 0 이다")
+    void emptyWhenNobodyScored() {
+      Application application = submitted(1L, "홍길동");
+      criterion(activeGeneration.getId(), 1, "전공 적합성", 60);
+
+      EvaluationSummaryResult result =
+          applicationEvaluationService.getScores(application.getId(), EVALUATOR_A);
+
+      assertThat(result.totalScore()).isNull();
+      assertThat(result.evaluatorCount()).isZero();
+      assertThat(result.criteria()).singleElement()
+          .satisfies(c -> assertThat(c.evaluatorScores()).isEmpty());
     }
   }
 

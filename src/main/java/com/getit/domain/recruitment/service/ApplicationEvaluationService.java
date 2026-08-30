@@ -3,8 +3,9 @@ package com.getit.domain.recruitment.service;
 import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionResult;
 import com.getit.domain.recruitment.dto.EvaluationScoreItem;
-import com.getit.domain.recruitment.dto.EvaluationScoreResult;
-import com.getit.domain.recruitment.dto.EvaluationScoreSaveResult;
+import com.getit.domain.recruitment.dto.EvaluationSubmission;
+import com.getit.domain.recruitment.dto.EvaluationSummaryResult;
+import com.getit.domain.user.service.UserQueryService;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.entity.EvaluationCriterion;
@@ -18,11 +19,11 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ public class ApplicationEvaluationService {
   private final EvaluationCriterionRepository evaluationCriterionRepository;
   private final EvaluationScoreRepository evaluationScoreRepository;
   private final GenerationQueryService generationQueryService;
+  private final UserQueryService userQueryService;
 
   /**
    * 7.3. 기준마다 upsert 한다. 기준은 지원서와 같은 기수 소속이어야 한다 — 다른 기수 기준으로
@@ -53,16 +55,32 @@ public class ApplicationEvaluationService {
    * 있었다).
    */
   @Transactional
-  public EvaluationScoreSaveResult saveScores(Long applicationId, List<EvaluationScoreItem> items) {
-    Application application = findSubmittedApplication(applicationId);
+  public EvaluationSummaryResult saveScores(EvaluationSubmission submission) {
+    Application application = findSubmittedApplication(submission.applicationId());
 
-    for (EvaluationScoreItem item : items) {
+    for (EvaluationScoreItem item : submission.items()) {
       EvaluationCriterion criterion = findCriterionInGeneration(item.criterionId(), application.getGenerationId());
       validateScore(item.score(), criterion.getMaxScore());
-      upsertScore(applicationId, item.criterionId(), item.score());
+      upsertScore(submission.applicationId(), item.criterionId(), submission.evaluatorId(), item.score());
     }
 
-    return buildScoreSummary(application);
+    return buildSummary(application, submission.evaluatorId());
+  }
+
+  /**
+   * 저장된 점수를 다시 읽는다. (이슈 #151)
+   *
+   * <p>이 조회가 없어서 상세를 다시 열면 매긴 점수가 사라진 것처럼 보였고, 매번 빈 칸부터
+   * 다시 채점해야 했다.
+   */
+  public EvaluationSummaryResult getScores(Long applicationId, Long requesterId) {
+    GenerationSummary activeGeneration = findActiveGeneration();
+    Application application = applicationRepository
+        .findByIdAndGenerationId(applicationId, activeGeneration.id())
+        .filter(a -> a.getStatus() != ApplicationStatus.DRAFT)
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_FOUND));
+
+    return buildSummary(application, requesterId);
   }
 
   /**
@@ -173,21 +191,22 @@ public class ApplicationEvaluationService {
    * (PR #52 Copilot 리뷰 지적). {@code saveAndFlush} 로 그 위반을 이 자리에서 즉시 잡아내고,
    * 그 경우 다른 요청이 먼저 넣은 행을 다시 조회해 갱신으로 전환한다.
    */
-  private void upsertScore(Long applicationId, Long criterionId, Integer score) {
-    Optional<EvaluationScore> existing =
-        evaluationScoreRepository.findByApplicationIdAndCriterionId(applicationId, criterionId);
+  private void upsertScore(Long applicationId, Long criterionId, Long evaluatorId, Integer score) {
+    Optional<EvaluationScore> existing = evaluationScoreRepository
+        .findByApplicationIdAndCriterionIdAndEvaluatorId(applicationId, criterionId, evaluatorId);
     if (existing.isPresent()) {
       existing.get().updateScore(score);
       return;
     }
 
-    try {
-      evaluationScoreRepository.saveAndFlush(EvaluationScore.create(applicationId, criterionId, score));
-    } catch (DataIntegrityViolationException e) {
-      evaluationScoreRepository.findByApplicationIdAndCriterionId(applicationId, criterionId)
-          .orElseThrow(() -> e)
-          .updateScore(score);
-    }
+    // 유니크 위반을 잡아 다시 조회·수정하던 코드가 있었으나 걷어냈다. 제약 위반 뒤에는
+    // 영속성 컨텍스트와 트랜잭션이 이미 실패 상태라 같은 트랜잭션 안에서 복구할 수 없다
+    // (PR #154 Copilot 리뷰 지적). 되지 않는 복구는 문제를 감추기만 한다.
+    //
+    // 남는 경우는 "같은 평가자가 같은 기준을 동시에 두 번 저장" 뿐이다. 화면에서 두 번
+    // 눌렀을 때인데, 이때는 500 이 아니라 충돌로 드러나는 편이 낫다.
+    evaluationScoreRepository.save(
+        EvaluationScore.create(applicationId, criterionId, evaluatorId, score));
   }
 
   private EvaluationCriterion findCriterionInGeneration(Long criterionId, Long generationId) {
@@ -202,25 +221,85 @@ public class ApplicationEvaluationService {
     }
   }
 
-  private EvaluationScoreSaveResult buildScoreSummary(Application application) {
+  /**
+   * 평가자별 점수를 종합한다.
+   *
+   * <p>{@code totalScore} 는 <b>평가자별 총점의 평균</b>이다 (명세서 7.3 이 정한 방식).
+   * 다만 <b>모든 기준을 매긴 평가자만</b> 평균에 넣는다 — 4개 중 2개만 매긴 사람의 총점을
+   * 다 매긴 사람과 나란히 평균 내면 실제보다 낮게 나온다.
+   */
+  private EvaluationSummaryResult buildSummary(Application application, Long requesterId) {
     List<EvaluationCriterion> criteria =
         evaluationCriterionRepository.findByGenerationId(application.getGenerationId());
-    Map<Long, EvaluationScore> scoresByCriterionId =
-        evaluationScoreRepository.findByApplicationId(application.getId()).stream()
-            .collect(Collectors.toMap(EvaluationScore::getCriterionId, Function.identity()));
-
-    List<EvaluationScoreResult> results = criteria.stream()
-        .map(criterion -> {
-          EvaluationScore score = scoresByCriterionId.get(criterion.getId());
-          return EvaluationScoreResult.of(criterion, score != null ? score.getScore() : null);
-        })
+    // 기준을 지워도 점수는 남는다(FK · cascade 가 없다). 지운 기준의 점수를 함께 세면
+    // 현재 기준을 다 매기지 않은 평가자도 개수가 맞아 완료로 잡히고, 옛 점수가 총점에
+    // 섞인다 (PR #154 Copilot 리뷰 지적). 현재 기준의 점수만 남긴다.
+    Set<Long> currentCriterionIds = criteria.stream()
+        .map(EvaluationCriterion::getId)
+        .collect(Collectors.toSet());
+    List<EvaluationScore> scores = evaluationScoreRepository.findByApplicationId(application.getId())
+        .stream()
+        .filter(score -> currentCriterionIds.contains(score.getCriterionId()))
         .toList();
 
-    boolean allScored = results.stream().allMatch(result -> result.score() != null);
-    Integer totalScore = allScored
-        ? results.stream().mapToInt(EvaluationScoreResult::score).sum()
+    Map<Long, String> evaluatorNames = userQueryService.findNamesByIds(
+        scores.stream().map(EvaluationScore::getEvaluatorId).collect(Collectors.toSet()));
+
+    Map<Long, List<EvaluationScore>> byCriterion = scores.stream()
+        .collect(Collectors.groupingBy(EvaluationScore::getCriterionId));
+
+    List<EvaluationSummaryResult.CriterionScore> criterionScores = criteria.stream()
+        .map(criterion -> toCriterionScore(criterion, byCriterion, evaluatorNames, requesterId))
+        .toList();
+
+    Map<Long, List<EvaluationScore>> byEvaluator = scores.stream()
+        .collect(Collectors.groupingBy(EvaluationScore::getEvaluatorId));
+
+    List<Integer> completedTotals = byEvaluator.values().stream()
+        .filter(own -> own.size() == criteria.size())
+        .map(own -> own.stream().mapToInt(EvaluationScore::getScore).sum())
+        .toList();
+
+    Double totalScore = completedTotals.isEmpty()
+        ? null
+        : completedTotals.stream().mapToInt(Integer::intValue).average().orElseThrow();
+
+    List<EvaluationScore> mine = byEvaluator.getOrDefault(requesterId, List.of());
+    Integer myTotalScore = mine.size() == criteria.size() && !criteria.isEmpty()
+        ? mine.stream().mapToInt(EvaluationScore::getScore).sum()
         : null;
 
-    return new EvaluationScoreSaveResult(application.getId(), results, totalScore);
+    return new EvaluationSummaryResult(
+        application.getId(), criterionScores, totalScore, completedTotals.size(), myTotalScore);
+  }
+
+  private EvaluationSummaryResult.CriterionScore toCriterionScore(
+      EvaluationCriterion criterion,
+      Map<Long, List<EvaluationScore>> byCriterion,
+      Map<Long, String> evaluatorNames,
+      Long requesterId
+  ) {
+    List<EvaluationScore> given = byCriterion.getOrDefault(criterion.getId(), List.of());
+
+    List<EvaluationSummaryResult.EvaluatorScore> evaluatorScores = given.stream()
+        .map(score -> new EvaluationSummaryResult.EvaluatorScore(
+            score.getEvaluatorId(),
+            evaluatorNames.getOrDefault(score.getEvaluatorId(), "알 수 없음"),
+            score.getScore()))
+        .toList();
+
+    Double average = given.isEmpty()
+        ? null
+        : given.stream().mapToInt(EvaluationScore::getScore).average().orElseThrow();
+
+    Integer myScore = given.stream()
+        .filter(score -> Objects.equals(score.getEvaluatorId(), requesterId))
+        .map(EvaluationScore::getScore)
+        .findFirst()
+        .orElse(null);
+
+    return new EvaluationSummaryResult.CriterionScore(
+        criterion.getId(), criterion.getName(), criterion.getMaxScore(),
+        average, myScore, evaluatorScores);
   }
 }
