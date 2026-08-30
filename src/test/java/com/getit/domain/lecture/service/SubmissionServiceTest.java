@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
-import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.lecture.dto.SubmissionRequest;
 import com.getit.domain.lecture.dto.SubmissionResult;
 import com.getit.domain.lecture.entity.Assignment;
@@ -111,7 +111,9 @@ class SubmissionServiceTest {
   }
 
   private Long uploadFileBy(Long uploaderId) {
-    return TestStoredFiles.stored(fileAssetRepository, fileStorage,"key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", uploaderId).getId();
+    return TestStoredFiles.stored(
+        fileAssetRepository, fileStorage,
+        "key/1", "과제.zip", "https://cdn/key/1", 1024L, "application/zip", uploaderId).getId();
   }
 
   @Nested

@@ -26,4 +26,10 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
   @Query("select f from FileAsset f where f.id in :ids and f.deletedAt is null")
   List<FileAsset> findAllByIdInAndDeletedAtIsNullForUpdate(@Param("ids") List<Long> ids);
 
+  /** 락을 잡기 전에 저장소를 확인하려고 값만 읽는다. {@link FileConnectionView} 의 설명 참고. */
+  @Query("select new com.getit.domain.file.repository.FileConnectionView("
+      + "f.id, f.storedKey, f.size, f.status) "
+      + "from FileAsset f where f.id in :ids and f.deletedAt is null")
+  List<FileConnectionView> findConnectionViewsByIdIn(@Param("ids") List<Long> ids);
+
 }

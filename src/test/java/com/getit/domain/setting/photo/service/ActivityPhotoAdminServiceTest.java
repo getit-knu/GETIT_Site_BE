@@ -15,9 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
-import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.setting.photo.dto.ActivityPhotoRequest;
 import com.getit.domain.setting.photo.dto.ActivityPhotoResult;
 import com.getit.domain.setting.photo.entity.ActivityPhoto;
