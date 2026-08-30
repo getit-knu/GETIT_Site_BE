@@ -18,6 +18,10 @@ import com.getit.global.dto.ApiResponse;
  *
  * <p>트랙 구조는 {@code /api/admin/setting/tracks} 에도 있지만 그쪽은 ADMIN 전용이라
  * 부원 화면에서는 403 이 난다. 읽기 전용 목록만 부원에게 연다.
+ *
+ * <p>⚠️ <b>명세서에 없는 엔드포인트다.</b> API 명세서는 저장소 밖의
+ * {@code DOCS/API_명세서.pdf} 라 코드와 함께 고칠 수 없다. 명세에 반영되지 않은
+ * 엔드포인트가 여럿 쌓여 있어 별도로 모아 정리한다 (이슈 #155).
  */
 @Tag(name = "Member 트랙", description = "부원용 대분류 목록")
 @RestController
