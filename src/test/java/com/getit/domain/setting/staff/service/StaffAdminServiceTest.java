@@ -3,8 +3,10 @@ package com.getit.domain.setting.staff.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.setting.staff.dto.StaffRequest;
@@ -40,6 +42,9 @@ class StaffAdminServiceTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+  @Autowired
+  private FileStorage fileStorage;
+
   private Generation activeGeneration;
 
   @BeforeEach
@@ -50,8 +55,9 @@ class StaffAdminServiceTest {
   }
 
   private FileAsset file(String key) {
-    return fileAssetRepository.save(
-        FileAsset.upload(key, key + ".png", "https://cdn.getit.com/" + key, 100L, "image/png", 1L));
+    return TestStoredFiles.stored(
+        fileAssetRepository, fileStorage,
+        key, key + ".png", "https://cdn.getit.com/" + key, 100L, "image/png", 1L);
   }
 
   private StaffRequest request(

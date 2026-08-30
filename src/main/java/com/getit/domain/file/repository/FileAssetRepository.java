@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,7 +26,10 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
   @Query("select f from FileAsset f where f.id in :ids and f.deletedAt is null")
   List<FileAsset> findAllByIdInAndDeletedAtIsNullForUpdate(@Param("ids") List<Long> ids);
 
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query("update FileAsset f set f.status = :status where f.id in :ids")
-  void updateStatusByIdIn(@Param("ids") List<Long> ids, @Param("status") FileStatus status);
+  /** 락을 잡기 전에 저장소를 확인하려고 값만 읽는다. {@link FileConnectionView} 의 설명 참고. */
+  @Query("select new com.getit.domain.file.repository.FileConnectionView("
+      + "f.id, f.storedKey, f.size, f.status) "
+      + "from FileAsset f where f.id in :ids and f.deletedAt is null")
+  List<FileConnectionView> findConnectionViewsByIdIn(@Param("ids") List<Long> ids);
+
 }

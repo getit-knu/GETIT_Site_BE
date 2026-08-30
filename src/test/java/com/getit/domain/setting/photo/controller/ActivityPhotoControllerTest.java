@@ -19,8 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
-import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.setting.photo.dto.ActivityPhotoRequest;
 import com.getit.domain.setting.photo.entity.ActivityPhoto;
 import com.getit.domain.setting.photo.repository.ActivityPhotoRepository;
@@ -49,13 +50,16 @@ class ActivityPhotoControllerTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+  @Autowired
+  private FileStorage fileStorage;
+
   private String adminToken() {
     return "Bearer " + jwtProvider.createAccessToken(1L, "admin@getit.com", Role.ADMIN);
   }
 
   private Long publicFileId(String key) {
-    return fileAssetRepository.save(FileAsset.upload(
-        "public/" + key, key + ".png", "https://cdn/" + key, 10L, "image/png", 1L)).getId();
+    return TestStoredFiles.stored(fileAssetRepository, fileStorage,
+        "public/" + key, key + ".png", "https://cdn/" + key, 10L, "image/png", 1L).getId();
   }
 
   private String requestJson(Long fileId, Integer order) throws Exception {

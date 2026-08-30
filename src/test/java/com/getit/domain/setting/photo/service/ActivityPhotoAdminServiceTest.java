@@ -13,9 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.setting.photo.dto.ActivityPhotoRequest;
 import com.getit.domain.setting.photo.dto.ActivityPhotoResult;
 import com.getit.domain.setting.photo.entity.ActivityPhoto;
@@ -42,6 +44,9 @@ class ActivityPhotoAdminServiceTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+  @Autowired
+  private FileStorage fileStorage;
+
   private Long fileId;
 
   @BeforeEach
@@ -50,8 +55,8 @@ class ActivityPhotoAdminServiceTest {
   }
 
   private FileAsset uploadedFile(String key) {
-    return fileAssetRepository.save(FileAsset.upload(
-        "public/" + key, key + ".png", "https://cdn/" + key, 1024L, "image/png", 1L));
+    return TestStoredFiles.stored(fileAssetRepository, fileStorage,
+        "public/" + key, key + ".png", "https://cdn/" + key, 1024L, "image/png", 1L);
   }
 
   private ActivityPhoto savedPhoto(int order) {
@@ -184,8 +189,8 @@ class ActivityPhotoAdminServiceTest {
     @Test
     @DisplayName("비공개 저장소 파일은 붙일 수 없다")
     void rejectsPrivateFile() {
-      FileAsset privateFile = fileAssetRepository.save(FileAsset.upload(
-          "private/lecture.pdf", "강의자료.pdf", "https://cdn/x", 10L, "application/pdf", 1L));
+      FileAsset privateFile = TestStoredFiles.stored(fileAssetRepository, fileStorage,
+          "private/lecture.pdf", "강의자료.pdf", "https://cdn/x", 10L, "application/pdf", 1L);
 
       // 붙이면 공개 홈이 5분짜리 서명 주소를 내려주게 되어 방문자에게 깨진 이미지가 된다.
       assertThatThrownBy(() -> activityPhotoAdminService.create(

@@ -60,8 +60,8 @@ public class ActivityPhotoAdminService {
     ActivityPhoto saved = activityPhotoRepository.save(
         ActivityPhoto.create(request.fileId(), newOrder, request.isVisible()));
 
-    // 파일 연결은 마지막이다. 연결 쿼리가 영속성 컨텍스트를 비우므로(clearAutomatically)
-    // 먼저 부르면 위에서 바꾼 엔티티들이 detached 가 되어 반영되지 않는다.
+    // 순서는 자유다. 예전에는 연결 쿼리가 영속성 컨텍스트를 비워서(clearAutomatically)
+    // 반드시 마지막이어야 했지만, 이슈 #160 에서 엔티티 변경으로 바꾸며 제약이 없어졌다.
     validateAndConnect(request.fileId());
 
     return ActivityPhotoResult.from(saved, imageUrl(saved.getFileId()));
@@ -80,8 +80,7 @@ public class ActivityPhotoAdminService {
       validateFile(request.fileId());
     }
 
-    // 엔티티 변경을 먼저 끝낸다. 파일 연결 쿼리가 영속성 컨텍스트를 비우기 때문에
-    // 그 뒤에 손대면 반영되지 않는다 (PR #152 Copilot 리뷰 지적).
+    // PR #152 Copilot 리뷰 때는 이 순서가 강제였다. 이슈 #160 이후로는 아니다.
     target.update(request.fileId(), request.isVisible());
     if (request.order() != null) {
       moveOrder(siblings, target, request.order());
