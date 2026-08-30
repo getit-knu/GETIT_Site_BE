@@ -48,9 +48,7 @@ public class ActivityPhotoAdminService {
 
   /** order 를 생략하면 맨 뒤에 붙이고, 값이 있으면 [1, 기존 개수+1] 로 맞춘 뒤 뒤를 민다. */
   public ActivityPhotoResult create(ActivityPhotoRequest request) {
-    validateAndConnect(request.fileId());
-
-    List<ActivityPhoto> siblings = activityPhotoRepository.findAllByOrderByOrderAsc();
+    List<ActivityPhoto> siblings = activityPhotoRepository.findAllForUpdate();
     int newOrder = request.order() == null
         ? siblings.size() + 1
         : clamp(request.order(), 1, siblings.size() + 1);
@@ -62,36 +60,57 @@ public class ActivityPhotoAdminService {
     ActivityPhoto saved = activityPhotoRepository.save(
         ActivityPhoto.create(request.fileId(), newOrder, request.isVisible()));
 
+    // 파일 연결은 마지막이다. 연결 쿼리가 영속성 컨텍스트를 비우므로(clearAutomatically)
+    // 먼저 부르면 위에서 바꾼 엔티티들이 detached 가 되어 반영되지 않는다.
+    validateAndConnect(request.fileId());
+
     return ActivityPhotoResult.from(saved, imageUrl(saved.getFileId()));
   }
 
   public ActivityPhotoResult update(Long id, ActivityPhotoRequest request) {
-    ActivityPhoto target = findPhoto(id);
+    List<ActivityPhoto> siblings = activityPhotoRepository.findAllForUpdate();
+    ActivityPhoto target = siblings.stream()
+        .filter(photo -> photo.getId().equals(id))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(ActivityPhotoErrorCode.ACTIVITY_PHOTO_NOT_FOUND));
 
     Long oldFileId = target.getFileId();
-    if (!oldFileId.equals(request.fileId())) {
-      validateAndConnect(request.fileId());
+    boolean fileChanged = !oldFileId.equals(request.fileId());
+    if (fileChanged) {
+      validateFile(request.fileId());
+    }
+
+    // 엔티티 변경을 먼저 끝낸다. 파일 연결 쿼리가 영속성 컨텍스트를 비우기 때문에
+    // 그 뒤에 손대면 반영되지 않는다 (PR #152 Copilot 리뷰 지적).
+    target.update(request.fileId(), request.isVisible());
+    if (request.order() != null) {
+      moveOrder(siblings, target, request.order());
+    }
+
+    if (fileChanged) {
+      fileConnectionService.connectAll(List.of(request.fileId()));
       fileConnectionService.disconnectAll(List.of(oldFileId));
     }
-    target.update(request.fileId(), request.isVisible());
-
-    if (request.order() != null) {
-      moveOrder(activityPhotoRepository.findAllByOrderByOrderAsc(), target, request.order());
-    }
-    return ActivityPhotoResult.from(target, imageUrl(target.getFileId()));
+    return ActivityPhotoResult.from(target, imageUrl(request.fileId()));
   }
 
   public void delete(Long id) {
-    ActivityPhoto target = findPhoto(id);
+    List<ActivityPhoto> siblings = activityPhotoRepository.findAllForUpdate();
+    ActivityPhoto target = siblings.stream()
+        .filter(photo -> photo.getId().equals(id))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(ActivityPhotoErrorCode.ACTIVITY_PHOTO_NOT_FOUND));
+
     int deletedOrder = target.getOrder();
+    Long fileId = target.getFileId();
 
-    fileConnectionService.disconnectAll(List.of(target.getFileId()));
     activityPhotoRepository.delete(target);
-
     // 지운 자리 뒤를 당겨 1..N 연속을 유지한다.
-    activityPhotoRepository.findAllByOrderByOrderAsc().stream()
+    siblings.stream()
         .filter(photo -> photo.getOrder() > deletedOrder)
         .forEach(photo -> photo.updateOrder(photo.getOrder() - 1));
+
+    fileConnectionService.disconnectAll(List.of(fileId));
   }
 
   private void moveOrder(List<ActivityPhoto> siblings, ActivityPhoto target, int requested) {
@@ -115,13 +134,20 @@ public class ActivityPhotoAdminService {
 
   /** 파일이 실제로 있는지 확인하고 연결한다. 연결하지 않으면 정리 배치가 지운다. */
   private void validateAndConnect(Long fileId) {
-    fileQueryService.findById(fileId);
+    validateFile(fileId);
     fileConnectionService.connectAll(List.of(fileId));
   }
 
-  private ActivityPhoto findPhoto(Long id) {
-    return activityPhotoRepository.findById(id)
-        .orElseThrow(() -> new BusinessException(ActivityPhotoErrorCode.ACTIVITY_PHOTO_NOT_FOUND));
+  /**
+   * 공개 저장소에 올린 파일인지 본다.
+   *
+   * <p>비공개 파일을 붙이면 공개 홈이 5분짜리 서명 주소를 내려주게 된다. 방문자에게는
+   * 얼마 뒤 깨진 이미지가 되고 캐시도 걸리지 않는다 (PR #152 Copilot 리뷰 지적).
+   */
+  private void validateFile(Long fileId) {
+    if (!fileQueryService.findById(fileId).publiclyReadable()) {
+      throw new BusinessException(ActivityPhotoErrorCode.NOT_PUBLIC_FILE);
+    }
   }
 
   private String imageUrl(Long fileId) {

@@ -158,6 +158,40 @@ class ActivityPhotoAdminServiceTest {
           .isEqualTo(FileStatus.PENDING);
       assertThat(fileAssetRepository.findById(newFileId).orElseThrow().getStatus())
           .isEqualTo(FileStatus.CONNECTED);
+      // 연결 쿼리가 영속성 컨텍스트를 비우므로, 순서를 잘못 두면 응답만 새 파일을 가리키고
+      // DB 는 옛 파일을 계속 참조한다. 실제로 저장됐는지 본다 (PR #152 Copilot 리뷰 지적).
+      assertThat(activityPhotoRepository.findById(created.id()).orElseThrow().getFileId())
+          .isEqualTo(newFileId);
+    }
+
+    @Test
+    @DisplayName("파일을 바꾸면서 순서도 함께 바꿀 수 있다")
+    void changesFileAndOrderTogether() {
+      ActivityPhotoResult first =
+          activityPhotoAdminService.create(new ActivityPhotoRequest(fileId, true, null));
+      savedPhoto(2);
+      Long newFileId = uploadedFile("photo-swap").getId();
+
+      activityPhotoAdminService.update(first.id(), new ActivityPhotoRequest(newFileId, false, 2));
+
+      ActivityPhoto reloaded = activityPhotoRepository.findById(first.id()).orElseThrow();
+      assertThat(reloaded.getFileId()).isEqualTo(newFileId);
+      assertThat(reloaded.getOrder()).isEqualTo(2);
+      assertThat(reloaded.isVisible()).isFalse();
+      assertThat(orders()).containsExactly(1, 2);
+    }
+
+    @Test
+    @DisplayName("비공개 저장소 파일은 붙일 수 없다")
+    void rejectsPrivateFile() {
+      FileAsset privateFile = fileAssetRepository.save(FileAsset.upload(
+          "private/lecture.pdf", "강의자료.pdf", "https://cdn/x", 10L, "application/pdf", 1L));
+
+      // 붙이면 공개 홈이 5분짜리 서명 주소를 내려주게 되어 방문자에게 깨진 이미지가 된다.
+      assertThatThrownBy(() -> activityPhotoAdminService.create(
+          new ActivityPhotoRequest(privateFile.getId(), true, null)))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", ActivityPhotoErrorCode.NOT_PUBLIC_FILE);
     }
 
     @Test
