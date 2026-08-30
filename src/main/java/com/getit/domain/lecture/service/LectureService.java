@@ -156,7 +156,7 @@ public class LectureService {
       for (CategorySummary.SubCategoryBrief sub : track.subCategories()) {
         long count = countBySubCategoryId.getOrDefault(sub.id(), 0L);
         tabs.add(new LectureResult.Tab(
-            track.id(), track.name(), sub.id(), sub.name(), sub.name(), count));
+            track.id(), track.name(), sub.id(), sub.name(), count));
       }
     }
     return tabs;

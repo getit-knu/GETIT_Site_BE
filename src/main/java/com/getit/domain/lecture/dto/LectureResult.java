@@ -30,11 +30,6 @@ public class LectureResult {
       String trackName,
       Long subCategoryId,
       String subCategoryName,
-      /*
-      name은 subCategoryName의 구 이름. 명세 4.1 호환 위해 같은 값으로 유지,
-      FE가 subCategoryName으로 옮기면 제거 (#144)
-      */
-      String name,
       long count
   ) { }
 

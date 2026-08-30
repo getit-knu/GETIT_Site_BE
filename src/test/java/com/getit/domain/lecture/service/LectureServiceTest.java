@@ -176,7 +176,6 @@ class LectureServiceTest {
             assertThat(tab.trackId()).isEqualTo(trackId);
             assertThat(tab.trackName()).isEqualTo("SW");
             assertThat(tab.subCategoryName()).isEqualTo("빈 분류");
-            assertThat(tab.name()).isEqualTo(tab.subCategoryName());
           });
     }
 
