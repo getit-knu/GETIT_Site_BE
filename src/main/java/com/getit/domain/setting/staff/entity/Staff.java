@@ -1,5 +1,6 @@
 package com.getit.domain.setting.staff.entity;
 
+import com.getit.domain.setting.staff.dto.StaffCommand;
 import com.getit.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -63,6 +64,13 @@ public class Staff extends BaseTimeEntity {
   @Column(length = 255)
   private String introduction;
 
+  /** 계정이 없는 운영진도 있어 선택값이다. 비어 있으면 화면에서 아이콘을 감춘다. */
+  @Column(length = 512)
+  private String githubUrl;
+
+  @Column(length = 512)
+  private String instagramUrl;
+
   @Column
   private Long userId;
 
@@ -70,65 +78,38 @@ public class Staff extends BaseTimeEntity {
   private Long fileId;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private Staff(
-      int generationNo,
-      int order,
-      StaffSection section,
-      String staffRole,
-      String name,
-      String department,
-      String introduction,
-      Long userId,
-      Long fileId
-  ) {
+  private Staff(int generationNo, int order, StaffCommand command) {
     this.generationNo = generationNo;
     this.order = order;
-    this.section = section;
-    this.staffRole = staffRole;
-    this.name = name;
-    this.department = department;
-    this.introduction = introduction;
-    this.userId = userId;
-    this.fileId = fileId;
+    apply(command);
   }
 
-  public static Staff create(
-      int generationNo,
-      int order,
-      StaffSection section,
-      String staffRole,
-      String name,
-      String department,
-      String introduction,
-      Long userId,
-      Long fileId
-  ) {
-    return Staff.builder()
-        .generationNo(generationNo)
-        .order(order)
-        .section(section)
-        .staffRole(staffRole)
-        .name(name)
-        .department(department)
-        .introduction(introduction)
-        .userId(userId)
-        .fileId(fileId)
-        .build();
+  public static Staff create(int generationNo, int order, StaffCommand command) {
+    return Staff.builder().generationNo(generationNo).order(order).command(command).build();
   }
 
   /** 10.21 수정. order 는 바꾸지 않는다 — section 이 바뀌면 서비스가 {@link #updateOrder} 로 따로 재배정한다. */
-  public void update(
-      StaffSection section, String staffRole, String name, String department,
-      String introduction, Long userId, Long fileId
-  ) {
-    this.section = section;
-    this.staffRole = staffRole;
-    this.name = name;
-    this.department = department;
-    this.introduction = introduction;
-    this.userId = userId;
-    this.fileId = fileId;
+  public void update(StaffCommand command) {
+    apply(command);
   }
+
+  /**
+   * 생성과 수정이 같은 필드를 채운다. 나뉘어 있으면 필드가 늘어날 때 한쪽만 고쳐도
+   * 컴파일이 되고, 그 값은 조용히 저장되지 않는다 — 실제로 이번 PR 에서 update 가
+   * SNS 링크를 빠뜨린 채로 나갔다 (PR #158 Copilot 리뷰 지적).
+   */
+  private void apply(StaffCommand command) {
+    this.section = command.section();
+    this.staffRole = command.staffRole();
+    this.name = command.name();
+    this.department = command.department();
+    this.introduction = command.introduction();
+    this.githubUrl = command.githubUrl();
+    this.instagramUrl = command.instagramUrl();
+    this.userId = command.userId();
+    this.fileId = command.fileId();
+  }
+
 
   /** 10.22 순서 변경, 그리고 10.21 에서 section 이 바뀌어 재배정이 필요할 때 쓴다. */
   public void updateOrder(int order) {

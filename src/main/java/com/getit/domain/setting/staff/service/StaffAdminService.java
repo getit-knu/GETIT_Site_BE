@@ -62,9 +62,7 @@ public class StaffAdminService {
     }
 
     int nextOrder = nextOrderInSection(request.generationNo(), request.section());
-    Staff saved = staffRepository.save(Staff.create(
-        request.generationNo(), nextOrder, request.section(), request.staffRole(), request.name(),
-        request.department(), request.introduction(), request.userId(), request.fileId()));
+    Staff saved = staffRepository.save(Staff.create(request.generationNo(), nextOrder, request.toCommand()));
 
     return StaffResult.of(saved, resolveProfileImageUrl(request.fileId()));
   }
@@ -90,9 +88,7 @@ public class StaffAdminService {
     if (staff.getSection() != request.section()) {
       reassignToNewSection(staff, request.generationNo(), request.section());
     }
-    staff.update(
-        request.section(), request.staffRole(), request.name(), request.department(),
-        request.introduction(), request.userId(), request.fileId());
+    staff.update(request.toCommand());
 
     updateProfileFile(previousFileId, request.fileId());
 

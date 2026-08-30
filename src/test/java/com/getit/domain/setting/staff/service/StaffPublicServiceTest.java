@@ -8,6 +8,7 @@ import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.setting.staff.dto.StaffDirectoryResult;
 import com.getit.domain.setting.staff.dto.StaffSectionGroup;
+import com.getit.domain.setting.staff.dto.StaffCommand;
 import com.getit.domain.setting.staff.entity.Staff;
 import com.getit.domain.setting.staff.entity.StaffSection;
 import com.getit.domain.setting.staff.repository.StaffRepository;
@@ -33,6 +34,25 @@ class StaffPublicServiceTest {
   @Autowired
   private FileAssetRepository fileAssetRepository;
 
+
+  @Test
+  @DisplayName("공개 조회에도 GitHub · Instagram 링크가 나간다")
+  void exposesSnsLinks() {
+    Generation generation = Generation.create(9, 2026);
+    generation.activate();
+    generationRepository.save(generation);
+    staffRepository.save(Staff.create(
+        9, 1, new StaffCommand(StaffSection.SW,"SW 운영진","홍길동","컴퓨터공학과 21",null,"https://github.com/hong","https://instagram.com/hong",null,null)));
+
+    StaffDirectoryResult result = staffPublicService.getStaffDirectory();
+
+    // 공개 카드의 아이콘이 실제 계정으로 연결되려면 여기로 나가야 한다 (이슈 #155).
+    assertThat(result.sections()).flatExtracting(StaffSectionGroup::staffs)
+        .anySatisfy(staff -> {
+          assertThat(staff.githubUrl()).isEqualTo("https://github.com/hong");
+          assertThat(staff.instagramUrl()).isEqualTo("https://instagram.com/hong");
+        });
+  }
   @Test
   @DisplayName("항상 3개 section 을 반환하고, 소속 운영진이 없으면 빈 배열이다")
   void alwaysReturnsThreeSections() {
@@ -40,7 +60,7 @@ class StaffPublicServiceTest {
     generation.activate();
     generationRepository.save(generation);
     staffRepository.save(
-        Staff.create(9, 1, StaffSection.EXECUTIVE, "회장", "김철수", "경영학과 20", null, null, null));
+        Staff.create(9, 1, new StaffCommand(StaffSection.EXECUTIVE,"회장","김철수","경영학과 20",null,null,null,null,null)));
 
     StaffDirectoryResult result = staffPublicService.getStaffDirectory();
 
@@ -71,7 +91,7 @@ class StaffPublicServiceTest {
     FileAsset uploaded = fileAssetRepository.save(
         FileAsset.upload("staff-1", "staff-1.png", "https://cdn.getit.com/staff-1", 100L, "image/png", 1L));
     staffRepository.save(Staff.create(
-        9, 1, StaffSection.SW, "SW 운영진", "홍길동", "컴퓨터공학과 21", null, null, uploaded.getId()));
+        9, 1, new StaffCommand(StaffSection.SW,"SW 운영진","홍길동","컴퓨터공학과 21",null,null,null,null,uploaded.getId())));
 
     StaffDirectoryResult result = staffPublicService.getStaffDirectory();
 
@@ -87,7 +107,7 @@ class StaffPublicServiceTest {
     generation.activate();
     generationRepository.save(generation);
     staffRepository.save(
-        Staff.create(8, 1, StaffSection.SW, "SW 운영진", "지난기수", "컴퓨터공학과", null, null, null));
+        Staff.create(8, 1, new StaffCommand(StaffSection.SW,"SW 운영진","지난기수","컴퓨터공학과",null,null,null,null,null)));
 
     StaffDirectoryResult result = staffPublicService.getStaffDirectory();
 

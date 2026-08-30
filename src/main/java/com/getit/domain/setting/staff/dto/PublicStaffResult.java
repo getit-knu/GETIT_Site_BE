@@ -12,6 +12,8 @@ public record PublicStaffResult(
     String staffRole,
     String department,
     String introduction,
+    String githubUrl,
+    String instagramUrl,
     String profileImageUrl,
     Integer order
 ) {
@@ -26,6 +28,8 @@ public record PublicStaffResult(
         staff.getStaffRole(),
         staff.getDepartment(),
         staff.getIntroduction() != null ? staff.getIntroduction() : DEFAULT_INTRODUCTION,
+        staff.getGithubUrl(),
+        staff.getInstagramUrl(),
         profileImageUrl,
         staff.getOrder()
     );
