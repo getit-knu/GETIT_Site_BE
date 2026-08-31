@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.DynamicUpdate;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,8 +20,25 @@ import lombok.NoArgsConstructor;
  * <p>interviewEndAt 은 요청으로 받지 않는다. totalEndAt 과 항상 같은 값으로 서버가 채운다. (API 명세서 4.4)
  * 날짜 순서 검증(총 기간 · 서류 기간 · 면접 시작일)은 서비스 레이어에서 수행한다.
  */
+/**
+ * 바뀐 컬럼만 UPDATE 한다. (PR #173 리뷰 지적)
+ *
+ * <p>이 행에는 성격이 다른 두 갈래의 쓰기가 붙는다 — 일정 저장(6.2, 홈 일괄 저장)과
+ * 지원 스위치({@code applyEnabled})다. Hibernate 의 기본 UPDATE 는 바꾸지 않은 컬럼까지
+ * 함께 쓰기 때문에, 둘이 겹치면 나중에 커밋한 쪽이 상대가 방금 바꾼 값을 자기가 읽어 둔
+ * 옛 값으로 되돌린다.
+ *
+ * <p>스위치는 사고가 났을 때 내리는 것이라, 그 사이 누가 일정을 저장했다는 이유로 조용히
+ * 다시 올라가면 안 된다. 두 갈래가 건드리는 컬럼이 서로 겹치지 않으므로, 바뀐 컬럼만
+ * 쓰게 하면 서로를 덮지 않는다.
+ *
+ * <p>{@code @Version} 대신 이 방법을 쓴다. 낙관적 잠금은 일정 저장끼리의 경합까지 잡아주지만
+ * 컬럼 추가(마이그레이션)와 409 처리가 따라온다. 지금 막아야 하는 것은 성격이 다른 두 쓰기가
+ * 서로를 지우는 것이고, 그건 컬럼을 나누는 것으로 충분하다.
+ */
 @Entity
 @Table(name = "recruitment_schedule")
+@DynamicUpdate
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecruitmentSchedule extends BaseTimeEntity {
