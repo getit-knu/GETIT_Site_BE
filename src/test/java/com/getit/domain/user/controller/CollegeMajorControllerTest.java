@@ -84,4 +84,60 @@ class CollegeMajorControllerTest {
           .andExpect(jsonPath("$.data").isArray());
     }
   }
+
+  /**
+   * 명세서 2.7 의 경로. 지금까지 404 였다. (이슈 #193)
+   *
+   * <p>지원서 폼의 단과대 · 학과 셀렉트가 이 경로를 쓴다. FE 가 명세를 보고 붙이면 404 가
+   * 나던 상태였다.
+   */
+  @Nested
+  @DisplayName("GET " + COLLEGES_PATH + "/{collegeId}/majors")
+  class GetMajorsOfCollege {
+
+    @Test
+    @DisplayName("그 단과대의 전공만 반환한다")
+    void returnsMajorsOfCollege() throws Exception {
+      College engineering = collegeRepository.save(College.create("IT대학"));
+      majorRepository.save(Major.create(business.getId(), "경영학과"));
+      majorRepository.save(Major.create(engineering.getId(), "컴퓨터학부"));
+
+      mockMvc.perform(get(COLLEGES_PATH + "/" + engineering.getId() + "/majors"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.length()").value(1))
+          .andExpect(jsonPath("$.data[0].name").value("컴퓨터학부"));
+    }
+
+    @Test
+    @DisplayName("인증 없이 열린다")
+    void openWithoutAuth() throws Exception {
+      mockMvc.perform(get(COLLEGES_PATH + "/" + business.getId() + "/majors"))
+          .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("없는 단과대 id 면 빈 목록이다")
+    void returnsEmptyForUnknownCollege() throws Exception {
+      // 화면 입장에서 "그런 단과대가 없다" 와 "그 단과대에 학과가 없다" 는
+      // 똑같이 고를 것이 없는 상태다. 404 로 나누지 않는다.
+      mockMvc.perform(get(COLLEGES_PATH + "/999999/majors"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("쿼리 파라미터 방식과 같은 결과다")
+    void matchesQueryParamVariant() throws Exception {
+      majorRepository.save(Major.create(business.getId(), "경영학과"));
+
+      String nested = mockMvc.perform(get(COLLEGES_PATH + "/" + business.getId() + "/majors"))
+          .andReturn().getResponse().getContentAsString();
+      String query = mockMvc.perform(
+              get(MAJORS_PATH).param("collegeId", business.getId().toString()))
+          .andReturn().getResponse().getContentAsString();
+
+      // 같은 서비스 메서드를 쓰므로 동작이 갈라지면 안 된다.
+      org.assertj.core.api.Assertions.assertThat(nested).isEqualTo(query);
+    }
+  }
 }
