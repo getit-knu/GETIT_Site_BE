@@ -210,6 +210,24 @@ class QuestionServiceTest {
     }
 
     @Test
+    @DisplayName("강의에 매이지 않은 질문도 나오고, 강의 정보는 비어 있다")
+    void includesQuestionsWithoutLecture() {
+      Lecture lecture = lecture(true);
+      questionRepository.save(Question.create(memberId, lecture.getId(), "강의 질문"));
+      questionRepository.save(Question.create(memberId, null, "사이트 질문"));
+
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      // 내가 쓴 질문인 것은 같다. 강의 정보만 채울 것이 없다.
+      assertThat(result.content()).extracting(MemberQuestionResult.MyListItem::content)
+          .containsExactly("사이트 질문", "강의 질문");
+      MemberQuestionResult.MyListItem siteWide = result.content().get(0);
+      assertThat(siteWide.lectureId()).isNull();
+      assertThat(siteWide.lectureTitle()).isNull();
+    }
+
+    @Test
     @DisplayName("질문이 없으면 빈 목록이다")
     void returnsEmptyWhenNoQuestions() {
       PageResponse<MemberQuestionResult.MyListItem> result =

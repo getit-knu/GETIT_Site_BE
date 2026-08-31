@@ -58,8 +58,8 @@ public class QuestionService {
   ) {
     Page<Question> questions = questionRepository.findMyQuestions(userId, status, pageable);
     if (questions.isEmpty()) {
-      // 빈 목록에 답변·강의 조회를 더 보내지 않는다. 매퍼는 호출되지 않는다.
-      return PageResponse.from(questions, question -> null);
+      // 빈 목록에 답변 · 강의 조회를 더 보내지 않는다.
+      return PageResponse.empty(questions);
     }
 
     Map<Long, Answer> answerByQuestionId = answerRepository
