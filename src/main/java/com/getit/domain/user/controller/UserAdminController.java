@@ -60,11 +60,11 @@ public class UserAdminController {
   public ApiResponse<UserSummary> updateUser(
       @PathVariable Long id,
       @AuthenticationPrincipal CustomUserDetails principal,
-      @RequestBody UserUpdateRequest request
+      @Valid @RequestBody UserUpdateRequest request
   ) {
     return ApiResponse.success(userAdminService.updateUser(id, principal.getUserId(),
         new UserUpdateCommand(request.role(), request.groupId(), request.generationNo(),
-            request.unassignGroupOrDefault())));
+            request.unassignGroupOrDefault(), request.college(), request.major())));
   }
 
   @Operation(summary = "사용자 삭제", description = "명세서 9.3")

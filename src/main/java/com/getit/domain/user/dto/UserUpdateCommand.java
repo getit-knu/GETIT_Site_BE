@@ -13,10 +13,16 @@ import com.getit.domain.user.entity.Role;
  * @param groupId 배정할 조. {@code null} 은 "조를 건드리지 않는다" 는 뜻이지 해제가 아니다
  * @param unassignGroup 조 배정을 푼다. {@code groupId} 의 {@code null} 이 이미 "안 건드림" 으로
  *                      쓰이고 있어 해제를 표현할 자리가 없었다 (이슈 #174)
+ * @param college 단과대 이름. 값이 채워지는 정상 경로는 승격(9.4)이지만, 지원서에 단과대 id 가
+ *                담기지 않던 동안 승격된 부원은 비어 있고 그 지원서에는 되살릴 원본도 없다.
+ *                손으로 채울 자리가 필요하다 (이슈 #192)
+ * @param major 학과 이름. {@code college} 와 같다
  */
 public record UserUpdateCommand(
     Role role,
     Long groupId,
     Integer generationNo,
-    boolean unassignGroup
+    boolean unassignGroup,
+    String college,
+    String major
 ) { }
