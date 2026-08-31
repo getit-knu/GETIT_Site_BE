@@ -139,6 +139,39 @@ class UserAdminControllerTest {
   class UpdateUser {
 
     @Test
+    @DisplayName("단과대 · 학과를 채운다")
+    void fillsAffiliation() throws Exception {
+      User target = guest("google-aff-api", "affapi@getit.com", "부원");
+      target.promoteToMember(9);
+      userRepository.flush();
+      String body = objectMapper.writeValueAsString(
+          new UserUpdateRequest(null, null, null, null, "IT대학", "컴퓨터학부"));
+
+      mockMvc.perform(put(USERS_PATH + "/" + target.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.college").value("IT대학"))
+          .andExpect(jsonPath("$.data.major").value("컴퓨터학부"));
+    }
+
+    @Test
+    @DisplayName("컬럼(50자)을 넘는 학과 이름은 400 이다")
+    void rejectsTooLongAffiliation() throws Exception {
+      User target = guest("google-aff-long", "afflong@getit.com", "부원");
+      userRepository.flush();
+      String body = objectMapper.writeValueAsString(
+          new UserUpdateRequest(null, null, null, null, null, "가".repeat(51)));
+
+      mockMvc.perform(put(USERS_PATH + "/" + target.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("unassignGroup 으로 미배정으로 되돌린다")
     void unassignsGroup() throws Exception {
       Generation generation = Generation.create(9, 2026);
@@ -151,7 +184,7 @@ class UserAdminControllerTest {
       userRepository.flush();
 
       String body = objectMapper.writeValueAsString(
-          new UserUpdateRequest(null, null, null, true));
+          new UserUpdateRequest(null, null, null, true, null, null));
 
       // 어드민 화면의 "미배정" 을 골라도 아무 일이 없던 것을 고친다 (이슈 #174).
       mockMvc.perform(put(USERS_PATH + "/" + target.getId())
@@ -169,7 +202,7 @@ class UserAdminControllerTest {
       generation.activate();
       generationRepository.save(generation);
       User target = guest("google-5", "e@getit.com", "부원");
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null, null, null));
 
       // 기수 없이 부원이 되면 강좌 · 대시보드가 403 이 된다 (이슈 #178).
       mockMvc.perform(put(USERS_PATH + "/" + target.getId())
@@ -187,7 +220,7 @@ class UserAdminControllerTest {
       User admin = guest("google-6", "f@getit.com", "운영진");
       admin.updateRole(Role.ADMIN);
       String selfToken = tokenFor(admin, Role.ADMIN);
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null, null, null));
 
       mockMvc.perform(put(USERS_PATH + "/" + admin.getId())
               .header("Authorization", selfToken)
@@ -200,7 +233,7 @@ class UserAdminControllerTest {
     @Test
     @DisplayName("없는 사용자면 404 다")
     void returns404WhenNotFound() throws Exception {
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null, null, null));
 
       mockMvc.perform(put(USERS_PATH + "/999")
               .header("Authorization", adminToken())

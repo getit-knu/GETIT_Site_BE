@@ -1,6 +1,7 @@
 package com.getit.domain.user.dto;
 
 import com.getit.domain.user.entity.Role;
+import jakarta.validation.constraints.Size;
 
 /**
  * 사용자 권한 · 그룹 · 기수 변경 요청. (API 명세서 9.2)
@@ -18,7 +19,9 @@ public record UserUpdateRequest(
     Role role,
     Long groupId,
     Integer generationNo,
-    Boolean unassignGroup
+    Boolean unassignGroup,
+    @Size(max = 50) String college,
+    @Size(max = 50) String major
 ) {
 
   public boolean unassignGroupOrDefault() {

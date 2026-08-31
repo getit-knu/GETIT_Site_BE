@@ -201,6 +201,24 @@ public class User extends SoftDeletableEntity {
     this.studentNumber = studentNumber;
   }
 
+  /**
+   * 어드민이 소속을 고친다. (9.2 PUT /admin/users/{id}, 이슈 #192)
+   *
+   * <p>{@link #updateApplicantInfo} 와 나눈 이유가 있다. 그쪽은 지원서 값을 통째로 옮기는
+   * 자리라 연락처 · 학년 · 학번까지 함께 덮는다. 학과만 고치려고 그걸 부르면 나머지가
+   * 지워진다.
+   *
+   * <p>{@code null} 인 값은 건드리지 않는다. 둘 중 하나만 고치는 경우가 있다.
+   */
+  public void updateAffiliation(String college, String major) {
+    if (college != null) {
+      this.college = college;
+    }
+    if (major != null) {
+      this.major = major;
+    }
+  }
+
   /** 최종 합격자 승격. (9.4 POST /admin/users/promote) */
   public void promoteToMember(Integer generationNo) {
     this.role = Role.MEMBER;

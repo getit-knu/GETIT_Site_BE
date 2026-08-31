@@ -226,6 +226,68 @@ class UserAdminServiceTest {
   class UpdateUser {
 
     @Test
+    @DisplayName("어드민이 단과대 · 학과를 채운다")
+    void fillsAffiliation() {
+      User member = guest("google-aff", "aff@getit.com", "부원");
+      member.promoteToMember(9);
+      userRepository.flush();
+
+      // 승격 경로가 값을 못 만든 부원은 여기 말고 채울 자리가 없다 (이슈 #192).
+      UserSummary result = userAdminService.updateUser(member.getId(), 999L,
+          new UserUpdateCommand(null, null, null, false, "IT대학", "컴퓨터학부"));
+
+      assertThat(result.college()).isEqualTo("IT대학");
+      assertThat(result.major()).isEqualTo("컴퓨터학부");
+    }
+
+    @Test
+    @DisplayName("학과만 보내면 단과대는 그대로다")
+    void updatesOnlyGivenAffiliationField() {
+      User member = guest("google-aff2", "aff2@getit.com", "부원");
+      member.updateApplicantInfo("010-1234-5678", "IT대학", "옛학과", 3, "2021110000");
+      member.promoteToMember(9);
+      userRepository.flush();
+
+      userAdminService.updateUser(member.getId(), 999L,
+          new UserUpdateCommand(null, null, null, false, null, "새학과"));
+
+      assertThat(member.getCollege()).isEqualTo("IT대학");
+      assertThat(member.getMajor()).isEqualTo("새학과");
+    }
+
+    @Test
+    @DisplayName("학과를 고쳐도 연락처 · 학번은 지워지지 않는다")
+    void keepsOtherApplicantInfo() {
+      User member = guest("google-aff3", "aff3@getit.com", "부원");
+      member.updateApplicantInfo("010-1234-5678", "IT대학", "컴퓨터학부", 3, "2021110000");
+      member.promoteToMember(9);
+      userRepository.flush();
+
+      // updateApplicantInfo 를 재사용했다면 나머지가 함께 덮였다.
+      userAdminService.updateUser(member.getId(), 999L,
+          new UserUpdateCommand(null, null, null, false, "공과대학", "기계공학과"));
+
+      assertThat(member.getPhoneNumber()).isEqualTo("010-1234-5678");
+      assertThat(member.getStudentNumber()).isEqualTo("2021110000");
+      assertThat(member.getStudentYear()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("학과를 안 보내면 그대로 둔다")
+    void leavesAffiliationUntouched() {
+      User member = guest("google-aff4", "aff4@getit.com", "부원");
+      member.updateApplicantInfo(null, "IT대학", "컴퓨터학부", null, null);
+      member.promoteToMember(9);
+      userRepository.flush();
+
+      userAdminService.updateUser(member.getId(), 999L,
+          new UserUpdateCommand(Role.MEMBER, null, null, false, null, null));
+
+      assertThat(member.getCollege()).isEqualTo("IT대학");
+      assertThat(member.getMajor()).isEqualTo("컴퓨터학부");
+    }
+
+    @Test
     @DisplayName("unassignGroup 으로 조 배정을 푼다")
     void unassignsGroup() {
       Group group = groupRepository.save(Group.create(generation9.getId(), "1조"));
@@ -235,7 +297,7 @@ class UserAdminServiceTest {
       userRepository.flush();
 
       UserSummary result = userAdminService.updateUser(user.getId(), 999L,
-          new UserUpdateCommand(null, null, null, true));
+          new UserUpdateCommand(null, null, null, true, null, null));
 
       assertThat(user.getGroupId()).isNull();
       assertThat(result.group()).isNull();
@@ -251,7 +313,7 @@ class UserAdminServiceTest {
       userRepository.flush();
 
       // 이 뜻 때문에 해제를 표현할 자리가 없었다 (이슈 #174).
-      userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false));
+      userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false, null, null));
 
       assertThat(user.getGroupId()).isEqualTo(group.getId());
     }
@@ -269,7 +331,7 @@ class UserAdminServiceTest {
       // 기수를 8 로 되돌리면서 조도 뺀다. 조-기수 일치 검사를 그대로 적용하면, 정작 어긋난
       // 상태를 푸는 이 요청이 GROUP_GENERATION_MISMATCH 로 막힌다 (PR #181 리뷰 지적).
       userAdminService.updateUser(
-          user.getId(), 999L, new UserUpdateCommand(null, null, 8, true));
+          user.getId(), 999L, new UserUpdateCommand(null, null, 8, true, null, null));
 
       assertThat(user.getGroupId()).isNull();
       assertThat(user.getGenerationNo()).isEqualTo(8);
@@ -285,7 +347,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           user.getId(), 999L,
-          new UserUpdateCommand(null, group.getId(), null, true)))
+          new UserUpdateCommand(null, group.getId(), null, true, null, null)))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.GROUP_ASSIGN_CONFLICT);
     }
@@ -297,7 +359,7 @@ class UserAdminServiceTest {
       user.updateGenerationNo(9);
       userRepository.flush();
 
-      userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(null, null, null, true));
+      userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(null, null, null, true, null, null));
 
       assertThat(user.getGroupId()).isNull();
     }
@@ -308,7 +370,7 @@ class UserAdminServiceTest {
       User user = guest("google-7", "g@getit.com", "부원");
 
       UserSummary result = userAdminService.updateUser(user.getId(), 999L,
-          new UserUpdateCommand(Role.MEMBER, null, null, false));
+          new UserUpdateCommand(Role.MEMBER, null, null, false, null, null));
 
       assertThat(result.role()).isEqualTo(Role.MEMBER);
       assertThat(user.getGroupId()).isNull();
@@ -323,7 +385,7 @@ class UserAdminServiceTest {
       user.updateGenerationNo(8);
 
       userAdminService.updateUser(
-          user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false));
+          user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false, null, null));
 
       assertThat(user.getGenerationNo()).isEqualTo(8);
     }
@@ -335,7 +397,7 @@ class UserAdminServiceTest {
       generationRepository.save(Generation.create(8, 2025));
 
       userAdminService.updateUser(
-          user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, 8, false));
+          user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, 8, false, null, null));
 
       assertThat(user.getGenerationNo()).isEqualTo(8);
     }
@@ -346,7 +408,7 @@ class UserAdminServiceTest {
       User user = guest("google-7d", "gd@getit.com", "게스트");
 
       userAdminService.updateUser(
-          user.getId(), 999L, new UserUpdateCommand(Role.GUEST, null, null, false));
+          user.getId(), 999L, new UserUpdateCommand(Role.GUEST, null, null, false, null, null));
 
       assertThat(user.getGenerationNo()).isNull();
     }
@@ -361,7 +423,7 @@ class UserAdminServiceTest {
       // 어느 기수 소속인지 정할 수 없는 부원은 만들어 봐야 화면 어디에도 나오지 않는다.
       assertThatThrownBy(() ->
           userAdminService.updateUser(
-              user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false)))
+              user.getId(), 999L, new UserUpdateCommand(Role.MEMBER, null, null, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.ACTIVE_GENERATION_NOT_FOUND);
     }
@@ -374,7 +436,7 @@ class UserAdminServiceTest {
       user.promoteToMember(9);
 
       UserSummary result = userAdminService.updateUser(user.getId(), 999L,
-          new UserUpdateCommand(null, group.getId(), null, false));
+          new UserUpdateCommand(null, group.getId(), null, false, null, null));
 
       assertThat(result.group().id()).isEqualTo(group.getId());
     }
@@ -386,7 +448,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           user.getId(), 999L,
-          new UserUpdateCommand(null, 999L, null, false)))
+          new UserUpdateCommand(null, 999L, null, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GROUP_NOT_FOUND);
@@ -397,7 +459,7 @@ class UserAdminServiceTest {
     void updatesGenerationNoOnly() {
       User user = guest("google-10", "j@getit.com", "부원");
 
-      UserSummary result = userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(null, null, 9, false));
+      UserSummary result = userAdminService.updateUser(user.getId(), 999L, new UserUpdateCommand(null, null, 9, false, null, null));
 
       assertThat(result.generationNo()).isEqualTo(9);
     }
@@ -409,7 +471,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           user.getId(), 999L,
-          new UserUpdateCommand(null, null, 999, false)))
+          new UserUpdateCommand(null, null, 999, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GENERATION_NOT_FOUND);
@@ -425,7 +487,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           user.getId(), 999L,
-          new UserUpdateCommand(null, group.getId(), null, false)))
+          new UserUpdateCommand(null, group.getId(), null, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GROUP_GENERATION_MISMATCH);
@@ -442,7 +504,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           user.getId(), 999L,
-          new UserUpdateCommand(null, null, 8, false)))
+          new UserUpdateCommand(null, null, 8, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.GROUP_GENERATION_MISMATCH);
@@ -456,7 +518,7 @@ class UserAdminServiceTest {
     void throwsWhenUserNotFound() {
       assertThatThrownBy(() -> userAdminService.updateUser(
           999L, 999L,
-          new UserUpdateCommand(Role.MEMBER, null, null, false)))
+          new UserUpdateCommand(Role.MEMBER, null, null, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.USER_NOT_FOUND);
@@ -470,7 +532,7 @@ class UserAdminServiceTest {
 
       assertThatThrownBy(() -> userAdminService.updateUser(
           admin.getId(), admin.getId(),
-          new UserUpdateCommand(Role.MEMBER, null, null, false)))
+          new UserUpdateCommand(Role.MEMBER, null, null, false, null, null)))
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(UserErrorCode.CANNOT_REMOVE_OWN_ADMIN);
@@ -487,7 +549,7 @@ class UserAdminServiceTest {
       otherAdmin.updateRole(Role.ADMIN);
 
       UserSummary result = userAdminService.updateUser(admin.getId(), otherAdmin.getId(),
-          new UserUpdateCommand(Role.MEMBER, null, null, false));
+          new UserUpdateCommand(Role.MEMBER, null, null, false, null, null));
 
       assertThat(result.role()).isEqualTo(Role.MEMBER);
     }
@@ -499,7 +561,7 @@ class UserAdminServiceTest {
       admin.updateRole(Role.ADMIN);
 
       UserSummary result = userAdminService.updateUser(admin.getId(), admin.getId(),
-          new UserUpdateCommand(Role.ADMIN, null, 9, false));
+          new UserUpdateCommand(Role.ADMIN, null, 9, false, null, null));
 
       assertThat(result.role()).isEqualTo(Role.ADMIN);
       assertThat(result.generationNo()).isEqualTo(9);

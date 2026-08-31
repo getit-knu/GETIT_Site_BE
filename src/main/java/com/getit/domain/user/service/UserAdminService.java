@@ -127,6 +127,11 @@ public class UserAdminService {
    * 권한만 올린 채로 두면 강좌 목록 · 대시보드가 403 이 되고 제출 현황과 조 배정 화면에서도
    * 사람이 사라진다 — 아무 경고 없이 쓸 수 없는 계정이 만들어진다 (이슈 #178).
    *
+   * <p>{@code college} · {@code major} 는 손으로 채우는 자리다. 값이 채워지는 정상 경로는
+   * 승격(9.4)이지만, 지원서에 단과대 id 가 담기지 않던 동안 승격된 부원은 비어 있고 그
+   * 지원서에는 되살릴 원본도 없다. 본인 수정(이슈 #147)에서도 뺀 값이라 여기가 유일한
+   * 자리다 (이슈 #192).
+   *
    * <p>{@code unassignGroup} 은 조 배정을 푼다. {@code groupId} 의 {@code null} 이 이미
    * "안 건드림" 으로 쓰이고 있어 해제를 표현할 자리가 없었다 — 어드민 화면의 "미배정" 을
    * 골라도 아무 일이 일어나지 않았다 (이슈 #174).
@@ -168,6 +173,7 @@ public class UserAdminService {
     if (resolvedGenerationNo != null) {
       user.updateGenerationNo(resolvedGenerationNo);
     }
+    user.updateAffiliation(command.college(), command.major());
 
     GroupSummary group = user.getGroupId() != null
         ? groupRepository.findById(user.getGroupId()).map(GroupSummary::from).orElse(null)
