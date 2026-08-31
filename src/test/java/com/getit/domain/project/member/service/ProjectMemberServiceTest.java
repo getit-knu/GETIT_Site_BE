@@ -217,12 +217,43 @@ class ProjectMemberServiceTest {
   class AdminDecision {
 
     @Test
+    @DisplayName("changeStatus 로는 반려할 수 없다")
+    void cannotRejectWithoutReason() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+
+      // 여기로 반려하면 사유 없는 반려가 만들어져, 부원이 이유를 알게 하려던 것이
+      // 그대로 뚫린다 (PR #197 리뷰).
+      assertThatThrownBy(() ->
+          projectAdminService.changeStatus(submitted.id(), ProjectStatus.REJECTED))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("지난 기수의 같은 이름 조에는 보이지 않는다")
+    void doesNotLeakToSameNamedGroupOfAnotherGeneration() {
+      projectMemberService.submitProject(memberInGroup.getId(), request(null));
+
+      // 조 이름은 기수 안에서만 유일하다. 8기에도 "3조" 가 있을 수 있다.
+      Generation previous = generationRepository.save(Generation.create(8, 2025));
+      Group sameNameLastYear = groupRepository.save(Group.create(previous.getId(), "3조"));
+      User lastYearMember = member("google-sub-last-year");
+      lastYearMember.assignToGroup(sameNameLastYear.getId());
+      userRepository.flush();
+
+      // 이름으로 찾으면 지난 기수 조원에게 올해 프로젝트가 보였다 (PR #197 리뷰).
+      assertThat(projectMemberService.getMyProjects(lastYearMember.getId())).isEmpty();
+      assertThat(projectMemberService.getMyProjects(memberInGroup.getId())).hasSize(1);
+    }
+
+    @Test
     @DisplayName("반려한 것을 다시 승인할 수 있다")
     void canApproveAfterRejecting() {
       MemberProjectResult submitted =
           projectMemberService.submitProject(memberInGroup.getId(), request(null));
 
-      projectAdminService.changeStatus(submitted.id(), ProjectStatus.REJECTED);
+      // 반려는 사유와 함께만 할 수 있다. changeStatus 로는 막힌다 (PR #197 리뷰).
+      projectAdminService.reject(submitted.id(), "설명 보강 필요");
       assertThat(showcaseTitles()).doesNotContain("우리 조 프로젝트");
 
       // 사람이 판단을 바꿀 수 있어야 한다.

@@ -92,6 +92,7 @@ public class ProjectAdminService {
    * <p>다시 승인하면 사유는 비워진다({@link Project#changeStatus}). 공개된 프로젝트에 반려
    * 사유가 붙어 있는 상태를 만들지 않는다.
    */
+  @Transactional
   public ProjectResult.Item reject(Long projectId, String reason) {
     Project project = findProject(projectId);
     if (project.getStatus() == ProjectStatus.REJECTED) {

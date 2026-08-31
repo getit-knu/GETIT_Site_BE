@@ -101,7 +101,7 @@ class ProjectAdminControllerTest {
   private Long pendingProjectId() {
     ProjectCommand command = new ProjectCommand(
         "부원 프로젝트", "3조", "2026-SPRING", null, List.of(), null, null, false, null);
-    return projectRepository.save(Project.submit(command, 1)).getId();
+    return projectRepository.save(Project.submit(command, 1, null)).getId();
   }
 
   @Test

@@ -31,7 +31,7 @@ class ProjectRepositoryTest {
   private Project pending(String title, String semester, int order) {
     ProjectCommand command = new ProjectCommand(
         title, "팀", semester, null, List.of(), null, null, false, null);
-    return projectRepository.save(Project.submit(command, order));
+    return projectRepository.save(Project.submit(command, order, null));
   }
 
   @Test
