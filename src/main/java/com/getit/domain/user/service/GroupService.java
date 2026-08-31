@@ -16,6 +16,7 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,11 +27,35 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class GroupService {
+public class GroupService implements MemberGroupService {
 
   private final GroupRepository groupRepository;
   private final UserRepository userRepository;
   private final GenerationQueryService generationQueryService;
+
+  /**
+   * 부원이 보는 내 조. (이슈 #148 — GET /api/member/group)
+   *
+   * <p>조 배정은 어드민이 한다. 아직 배정되지 않은 부원이 있는 것은 정상이라 오류로 다루지 않는다.
+   */
+  @Override
+  public Optional<GroupWithMembersResult> findMyGroup(Long userId) {
+    User user = userRepository.findById(userId)
+        .filter(found -> !found.isDeleted())
+        .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+    if (user.getGroupId() == null) {
+      return Optional.empty();
+    }
+
+    Group group = groupRepository.findById(user.getGroupId())
+        .orElseThrow(() -> new BusinessException(UserErrorCode.GROUP_NOT_FOUND));
+    List<GroupMemberResult> members =
+        userRepository.findByGroupIdAndStatus(group.getId(), UserStatus.ACTIVE).stream()
+            .map(GroupMemberResult::from)
+            .toList();
+
+    return Optional.of(GroupWithMembersResult.of(group, members));
+  }
 
   /** 9.6. generationId 가 없으면 활성 기수를 쓴다. */
   public GroupBoardResult getGroups(Long generationId) {

@@ -5,6 +5,7 @@ import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
 import com.getit.domain.project.entity.Project;
+import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.exception.ProjectErrorCode;
 import com.getit.domain.project.repository.ProjectRepository;
 import com.getit.global.dto.PageResponse;
@@ -31,7 +32,8 @@ public class ProjectAdminService {
 
   public PageResponse<ProjectResult.Item> getProjects(String semester, Pageable pageable) {
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-    Page<Project> page = projectRepository.searchBySemester(semester, pageOnly);
+    // 어드민은 승인 대기 중인 것도 봐야 하므로 상태로 거르지 않는다 (이슈 #148).
+    Page<Project> page = projectRepository.searchBySemester(semester, null, pageOnly);
     Map<Long, String> thumbnails = resolveThumbnails(page.getContent());
     return PageResponse.from(page, project -> ProjectResult.Item.of(project, thumbnails.get(project.getId())));
   }
@@ -56,6 +58,22 @@ public class ProjectAdminService {
   private ProjectResult.Item toItem(Project project) {
     Map<Long, String> thumbnails = resolveThumbnails(List.of(project));
     return ProjectResult.Item.of(project, thumbnails.get(project.getId()));
+  }
+
+  /**
+   * 부원이 낸 프로젝트를 승인하거나 반려한다. (이슈 #148)
+   *
+   * <p>반려한 것을 다시 승인하는 것도 허용한다. 사람이 판단을 바꿀 수 있어야 한다.
+   * 이미 같은 상태면 막는다 — 눌렀는데 아무 일도 일어나지 않는 것보다 낫다.
+   */
+  @Transactional
+  public ProjectResult.Item changeStatus(Long projectId, ProjectStatus status) {
+    Project project = findProject(projectId);
+    if (project.getStatus() == status) {
+      throw new BusinessException(ProjectErrorCode.PROJECT_STATUS_UNCHANGED);
+    }
+    project.changeStatus(status);
+    return toItem(project);
   }
 
   @Transactional

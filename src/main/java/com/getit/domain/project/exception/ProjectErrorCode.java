@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ProjectErrorCode implements ErrorCode {
 
-  PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다.");
+  PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다."),
+  NOT_ASSIGNED_TO_GROUP(HttpStatus.BAD_REQUEST, "조에 배정된 뒤에 프로젝트를 등록할 수 있습니다."),
+  PROJECT_STATUS_UNCHANGED(HttpStatus.CONFLICT, "프로젝트가 이미 그 상태입니다.");
 
   private final HttpStatus status;
   private final String message;

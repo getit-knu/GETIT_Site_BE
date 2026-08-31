@@ -16,7 +16,7 @@ public class ProjectRequest {
       @NotBlank @Size(max = 100) String title,
       @NotBlank @Size(max = 100) String teamName,
       @NotBlank @Pattern(regexp = "\\d{4}-(SPRING|SUMMER|FALL|WINTER)") String semester,
-      String description,
+      @Size(max = 20000) String description,
       @Size(max = 10) List<@Size(max = 40) @Pattern(regexp = "[^,]+") String> techStacks,
       @HttpUrl String codeUrl,
       @HttpUrl String demoUrl,

@@ -14,6 +14,7 @@ import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
+import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.repository.ProjectRepository;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
@@ -85,6 +86,65 @@ class ProjectAdminControllerTest {
     String token = "Bearer " + jwtProvider.createAccessToken(adminId, "admin@getit.com", Role.MEMBER);
 
     mockMvc.perform(get(PATH).header("Authorization", token)).andExpect(status().isForbidden());
+  }
+
+  /** 부원이 낸 승인 대기 프로젝트. (이슈 #148) */
+  private Long pendingProjectId() {
+    ProjectCommand command = new ProjectCommand(
+        "부원 프로젝트", "3조", "2026-SPRING", null, List.of(), null, null, false, null);
+    return projectRepository.save(Project.submit(command, 1)).getId();
+  }
+
+  @Test
+  @DisplayName("승인하면 200 과 APPROVED 를 준다")
+  void approvesPendingProject() throws Exception {
+    Long projectId = pendingProjectId();
+
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", adminToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value(ProjectStatus.APPROVED.name()))
+        .andExpect(jsonPath("$.data.statusLabel").value("공개"));
+  }
+
+  @Test
+  @DisplayName("반려하면 200 과 REJECTED 를 준다")
+  void rejectsPendingProject() throws Exception {
+    Long projectId = pendingProjectId();
+
+    mockMvc.perform(post(PATH + "/" + projectId + "/reject").header("Authorization", adminToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value(ProjectStatus.REJECTED.name()));
+  }
+
+  @Test
+  @DisplayName("이미 같은 상태면 409 다")
+  void rejectsNoOpTransition() throws Exception {
+    Long projectId = pendingProjectId();
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", adminToken()));
+
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", adminToken()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  @DisplayName("승인 · 반려도 토큰이 없으면 401 이다")
+  void decisionRejectsAnonymous() throws Exception {
+    Long projectId = pendingProjectId();
+
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve")).andExpect(status().isUnauthorized());
+    mockMvc.perform(post(PATH + "/" + projectId + "/reject")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("승인 · 반려도 ADMIN 이 아니면 403 이다")
+  void decisionRejectsNonAdmin() throws Exception {
+    Long projectId = pendingProjectId();
+    String token = "Bearer " + jwtProvider.createAccessToken(adminId, "admin@getit.com", Role.MEMBER);
+
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", token))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(post(PATH + "/" + projectId + "/reject").header("Authorization", token))
+        .andExpect(status().isForbidden());
   }
 
   @Test
