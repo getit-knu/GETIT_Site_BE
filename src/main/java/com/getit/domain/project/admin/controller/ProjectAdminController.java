@@ -2,6 +2,7 @@ package com.getit.domain.project.admin.controller;
 
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
+import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.admin.service.ProjectAdminService;
 import com.getit.global.dto.ApiResponse;
 import com.getit.global.dto.PageResponse;
@@ -54,6 +55,18 @@ public class ProjectAdminController {
       @Valid @RequestBody ProjectRequest.Write request
   ) {
     return ApiResponse.success(projectAdminService.updateProject(id, request));
+  }
+
+  @Operation(summary = "프로젝트 승인", description = "이슈 #148")
+  @PostMapping("/{id}/approve")
+  public ApiResponse<ProjectResult.Item> approveProject(@PathVariable Long id) {
+    return ApiResponse.success(projectAdminService.changeStatus(id, ProjectStatus.APPROVED));
+  }
+
+  @Operation(summary = "프로젝트 반려", description = "이슈 #148")
+  @PostMapping("/{id}/reject")
+  public ApiResponse<ProjectResult.Item> rejectProject(@PathVariable Long id) {
+    return ApiResponse.success(projectAdminService.changeStatus(id, ProjectStatus.REJECTED));
   }
 
   @Operation(summary = "프로젝트 삭제", description = "명세서 12.4")

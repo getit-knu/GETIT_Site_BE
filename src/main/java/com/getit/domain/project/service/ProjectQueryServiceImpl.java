@@ -1,5 +1,6 @@
 package com.getit.domain.project.service;
 
+import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.repository.ProjectRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,17 +20,19 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
   @Override
   public Page<ProjectView> findShowcase(String semester, Pageable pageable) {
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-    return projectRepository.searchBySemester(semester, pageOnly).map(ProjectView::from);
+    return projectRepository.searchBySemester(semester, ProjectStatus.APPROVED, pageOnly)
+        .map(ProjectView::from);
   }
 
   @Override
   public List<String> findDistinctSemesters() {
-    return projectRepository.findDistinctSemesters();
+    return projectRepository.findDistinctSemestersByStatus(ProjectStatus.APPROVED);
   }
 
   @Override
   public List<ProjectView> findFeatured() {
-    return projectRepository.findByIsFeaturedTrueOrderByOrderAscIdAsc().stream()
+    return projectRepository
+        .findByIsFeaturedTrueAndStatusOrderByOrderAscIdAsc(ProjectStatus.APPROVED).stream()
         .map(ProjectView::from)
         .toList();
   }

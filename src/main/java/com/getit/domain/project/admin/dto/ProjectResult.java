@@ -2,6 +2,7 @@ package com.getit.domain.project.admin.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.getit.domain.project.entity.Project;
+import com.getit.domain.project.entity.ProjectStatus;
 import java.util.List;
 
 public class ProjectResult {
@@ -18,7 +19,9 @@ public class ProjectResult {
       Long fileId,
       String thumbnailUrl,
       @JsonProperty("isFeatured") boolean isFeatured,
-      int order
+      int order,
+      ProjectStatus status,
+      String statusLabel
   ) {
 
     public static Item of(Project project, String thumbnailUrl) {
@@ -34,7 +37,9 @@ public class ProjectResult {
           project.getFileId(),
           thumbnailUrl,
           project.isFeatured(),
-          project.getOrder());
+          project.getOrder(),
+          project.getStatus(),
+          project.getStatus().getLabel());
     }
   }
 }
