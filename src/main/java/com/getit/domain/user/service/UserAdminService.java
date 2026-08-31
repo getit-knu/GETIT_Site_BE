@@ -159,12 +159,6 @@ public class UserAdminService {
   }
 
   /**
-   * 변경 후 사용자가 속하게 될 조와 기수가 서로 다른 기수를 가리키면 안 된다. 검증 없이
-   * 허용하면, 9.6 조회(조의 기수와 사용자의 generationNo 가 같아야 조원 명단에 나타남)에서
-   * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
-   * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
-   */
-  /**
    * 이번 요청으로 정해질 기수. 명시하면 그 값이고, 부원으로 올리는데 기수가 없으면 활성
    * 기수다. 그 외에는 {@code null} — 건드리지 않는다는 뜻이다.
    *
@@ -178,11 +172,20 @@ public class UserAdminService {
     if (role != Role.MEMBER || user.getGenerationNo() != null) {
       return null;
     }
-    return generationQueryService.findActive()
+    // findActive 가 아니라 findActiveForWrite 다. 읽고 나서 저장하기 전에 다른 트랜잭션이
+    // 기수를 전환하면, 방금 지난 기수가 된 값이 사용자에게 박힌다 — 이 수정이 없애려던
+    // "화면에 안 나오는 부원" 이 동시 요청에서 다시 생긴다 (PR #180 리뷰 지적).
+    return generationQueryService.findActiveForWrite()
         .orElseThrow(() -> new BusinessException(UserErrorCode.ACTIVE_GENERATION_NOT_FOUND))
         .generationNo();
   }
 
+  /**
+   * 변경 후 사용자가 속하게 될 조와 기수가 서로 다른 기수를 가리키면 안 된다. 검증 없이
+   * 허용하면, 9.6 조회(조의 기수와 사용자의 generationNo 가 같아야 조원 명단에 나타남)에서
+   * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
+   * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
+   */
   private void validateGroupGenerationConsistency(User user, Long groupId, Integer generationNo) {
     Integer effectiveGenerationNo = generationNo != null ? generationNo : user.getGenerationNo();
     Long effectiveGroupId = groupId != null ? groupId : user.getGroupId();
