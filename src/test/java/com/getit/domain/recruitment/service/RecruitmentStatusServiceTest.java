@@ -181,4 +181,72 @@ class RecruitmentStatusServiceTest {
 
     assertThat(status.phase()).isEqualTo(RecruitmentPhase.CLOSED);
   }
+
+  /**
+   * 지원 스위치는 일정과 별개다. (이슈 #170)
+   *
+   * <p>단계는 그대로 DOCUMENT_OPEN 이고 일정 값도 그대로 남는다. 바뀌는 것은 지원 가능
+   * 여부와 안내 문구뿐이다 — 급히 멈추려고 마감일을 당기면 D-day 와 일정 표시가 망가진다.
+   */
+  private RecruitmentSchedule openScheduleWithToggle(boolean applyEnabled) {
+    Generation generation = activeGeneration();
+    RecruitmentSchedule schedule = RecruitmentSchedule.create(
+        generation.getId(), NOW.minusDays(5), NOW.plusDays(20),
+        NOW.minusDays(5), NOW.plusDays(5), NOW.plusDays(10));
+    schedule.changeApplyEnabled(applyEnabled);
+    return recruitmentScheduleRepository.save(schedule);
+  }
+
+  @Test
+  @DisplayName("서류 기간이라도 스위치를 내리면 지원할 수 없다")
+  void closesApplyWhileStillInDocumentPeriod() {
+    openScheduleWithToggle(false);
+
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus();
+
+    assertThat(status.applyEnabled()).isFalse();
+    assertThat(status.message()).isEqualTo("지원 접수가 일시 중지되었습니다");
+  }
+
+  @Test
+  @DisplayName("스위치를 내려도 단계와 일정은 그대로다")
+  void keepsPhaseAndScheduleIntactWhenPaused() {
+    openScheduleWithToggle(false);
+
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus();
+
+    // 마감일을 당겨서 멈추는 것과 다른 점이 바로 이것이다.
+    assertThat(status.phase()).isEqualTo(RecruitmentPhase.DOCUMENT_OPEN);
+    assertThat(status.dDay()).isEqualTo(5L);
+    assertThat(status.schedule().documentEndAt())
+        .isEqualTo(NOW.plusDays(5).atZone(SEOUL).toOffsetDateTime());
+  }
+
+  @Test
+  @DisplayName("스위치를 다시 올리면 원래대로 돌아온다")
+  void reopensApply() {
+    RecruitmentSchedule schedule = openScheduleWithToggle(false);
+    schedule.changeApplyEnabled(true);
+    recruitmentScheduleRepository.save(schedule);
+
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus();
+
+    assertThat(status.applyEnabled()).isTrue();
+    assertThat(status.message()).isEqualTo("서류 마감까지 D-5");
+  }
+
+  @Test
+  @DisplayName("서류 기간이 아니면 스위치가 올라가 있어도 지원할 수 없다")
+  void scheduleStillWinsOverToggle() {
+    Generation generation = activeGeneration();
+    recruitmentScheduleRepository.save(RecruitmentSchedule.create(
+        generation.getId(), NOW.plusDays(1), NOW.plusDays(30),
+        NOW.plusDays(3), NOW.plusDays(10), NOW.plusDays(20)));
+
+    RecruitmentStatusResult status = recruitmentStatusService.getStatus();
+
+    assertThat(status.phase()).isEqualTo(RecruitmentPhase.BEFORE_OPEN);
+    assertThat(status.applyEnabled()).isFalse();
+    assertThat(status.message()).isEqualTo("모집 시작까지 D-3");
+  }
 }

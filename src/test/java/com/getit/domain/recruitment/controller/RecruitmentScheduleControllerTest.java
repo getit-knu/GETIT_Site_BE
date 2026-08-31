@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.recruitment.dto.ApplyToggleRequest;
 import com.getit.domain.recruitment.dto.RecruitmentScheduleUpdateRequest;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
 import com.getit.domain.recruitment.repository.RecruitmentScheduleRepository;
@@ -178,6 +179,102 @@ class RecruitmentScheduleControllerTest {
               .content(updateRequestJson(9)))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.error.code").value("ACTIVE_GENERATION_NOT_FOUND"));
+    }
+  }
+
+  /**
+   * 지원 접수 스위치. (이슈 #170)
+   *
+   * <p>일정과 별개다. 서류 기간 중이라도 내리면 지원이 막히고, 일정 값은 그대로 남는다.
+   */
+  @Nested
+  @DisplayName("PUT " + SCHEDULE_PATH + "/apply-enabled")
+  class ChangeApplyEnabled {
+
+    private String togglePath() {
+      return SCHEDULE_PATH + "/apply-enabled";
+    }
+
+    private String toggleJson(Boolean enabled) throws Exception {
+      return objectMapper.writeValueAsString(new ApplyToggleRequest(enabled));
+    }
+
+    private void saveSchedule() {
+      recruitmentScheduleRepository.save(RecruitmentSchedule.create(
+          activeGeneration.getId(), dt(9, 1), dt(9, 30), dt(9, 1), dt(9, 10), dt(9, 15)));
+    }
+
+    @Test
+    @DisplayName("내리면 applyEnabled 가 false 가 되고 일정은 그대로다")
+    void disablesApply() throws Exception {
+      saveSchedule();
+
+      mockMvc.perform(put(togglePath())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(false)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.applyEnabled").value(false))
+          .andExpect(jsonPath("$.data.documentEndAt").value(iso(dt(9, 10))));
+    }
+
+    @Test
+    @DisplayName("다시 올리면 true 로 돌아온다")
+    void enablesApplyAgain() throws Exception {
+      saveSchedule();
+      mockMvc.perform(put(togglePath())
+          .header("Authorization", adminToken())
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(toggleJson(false)));
+
+      mockMvc.perform(put(togglePath())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(true)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.applyEnabled").value(true));
+    }
+
+    @Test
+    @DisplayName("enabled 가 없으면 400 이다")
+    void rejectsMissingEnabled() throws Exception {
+      saveSchedule();
+
+      // 여닫는 것은 사고가 났을 때 누르는 버튼이라, 값이 빠졌을 때 한쪽으로 기울면 안 된다.
+      mockMvc.perform(put(togglePath())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(null)))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("일정이 없으면 404 다")
+    void returns404WhenNoSchedule() throws Exception {
+      mockMvc.perform(put(togglePath())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(false)))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("SCHEDULE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("토큰이 없으면 401, ADMIN 이 아니면 403 이다")
+    void requiresAdmin() throws Exception {
+      saveSchedule();
+      String memberToken =
+          "Bearer " + jwtProvider.createAccessToken(1L, "member@getit.com", Role.MEMBER);
+
+      mockMvc.perform(put(togglePath())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(false)))
+          .andExpect(status().isUnauthorized());
+      mockMvc.perform(put(togglePath())
+              .header("Authorization", memberToken)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(toggleJson(false)))
+          .andExpect(status().isForbidden());
     }
   }
 }

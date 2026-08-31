@@ -14,7 +14,8 @@ public record RecruitmentScheduleResult(
     LocalDateTime documentStartAt,
     LocalDateTime documentEndAt,
     LocalDateTime interviewStartAt,
-    LocalDateTime interviewEndAt
+    LocalDateTime interviewEndAt,
+    boolean applyEnabled
 ) {
 
   public static RecruitmentScheduleResult of(GenerationSummary generation, RecruitmentSchedule schedule) {
@@ -27,7 +28,8 @@ public record RecruitmentScheduleResult(
         schedule.getDocumentStartAt(),
         schedule.getDocumentEndAt(),
         schedule.getInterviewStartAt(),
-        schedule.getInterviewEndAt()
+        schedule.getInterviewEndAt(),
+        schedule.isApplyEnabled()
     );
   }
 }

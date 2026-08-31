@@ -32,6 +32,22 @@ public class RecruitmentScheduleService implements RecruitmentScheduleWriteServi
     return RecruitmentScheduleResult.of(activeGeneration, schedule);
   }
 
+  /**
+   * 지원 접수를 여닫는다. (이슈 #170)
+   *
+   * <p>일정은 건드리지 않는다. 급히 멈추려고 {@code documentEndAt} 을 과거로 당기면 원래
+   * 마감 일정이 지워지고 공개 화면의 D-day 와 일정 표시까지 함께 망가진다.
+   */
+  @Transactional
+  public RecruitmentScheduleResult changeApplyEnabled(boolean enabled) {
+    GenerationSummary activeGeneration = findActiveGeneration();
+    RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(activeGeneration.id())
+        .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.SCHEDULE_NOT_FOUND));
+
+    schedule.changeApplyEnabled(enabled);
+    return RecruitmentScheduleResult.of(activeGeneration, schedule);
+  }
+
   @Override
   @Transactional
   public RecruitmentScheduleResult updateSchedule(ScheduleUpdateCommand command) {
