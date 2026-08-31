@@ -5,6 +5,7 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.GroupSummary;
 import com.getit.domain.user.dto.UserExportFilter;
 import com.getit.domain.user.dto.UserSummary;
+import com.getit.domain.user.dto.UserUpdateCommand;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
@@ -125,24 +126,41 @@ public class UserAdminService {
    * <p>부원으로 올리는데 기수가 없으면 활성 기수를 붙인다. 부원은 기수에 속해야 의미가 있고,
    * 권한만 올린 채로 두면 강좌 목록 · 대시보드가 403 이 되고 제출 현황과 조 배정 화면에서도
    * 사람이 사라진다 — 아무 경고 없이 쓸 수 없는 계정이 만들어진다 (이슈 #178).
+   *
+   * <p>{@code unassignGroup} 은 조 배정을 푼다. {@code groupId} 의 {@code null} 이 이미
+   * "안 건드림" 으로 쓰이고 있어 해제를 표현할 자리가 없었다 — 어드민 화면의 "미배정" 을
+   * 골라도 아무 일이 일어나지 않았다 (이슈 #174).
+   *
+   * <p>조원 빼기(9.11 {@code DELETE /admin/groups/{groupId}/members/{userId}})로도 같은 일을
+   * 할 수 있다. 그쪽은 조 관리 화면에서 명단을 보며 빼는 자리이고, 이쪽은 사용자 한 줄에서
+   * 바꾸는 자리다. 둘 다 {@code User.leaveGroup()} 하나로 모인다.
    */
   @Transactional
-  public UserSummary updateUser(
-      Long targetUserId, Long currentUserId, Role role, Long groupId, Integer generationNo
-  ) {
+  public UserSummary updateUser(Long targetUserId, Long currentUserId, UserUpdateCommand command) {
+    Role role = command.role();
+    Long groupId = command.groupId();
+    Integer generationNo = command.generationNo();
+    boolean unassignGroup = command.unassignGroup();
+
     User user = findUser(targetUserId);
 
+    if (unassignGroup && groupId != null) {
+      throw new BusinessException(UserErrorCode.GROUP_ASSIGN_CONFLICT);
+    }
     if (role != null) {
       validateNotSelfAdminRevocation(user, targetUserId, currentUserId, role);
     }
 
     Integer resolvedGenerationNo = resolveGenerationNo(user, role, generationNo);
     if (groupId != null || resolvedGenerationNo != null) {
-      validateGroupGenerationConsistency(user, groupId, resolvedGenerationNo);
+      validateGroupGenerationConsistency(user, groupId, resolvedGenerationNo, unassignGroup);
     }
 
     if (role != null) {
       user.updateRole(role);
+    }
+    if (unassignGroup) {
+      user.leaveGroup();
     }
     if (groupId != null) {
       user.assignToGroup(groupId);
@@ -186,9 +204,12 @@ public class UserAdminService {
    * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
    * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
    */
-  private void validateGroupGenerationConsistency(User user, Long groupId, Integer generationNo) {
+  private void validateGroupGenerationConsistency(
+      User user, Long groupId, Integer generationNo, boolean unassignGroup
+  ) {
     Integer effectiveGenerationNo = generationNo != null ? generationNo : user.getGenerationNo();
-    Long effectiveGroupId = groupId != null ? groupId : user.getGroupId();
+    // 해제하면 조가 없어지므로 조-기수 일치를 따질 대상도 없다.
+    Long effectiveGroupId = unassignGroup ? null : (groupId != null ? groupId : user.getGroupId());
 
     if (generationNo != null) {
       findGenerationByNo(generationNo);

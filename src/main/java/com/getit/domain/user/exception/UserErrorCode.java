@@ -19,7 +19,8 @@ public enum UserErrorCode implements ErrorCode {
   CANNOT_REMOVE_OWN_ADMIN(HttpStatus.FORBIDDEN, "자기 자신의 ADMIN 권한은 해제할 수 없습니다."),
   INVALID_GROUP_FILTER(HttpStatus.BAD_REQUEST, "groupId 는 숫자 또는 'none' 이어야 합니다."),
   GROUP_GENERATION_MISMATCH(HttpStatus.BAD_REQUEST, "조의 소속 기수와 사용자의 소속 기수가 다릅니다."),
-  NOT_PUBLIC_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "프로필 사진은 공개 저장소의 파일이어야 합니다.");
+  NOT_PUBLIC_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "프로필 사진은 공개 저장소의 파일이어야 합니다."),
+  GROUP_ASSIGN_CONFLICT(HttpStatus.BAD_REQUEST, "조 배정과 해제를 함께 요청할 수 없습니다.");
 
   private final HttpStatus status;
   private final String message;
