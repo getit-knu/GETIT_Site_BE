@@ -1,8 +1,10 @@
 package com.getit.domain.auth.service;
 
 import com.getit.domain.auth.dto.MeResponse;
+import com.getit.domain.auth.dto.MeUpdateRequest;
 import com.getit.domain.user.exception.UserErrorCode;
 import com.getit.domain.user.service.UserAccountService;
+import com.getit.domain.user.service.UserProfileService;
 import com.getit.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
   private final UserAccountService userAccountService;
+  private final UserProfileService userProfileService;
 
   /**
    * 내 프로필 조회. (1.5 GET /api/auth/me)
@@ -31,5 +34,15 @@ public class AuthService {
     return userAccountService.findActiveById(userId)
         .map(MeResponse::from)
         .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  /**
+   * 내 프로필 수정. (이슈 #147)
+   *
+   * <p>GUEST · MEMBER · ADMIN 모두 호출한다. 자기 것만 고치므로 권한으로 나누지 않는다.
+   */
+  @Transactional
+  public MeResponse updateMe(Long userId, MeUpdateRequest request) {
+    return MeResponse.from(userProfileService.editMyProfile(userId, request.toCommand()));
   }
 }

@@ -75,6 +75,24 @@ public class User extends SoftDeletableEntity {
   @Column(length = 512)
   private String profileImageUrl;
 
+  /**
+   * 스스로 올린 프로필 사진의 파일 id. 구글 사진을 그대로 쓰는 동안은 null.
+   *
+   * <p>사진을 바꿀 때 이전 파일을 연결 해제하려고 들고 있는다. 화면에 쓰는 주소는
+   * {@link #profileImageUrl} 에 함께 저장한다. 프로필 사진은 공개 컨테이너라 주소가 고정이다.
+   */
+  @Column
+  private Long profileFileId;
+
+  /**
+   * 한 번이라도 프로필을 스스로 고쳤는지. (이슈 #147)
+   *
+   * <p>{@link #updateProfile} 은 OAuth 재로그인마다 이름과 사진을 구글 값으로 덮어쓴다.
+   * 이 표시가 없으면 자기 수정한 값이 다음 로그인에 조용히 사라진다.
+   */
+  @Column(nullable = false)
+  private boolean profileCustomized;
+
   /** 소속 기수. GUEST 는 아직 소속이 없으므로 null. */
   @Column
   private Integer generationNo;
@@ -132,10 +150,37 @@ public class User extends SoftDeletableEntity {
         .build();
   }
 
-  /** OAuth 재로그인 시 Google 쪽에서 바뀐 값을 반영한다. email 과 providerId 는 식별자라 갱신하지 않는다. */
+  /**
+   * OAuth 재로그인 시 Google 쪽에서 바뀐 값을 반영한다. email 과 providerId 는 식별자라 갱신하지 않는다.
+   *
+   * <p>스스로 고친 적이 있으면 건드리지 않는다. 덮어쓰면 자기 수정이 다음 로그인에
+   * 조용히 사라진다 (이슈 #147).
+   */
   public void updateProfile(String name, String profileImageUrl) {
+    if (profileCustomized) {
+      return;
+    }
     this.name = name;
     this.profileImageUrl = profileImageUrl;
+  }
+
+  /**
+   * 본인이 직접 고치는 프로필. (이슈 #147)
+   *
+   * <p>학과 · 학번 · 기수 · 권한 · 상태는 대상이 아니다. 그 값들은 지원서와 어드민 승격으로
+   * 정해지는 것이라, 본인이 바꾸면 심사 결과와 어긋난다.
+   *
+   * @param profileImageUrl 새 사진 주소. 사진을 바꾸지 않으면 {@code null} 을 넘긴다
+   * @param profileFileId 새 사진의 파일 id. 사진을 바꾸지 않으면 {@code null} 을 넘긴다
+   */
+  public void editProfile(String name, String phoneNumber, String profileImageUrl, Long profileFileId) {
+    this.name = name;
+    this.phoneNumber = phoneNumber;
+    if (profileFileId != null) {
+      this.profileImageUrl = profileImageUrl;
+      this.profileFileId = profileFileId;
+    }
+    this.profileCustomized = true;
   }
 
   /**
