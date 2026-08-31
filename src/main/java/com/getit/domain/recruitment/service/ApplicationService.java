@@ -270,6 +270,10 @@ public class ApplicationService {
     if (now.isBefore(schedule.getDocumentStartAt()) || now.isAfter(schedule.getDocumentEndAt())) {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
     }
+    // 공개 화면의 표시만 바꾸고 여기를 열어 두면 스위치가 의미가 없다 (이슈 #170).
+    if (!schedule.acceptsApplicationAt(now)) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_PAUSED);
+    }
     return schedule;
   }
 
