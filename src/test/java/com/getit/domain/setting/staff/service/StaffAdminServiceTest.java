@@ -179,6 +179,39 @@ class StaffAdminServiceTest {
   class UpdateStaff {
 
     @Test
+    @DisplayName("응답의 fileId 를 그대로 다시 보내면 사진이 유지된다")
+    void keepsPhotoWhenFileIdIsEchoedBack() {
+      FileAsset photo = file("staff-photo");
+      StaffResult created = staffAdminService.createStaff(
+          request(StaffSection.SW, "홍길동", "SW 운영진", "컴퓨터공학과 21", photo.getId()));
+
+      // 수정은 전체 교체다. 응답에 fileId 가 없으면 무엇을 다시 실어야 할지 알 수 없어
+      // null 을 보내게 되고, 그러면 사진이 지워진다 (이슈 #187).
+      StaffResult updated = staffAdminService.updateStaff(created.id(),
+          request(StaffSection.SW, "홍길동", "부운영진", "컴퓨터공학과 21", created.fileId()));
+
+      assertThat(created.fileId()).isEqualTo(photo.getId());
+      assertThat(updated.fileId()).isEqualTo(photo.getId());
+      assertThat(updated.profileImageUrl()).isNotNull();
+      assertThat(updated.staffRole()).isEqualTo("부운영진");
+    }
+
+    @Test
+    @DisplayName("fileId 를 비워 보내면 사진이 지워진다 — 전체 교체 규칙 그대로다")
+    void removesPhotoWhenFileIdIsBlank() {
+      FileAsset photo = file("staff-photo-2");
+      StaffResult created = staffAdminService.createStaff(
+          request(StaffSection.SW, "홍길동", "SW 운영진", "컴퓨터공학과 21", photo.getId()));
+
+      StaffResult updated = staffAdminService.updateStaff(created.id(),
+          request(StaffSection.SW, "홍길동", "SW 운영진", "컴퓨터공학과 21", null));
+
+      // 이 규칙 자체는 바꾸지 않았다. 사진을 지우는 방법이기도 하다.
+      assertThat(updated.fileId()).isNull();
+      assertThat(updated.profileImageUrl()).isNull();
+    }
+
+    @Test
     @DisplayName("section 이 그대로면 order 를 바꾸지 않는다")
     void keepsOrderWhenSectionUnchanged() {
       Staff staff = staffRepository.save(
