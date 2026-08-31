@@ -62,11 +62,11 @@ public class Application extends BaseTimeEntity {
   @Column(length = 20)
   private String phoneNumber;
 
-  /** College 마스터 데이터(2.6)가 아직 없어 항상 null 이다 (이슈 논의 필요 사항 참고). */
+  /** 지원서 폼이 단과대를 고르지 않으면 null 이다. 마스터 데이터는 2.6 에 있다 (이슈 #184). */
   @Column
   private Long collegeId;
 
-  /** Major 마스터 데이터(2.7)가 아직 없어 항상 null 이다 (이슈 논의 필요 사항 참고). */
+  /** 지원서 폼이 학과를 고르지 않으면 null 이다. 마스터 데이터는 2.7 에 있다 (이슈 #184). */
   @Column
   private Long majorId;
 
