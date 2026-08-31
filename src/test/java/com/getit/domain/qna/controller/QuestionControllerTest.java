@@ -10,6 +10,8 @@ import com.getit.domain.auth.jwt.JwtProvider;
 import com.getit.domain.lecture.entity.Lecture;
 import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.qna.dto.MemberQuestionRequest;
+import com.getit.domain.qna.entity.Question;
+import com.getit.domain.qna.repository.QuestionRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.entity.Role;
@@ -47,6 +49,9 @@ class QuestionControllerTest {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private QuestionRepository questionRepository;
 
   private Long lectureId;
   private Long memberId;
@@ -101,5 +106,32 @@ class QuestionControllerTest {
             .header("Authorization", memberToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].content").value("질문이요"));
+  }
+
+  @Test
+  @DisplayName("GET /api/member/questions — 내 질문을 강의 정보와 함께 준다")
+  void listsMyQuestionsAcrossLectures() throws Exception {
+    questionRepository.save(Question.create(memberId, lectureId, "내 질문"));
+
+    mockMvc.perform(get("/api/member/questions").header("Authorization", memberToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content[0].content").value("내 질문"))
+        .andExpect(jsonPath("$.data.content[0].lectureId").value(lectureId))
+        .andExpect(jsonPath("$.data.content[0].lectureTitle").value("1주차"));
+  }
+
+  @Test
+  @DisplayName("GET /api/member/questions — 토큰이 없으면 401 이다")
+  void myQuestionsRequireAuthentication() throws Exception {
+    mockMvc.perform(get("/api/member/questions")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("GET /api/member/questions — GUEST 는 쓸 수 없다")
+  void myQuestionsRejectGuest() throws Exception {
+    String guestToken = "Bearer " + jwtProvider.createAccessToken(memberId, "m@getit.com", Role.GUEST);
+
+    mockMvc.perform(get("/api/member/questions").header("Authorization", guestToken))
+        .andExpect(status().isForbidden());
   }
 }

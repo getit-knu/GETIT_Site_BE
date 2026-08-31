@@ -32,6 +32,24 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
   List<Question> findByLectureIdAndAuthorIdOrderByCreatedAtDescIdDesc(Long lectureId, long authorId);
 
+  /**
+   * 내가 쓴 질문 전체. 강의를 가로지른다. (이슈 #185)
+   *
+   * <p>강의별 조회(4.6)만 있으면 마이페이지의 "내 질문" 을 그리려고 프론트가 전체 강의를
+   * 순회해 N 번 호출해야 한다. 페이징과 정렬도 클라이언트에서 억지로 맞추게 된다.
+   *
+   * <p>강의에 매이지 않은 질문({@code lectureId is null})도 함께 나온다 — 내가 쓴 질문이라는
+   * 점은 같다.
+   */
+  @Query("select q from Question q "
+      + "where q.authorId = :authorId "
+      + "and (:status is null or q.status = :status) "
+      + "order by q.createdAt desc, q.id desc")
+  Page<Question> findMyQuestions(
+      @Param("authorId") long authorId,
+      @Param("status") QnaStatus status,
+      Pageable pageable);
+
   long countByStatus(QnaStatus status);
 
   List<Question> findByStatusOrderByCreatedAtDescIdDesc(QnaStatus status, Pageable pageable);
