@@ -96,7 +96,9 @@ public class FeedbackService {
         .orElseThrow(() -> new BusinessException(LectureErrorCode.ASSIGNMENT_NOT_FOUND));
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(assignment.getLectureId())
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
-    Long activeGenerationId = generationQueryService.findActive()
+    // findActive 가 아니라 findActiveForWrite 다. 확인 직후 기수가 전환되면
+    // 방금 아카이브가 된 곳에 피드백이 남는다 (PR #169 리뷰 지적).
+    Long activeGenerationId = generationQueryService.findActiveForWrite()
         .orElseThrow(() -> new BusinessException(LectureErrorCode.ACTIVE_GENERATION_NOT_FOUND))
         .id();
 

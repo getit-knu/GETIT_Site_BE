@@ -186,9 +186,13 @@ public class LectureAdminService {
    * <p>404 가 아니라 409 를 준다. 어드민은 지난 기수를 계속 볼 수 있으므로, 없는 것처럼
    * 감추는 것보다 "볼 수는 있지만 고칠 수 없다"가 맞다. 부원용 {@code SubmissionService} 가
    * 404 를 주는 것은 부원에게 애초에 보이지 않는 자료이기 때문이다.
+   *
+   * <p>{@code findActive} 가 아니라 {@code findActiveForWrite} 로 읽는다. 확인만 하고 잠그지
+   * 않으면 그 직후 다른 트랜잭션이 기수를 전환해도 이 쓰기가 그대로 커밋된다 — 방금 아카이브가
+   * 된 기수에 강의가 생기거나 지워진다(PR #169 리뷰 지적).
    */
   private void validateWritable(Long generationId) {
-    Long activeGenerationId = generationQueryService.findActive()
+    Long activeGenerationId = generationQueryService.findActiveForWrite()
         .orElseThrow(() -> new BusinessException(LectureErrorCode.ACTIVE_GENERATION_NOT_FOUND))
         .id();
     if (!generationId.equals(activeGenerationId)) {
