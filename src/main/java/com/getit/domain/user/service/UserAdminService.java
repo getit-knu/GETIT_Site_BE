@@ -14,6 +14,7 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.domain.user.util.ExcelExporter;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
+import com.getit.global.exception.CommonErrorCode;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
@@ -121,22 +122,38 @@ public class UserAdminService {
    *
    * <p>운영진 본인이 자신의 ADMIN 권한을 해제하는 요청은 거부한다 (최소 1명의 ADMIN 을
    * 보장하기 위함, 명세서 9.2).
+   *
+   * <p>{@code unassignGroup} 은 조 배정을 푼다. {@code groupId} 의 {@code null} 이 이미
+   * "안 건드림" 으로 쓰이고 있어 해제를 표현할 자리가 없었다 — 어드민 화면의 "미배정" 을
+   * 골라도 아무 일이 일어나지 않았다 (이슈 #174).
+   *
+   * <p>조원 빼기(9.11 {@code DELETE /admin/groups/{groupId}/members/{userId}})로도 같은 일을
+   * 할 수 있다. 그쪽은 조 관리 화면에서 명단을 보며 빼는 자리이고, 이쪽은 사용자 한 줄에서
+   * 바꾸는 자리다. 둘 다 {@code User.leaveGroup()} 하나로 모인다.
    */
   @Transactional
   public UserSummary updateUser(
-      Long targetUserId, Long currentUserId, Role role, Long groupId, Integer generationNo
+      Long targetUserId, Long currentUserId, Role role, Long groupId, Integer generationNo,
+      boolean unassignGroup
   ) {
     User user = findUser(targetUserId);
 
+    if (unassignGroup && groupId != null) {
+      throw new BusinessException(
+          CommonErrorCode.VALIDATION_FAILED, "조 배정과 해제를 함께 요청할 수 없습니다.");
+    }
     if (role != null) {
       validateNotSelfAdminRevocation(user, targetUserId, currentUserId, role);
     }
     if (groupId != null || generationNo != null) {
-      validateGroupGenerationConsistency(user, groupId, generationNo);
+      validateGroupGenerationConsistency(user, groupId, generationNo, unassignGroup);
     }
 
     if (role != null) {
       user.updateRole(role);
+    }
+    if (unassignGroup) {
+      user.leaveGroup();
     }
     if (groupId != null) {
       user.assignToGroup(groupId);
@@ -158,9 +175,12 @@ public class UserAdminService {
    * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
    * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
    */
-  private void validateGroupGenerationConsistency(User user, Long groupId, Integer generationNo) {
+  private void validateGroupGenerationConsistency(
+      User user, Long groupId, Integer generationNo, boolean unassignGroup
+  ) {
     Integer effectiveGenerationNo = generationNo != null ? generationNo : user.getGenerationNo();
-    Long effectiveGroupId = groupId != null ? groupId : user.getGroupId();
+    // 해제하면 조가 없어지므로 조-기수 일치를 따질 대상도 없다.
+    Long effectiveGroupId = unassignGroup ? null : (groupId != null ? groupId : user.getGroupId());
 
     if (generationNo != null) {
       findGenerationByNo(generationNo);

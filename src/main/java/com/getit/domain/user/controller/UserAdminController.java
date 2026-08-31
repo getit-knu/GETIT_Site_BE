@@ -62,7 +62,8 @@ public class UserAdminController {
       @RequestBody UserUpdateRequest request
   ) {
     return ApiResponse.success(userAdminService.updateUser(
-        id, principal.getUserId(), request.role(), request.groupId(), request.generationNo()));
+        id, principal.getUserId(), request.role(), request.groupId(), request.generationNo(),
+        request.unassignGroupOrDefault()));
   }
 
   @Operation(summary = "사용자 삭제", description = "명세서 9.3")

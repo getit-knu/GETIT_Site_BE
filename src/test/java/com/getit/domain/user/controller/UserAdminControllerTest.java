@@ -139,10 +139,34 @@ class UserAdminControllerTest {
   class UpdateUser {
 
     @Test
+    @DisplayName("unassignGroup 으로 미배정으로 되돌린다")
+    void unassignsGroup() throws Exception {
+      Generation generation = Generation.create(9, 2026);
+      generation.activate();
+      generation = generationRepository.save(generation);
+      Group group = groupRepository.save(Group.create(generation.getId(), "1조"));
+      User target = guest("google-unassign", "un@getit.com", "부원");
+      target.updateGenerationNo(9);
+      target.assignToGroup(group.getId());
+      userRepository.flush();
+
+      String body = objectMapper.writeValueAsString(
+          new UserUpdateRequest(null, null, null, true));
+
+      // 어드민 화면의 "미배정" 을 골라도 아무 일이 없던 것을 고친다 (이슈 #174).
+      mockMvc.perform(put(USERS_PATH + "/" + target.getId())
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.group").doesNotExist());
+    }
+
+    @Test
     @DisplayName("role 을 변경한다")
     void updatesRole() throws Exception {
       User target = guest("google-5", "e@getit.com", "부원");
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
 
       mockMvc.perform(put(USERS_PATH + "/" + target.getId())
               .header("Authorization", adminToken())
@@ -158,7 +182,7 @@ class UserAdminControllerTest {
       User admin = guest("google-6", "f@getit.com", "운영진");
       admin.updateRole(Role.ADMIN);
       String selfToken = tokenFor(admin, Role.ADMIN);
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
 
       mockMvc.perform(put(USERS_PATH + "/" + admin.getId())
               .header("Authorization", selfToken)
@@ -171,7 +195,7 @@ class UserAdminControllerTest {
     @Test
     @DisplayName("없는 사용자면 404 다")
     void returns404WhenNotFound() throws Exception {
-      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null));
+      String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null, null));
 
       mockMvc.perform(put(USERS_PATH + "/999")
               .header("Authorization", adminToken())
