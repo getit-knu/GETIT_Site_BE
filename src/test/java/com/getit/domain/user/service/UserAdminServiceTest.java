@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
 import com.getit.domain.user.dto.UserExportFilter;
+import com.getit.domain.user.entity.UserStatus;
 import com.getit.domain.user.dto.UserSummary;
 import com.getit.domain.user.dto.UserUpdateCommand;
 import com.getit.domain.user.entity.Group;
@@ -18,6 +19,8 @@ import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -64,6 +67,82 @@ class UserAdminServiceTest {
   @Nested
   @DisplayName("listUsers")
   class ListUsers {
+
+    @Test
+    @DisplayName("탈퇴한 사용자는 목록에 나오지 않는다")
+    void excludesWithdrawnUsers() {
+      User stays = guest("google-alive", "alive@getit.com", "남는사람");
+      User leaves = guest("google-gone", "gone@getit.com", "나간사람");
+      leaves.withdraw();
+      userRepository.flush();
+
+      PageResponse<UserSummary> result =
+          userAdminService.listUsers(null, null, null, null, PageRequest.of(0, 20));
+
+      // 삭제(9.3)가 soft delete 인데 목록이 걸러 주지 않아, 지워도 사라지지 않았다 (이슈 #183).
+      assertThat(result.content()).extracting(UserSummary::name).contains("남는사람");
+      assertThat(result.content()).extracting(UserSummary::id).doesNotContain(leaves.getId());
+      assertThat(stays.getId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("엑셀 내보내기도 탈퇴한 사용자를 뺀다")
+    void excelExcludesWithdrawnUsers() throws IOException {
+      guest("google-alive2", "alive2@getit.com", "남는사람");
+      User leaves = guest("google-gone2", "gone2@getit.com", "나간사람");
+      leaves.withdraw();
+      userRepository.flush();
+
+      // 같은 쿼리를 쓰므로 함께 반영돼야 한다.
+      byte[] excel = userAdminService.exportUsersExcel(
+          new UserExportFilter(null, null, null, null));
+
+      // 바이트가 비지 않았다는 것만 보면 필터가 풀려도 통과한다. 시트를 열어 이름을 본다.
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        List<String> names = new ArrayList<>();
+        for (int row = 1; row <= sheet.getLastRowNum(); row++) {
+          names.add(sheet.getRow(row).getCell(0).getStringCellValue());
+        }
+
+        assertThat(names).contains("남는사람");
+        assertThat(names).doesNotContain("나간사람");
+      }
+      assertThat(leaves.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
+    }
+
+    @Test
+    @DisplayName("연락처를 함께 반환한다")
+    void includesPhoneNumber() {
+      User member = guest("google-phone", "phone@getit.com", "김부원");
+      member.updateApplicantInfo("010-1234-5678", "IT대학", "컴퓨터학부", 3, "2021110000");
+      member.promoteToMember(9);
+      userRepository.flush();
+
+      PageResponse<UserSummary> result =
+          userAdminService.listUsers(null, null, null, null, PageRequest.of(0, 20));
+
+      // 어드민 부원 관리 화면이 연락처를 보여줘야 하는데 목록 DTO 가 빼고 있었다 (이슈 #182).
+      assertThat(result.content())
+          .filteredOn(summary -> summary.id().equals(member.getId()))
+          .extracting(UserSummary::phoneNumber)
+          .containsExactly("010-1234-5678");
+    }
+
+    @Test
+    @DisplayName("승격 전 사용자는 연락처가 비어 있다")
+    void phoneNumberIsNullBeforePromotion() {
+      User newcomer = guest("google-nophone", "nophone@getit.com", "게스트");
+      userRepository.flush();
+
+      PageResponse<UserSummary> result =
+          userAdminService.listUsers(null, null, null, null, PageRequest.of(0, 20));
+
+      assertThat(result.content())
+          .filteredOn(summary -> summary.id().equals(newcomer.getId()))
+          .extracting(UserSummary::phoneNumber)
+          .containsOnlyNulls();
+    }
 
     @Test
     @DisplayName("keyword · role · generationNo 로 필터링한다")
