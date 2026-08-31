@@ -24,6 +24,7 @@ import com.getit.domain.lecture.repository.AssignmentRepository;
 import com.getit.domain.lecture.repository.AssignmentSubmissionRepository;
 import com.getit.domain.lecture.repository.FeedbackRepository;
 import com.getit.domain.lecture.repository.LectureFileRepository;
+import com.getit.domain.lecture.repository.LectureRepository;
 import com.getit.domain.setting.category.entity.SubCategory;
 import com.getit.domain.setting.category.entity.Track;
 import com.getit.domain.setting.category.repository.SubCategoryRepository;
@@ -50,6 +51,9 @@ class LectureServiceTest {
 
   @Autowired
   private LectureAdminService lectureService;
+
+  @Autowired
+  private LectureRepository lectureRepository;
 
   @Autowired
   private LectureFileRepository lectureFileRepository;
@@ -468,6 +472,94 @@ class LectureServiceTest {
       assertThatThrownBy(() -> lectureService.deleteLecture(999_999L))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.LECTURE_NOT_FOUND);
+    }
+  }
+
+  /**
+   * 지난 기수의 자료는 읽기 전용 아카이브다. (이슈 #168)
+   *
+   * <p>조회는 그대로 열어 둔다 — 지난 기수를 볼 수 있어야 아카이브다. 막는 것은 쓰기뿐이다.
+   */
+  @Nested
+  @DisplayName("지난 기수는 읽기 전용")
+  class PastGenerationIsReadOnly {
+
+    private Long pastGenerationId;
+
+    /** 10기를 열어, setUp 의 9기를 지난 기수로 만든다. */
+    @BeforeEach
+    void startNewGeneration() {
+      pastGenerationId = activeGenerationId;
+
+      generationRepository.findAll().stream()
+          .filter(Generation::isActive)
+          .forEach(Generation::deactivate);
+      Generation next = Generation.create(10, 2027);
+      next.activate();
+      generationRepository.saveAndFlush(next);
+    }
+
+    @Test
+    @DisplayName("지난 기수에는 강의를 만들 수 없다")
+    void cannotCreateInPastGeneration() {
+      assertThatThrownBy(() -> lectureService.createLecture(
+          createRequest(pastGenerationId, trackId, subCategoryId), 100L))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
+
+    @Test
+    @DisplayName("지난 기수 강의는 수정할 수 없다")
+    void cannotUpdatePastLecture() {
+      Lecture archived = lectureRepository.save(Lecture.create(
+          1, "지난 기수 강의", null, null, null, null, true,
+          pastGenerationId, trackId, subCategoryId, 100L));
+
+      assertThatThrownBy(() -> lectureService.updateLecture(
+          archived.getId(), updateRequest(trackId, subCategoryId, null, null)))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
+
+    @Test
+    @DisplayName("지난 기수 강의는 삭제할 수 없고 그대로 남는다")
+    void cannotDeletePastLecture() {
+      Lecture archived = lectureRepository.save(Lecture.create(
+          1, "지난 기수 강의", null, null, null, null, true,
+          pastGenerationId, trackId, subCategoryId, 100L));
+
+      assertThatThrownBy(() -> lectureService.deleteLecture(archived.getId()))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+
+      assertThat(lectureRepository.findByIdAndDeletedAtIsNull(archived.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("활성 기수 강의를 지난 기수로 옮길 수 없다")
+    void cannotMoveIntoPastGeneration() {
+      Lecture current = lectureService.createLecture(
+          createRequest(null, trackId, subCategoryId), 100L);
+      LectureRequest.Update moveBack = new LectureRequest.Update(
+          pastGenerationId, trackId, subCategoryId, 2, "옮기기", null, null, null, null,
+          null, false, null);
+
+      // 허용하면 지난 기수에 새 자료가 생겨 아카이브가 아니게 된다.
+      assertThatThrownBy(() -> lectureService.updateLecture(current.getId(), moveBack))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
+
+    @Test
+    @DisplayName("조회는 막지 않는다 — 볼 수 있어야 아카이브다")
+    void stillReadsPastGeneration() {
+      lectureRepository.save(Lecture.create(
+          1, "지난 기수 강의", null, null, null, null, true,
+          pastGenerationId, trackId, subCategoryId, 100L));
+
+      assertThat(lectureService.getLectures(pastGenerationId, null, null).lectures())
+          .extracting(LectureAdminResult.LectureCard::title)
+          .contains("지난 기수 강의");
     }
   }
 }

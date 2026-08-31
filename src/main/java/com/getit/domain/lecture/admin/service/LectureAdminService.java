@@ -51,6 +51,7 @@ public class LectureAdminService {
   @Transactional
   public Lecture createLecture(LectureRequest.Create request, Long createdBy) {
     Long generationId = resolveGenerationId(request.generationId());
+    validateWritable(generationId);
     validateCategory(request.trackId(), request.subCategoryId());
 
     Lecture lecture = Lecture.create(
@@ -147,9 +148,13 @@ public class LectureAdminService {
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
 
+    // 지난 기수의 강의는 손대지 못한다. 옮겨 넣는 것도 막는다 — 그러면 지난 기수에
+    // 새 자료가 생겨 아카이브가 아니게 된다.
+    validateWritable(lecture.getGenerationId());
     Long generationId = request.generationId() != null
         ? resolveGenerationId(request.generationId())
         : lecture.getGenerationId();
+    validateWritable(generationId);
     validateCategory(request.trackId(), request.subCategoryId());
 
     lecture.update(
@@ -168,7 +173,27 @@ public class LectureAdminService {
   public void deleteLecture(Long lectureId) {
     Lecture lecture = lectureRepository.findByIdAndDeletedAtIsNull(lectureId)
         .orElseThrow(() -> new BusinessException(LectureErrorCode.LECTURE_NOT_FOUND));
+    validateWritable(lecture.getGenerationId());
     lecture.delete();
+  }
+
+  /**
+   * 지난 기수의 자료는 읽기 전용이다. (이슈 #168)
+   *
+   * <p>조회에는 걸지 않는다. {@code getLectures} 는 {@code generationId} 를 받아 지난 기수를
+   * 열람하라고 만든 것이고, 그게 아카이브의 뜻이다. 막는 것은 쓰기뿐이다.
+   *
+   * <p>404 가 아니라 409 를 준다. 어드민은 지난 기수를 계속 볼 수 있으므로, 없는 것처럼
+   * 감추는 것보다 "볼 수는 있지만 고칠 수 없다"가 맞다. 부원용 {@code SubmissionService} 가
+   * 404 를 주는 것은 부원에게 애초에 보이지 않는 자료이기 때문이다.
+   */
+  private void validateWritable(Long generationId) {
+    Long activeGenerationId = generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(LectureErrorCode.ACTIVE_GENERATION_NOT_FOUND))
+        .id();
+    if (!generationId.equals(activeGenerationId)) {
+      throw new BusinessException(LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
   }
 
   private Long resolveGenerationId(Long requestedGenerationId) {
