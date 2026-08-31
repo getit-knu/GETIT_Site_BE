@@ -21,6 +21,9 @@ import com.getit.global.exception.BusinessException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import com.getit.global.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -119,5 +122,100 @@ class QuestionServiceTest {
     Long lectureId = lecture(true).getId();
 
     assertThat(questionService.getMyQuestions(lectureId, memberId)).isEmpty();
+  }
+
+  /**
+   * 내 질문 전체 조회. 강의를 가로지른다. (이슈 #185)
+   *
+   * <p>강의별 조회(4.6)와 같은 규칙 — 내 질문만 — 이지만, 강의에 매이지 않고 페이징 · 정렬을
+   * 서버가 정하며 응답에 강의 정보가 실린다.
+   */
+  @Nested
+  @DisplayName("getMyQuestions (전체)")
+  class MyQuestionsAcrossLectures {
+
+    @Test
+    @DisplayName("여러 강의의 내 질문을 최신순으로 모아 준다")
+    void collectsAcrossLectures() {
+      Lecture first = lecture(true);
+      Lecture second = lectureRepository.save(Lecture.create(
+          2, "2주차", null, null, null, null, true, activeGenerationId, null, null, 1L));
+      questionRepository.save(Question.create(memberId, first.getId(), "먼저 쓴 질문"));
+      Question latest = questionRepository.save(
+          Question.create(memberId, second.getId(), "나중에 쓴 질문"));
+
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      assertThat(result.content()).extracting(MemberQuestionResult.MyListItem::content)
+          .containsExactly("나중에 쓴 질문", "먼저 쓴 질문");
+      assertThat(result.content().get(0).id()).isEqualTo(latest.getId());
+    }
+
+    @Test
+    @DisplayName("어느 강의의 질문인지 함께 준다")
+    void carriesLectureInfo() {
+      Lecture lecture = lecture(true);
+      questionRepository.save(Question.create(memberId, lecture.getId(), "질문"));
+
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      // 강의를 가로지르는 목록이라 이게 없으면 어느 강의 질문인지 구분이 안 된다.
+      assertThat(result.content().get(0).lectureId()).isEqualTo(lecture.getId());
+      assertThat(result.content().get(0).lectureTitle()).isEqualTo("1주차");
+    }
+
+    @Test
+    @DisplayName("남의 질문은 섞이지 않는다")
+    void excludesOtherPeoplesQuestions() {
+      Long lectureId = lecture(true).getId();
+      questionRepository.save(Question.create(memberId, lectureId, "내 질문"));
+      questionRepository.save(Question.create(otherMemberId, lectureId, "남의 질문"));
+
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      assertThat(result.content()).extracting(MemberQuestionResult.MyListItem::content)
+          .containsExactly("내 질문");
+    }
+
+    @Test
+    @DisplayName("status 로 답변 대기만 거를 수 있다")
+    void filtersByStatus() {
+      Long lectureId = lecture(true).getId();
+      Question pending = questionRepository.save(Question.create(memberId, lectureId, "대기 중"));
+      Question answered = questionRepository.save(Question.create(memberId, lectureId, "답변 됨"));
+      answered.markAnswered();
+      questionRepository.flush();
+
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, QnaStatus.PENDING, PageRequest.of(0, 20));
+
+      assertThat(result.content()).extracting(MemberQuestionResult.MyListItem::id)
+          .containsExactly(pending.getId());
+    }
+
+    @Test
+    @DisplayName("비공개로 바뀐 강의의 질문도 내 목록에는 남는다")
+    void keepsQuestionsFromUnpublishedLectures() {
+      Lecture hidden = lecture(false);
+      questionRepository.save(Question.create(memberId, hidden.getId(), "쓸 때는 공개였다"));
+
+      // 강의 접근 권한을 다시 보지 않는다. 내가 남긴 글이 나중에 사라지면 안 된다.
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      assertThat(result.content()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("질문이 없으면 빈 목록이다")
+    void returnsEmptyWhenNoQuestions() {
+      PageResponse<MemberQuestionResult.MyListItem> result =
+          questionService.getMyQuestions(memberId, null, PageRequest.of(0, 20));
+
+      assertThat(result.content()).isEmpty();
+    }
   }
 }
