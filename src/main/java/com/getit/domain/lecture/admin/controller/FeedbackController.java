@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -46,5 +47,15 @@ public class FeedbackController {
       @AuthenticationPrincipal CustomUserDetails principal
   ) {
     return ApiResponse.success(feedbackService.update(feedbackId, request, principal.getUserId()));
+  }
+
+  @Operation(summary = "피드백 삭제", description = "이슈 #91")
+  @DeleteMapping("/feedbacks/{feedbackId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(
+      @PathVariable Long feedbackId,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    feedbackService.delete(feedbackId, principal.getUserId());
   }
 }

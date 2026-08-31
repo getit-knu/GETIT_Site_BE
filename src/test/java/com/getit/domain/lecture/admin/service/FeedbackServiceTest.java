@@ -28,6 +28,7 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -183,6 +184,74 @@ class FeedbackServiceTest {
     void throwsWhenFeedbackNotFound() {
       assertThatThrownBy(() -> feedbackService.update(
           999_999L, new FeedbackRequest.Write("내용"), adminId))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.FEEDBACK_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("delete")
+  class Delete {
+
+    @Test
+    @DisplayName("작성자 본인이면 삭제된다")
+    void deletesWhenAuthor() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("지울 내용"), adminId);
+
+      feedbackService.delete(created.id(), adminId);
+
+      assertThat(feedbackRepository.findById(created.id())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("한 건만 지우고 나머지는 남긴다")
+    void deletesOnlyTheGivenFeedback() {
+      FeedbackResult.CreateResult first = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("첫 번째"), adminId);
+      FeedbackResult.CreateResult second = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("두 번째"), adminId);
+
+      feedbackService.delete(first.id(), adminId);
+
+      assertThat(feedbackRepository.findAllBySubmissionIdOrderByIdAsc(submissionId))
+          .extracting(feedback -> feedback.getId())
+          .containsExactly(second.id());
+    }
+
+    @Test
+    @DisplayName("마지막 한 건을 지우면 제출물이 다시 피드백 없음으로 돌아간다")
+    void submissionGoesBackToNoFeedback() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("내용"), adminId);
+      assertThat(feedbackRepository.findSubmissionIdsWithFeedback(List.of(submissionId)))
+          .contains(submissionId);
+
+      feedbackService.delete(created.id(), adminId);
+
+      // 제출 목록의 feedbackDone 이 이 조회로 계산된다. 지운 뒤에도 완료로 보이면 안 된다.
+      assertThat(feedbackRepository.findSubmissionIdsWithFeedback(List.of(submissionId)))
+          .doesNotContain(submissionId);
+    }
+
+    @Test
+    @DisplayName("작성자가 아니면 예외가 발생한다")
+    void throwsWhenNotAuthor() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("내용"), adminId);
+
+      // 수정과 같은 규칙이다. 남의 피드백을 말없이 없앨 수 있으면
+      // 부원은 피드백이 사라진 이유를 알 길이 없다.
+      assertThatThrownBy(() -> feedbackService.delete(created.id(), 999L))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.NOT_RESOURCE_OWNER);
+      assertThat(feedbackRepository.findById(created.id())).isPresent();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 피드백이면 예외가 발생한다")
+    void throwsWhenFeedbackNotFound() {
+      assertThatThrownBy(() -> feedbackService.delete(999_999L, adminId))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.FEEDBACK_NOT_FOUND);
     }
