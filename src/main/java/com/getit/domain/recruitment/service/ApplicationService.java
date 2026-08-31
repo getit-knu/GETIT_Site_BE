@@ -253,8 +253,13 @@ public class ApplicationService {
   }
 
   /**
-   * collegeId · majorId 는 지원서 폼이 고른 값을 그대로 저장한다. 마스터 데이터는 2.6 · 2.7 에 있다.
-   * grade 는 {@code User.studentYear} 에 대응한다 (이슈 #38 논의 필요 사항 참고).
+   * 3.1 프리필. {@code User} 에 있는 값으로 지원서 폼의 첫 화면을 채운다.
+   *
+   * <p>{@code collegeId} · {@code majorId} 는 여기서 채울 수 없어 항상 {@code null} 이다 —
+   * {@code User} 는 단과대 · 학과를 <b>이름</b>으로 들고 있어서(승격 때 이름으로 복사된다)
+   * 되돌릴 id 가 없다. 이 값은 지원자가 폼에서 고르고 저장(3.2) 경로에서 담긴다.
+   *
+   * <p>{@code grade} 는 {@code User.studentYear} 에 대응한다.
    */
   private BasicInfo toBasicInfo(UserAccount account) {
     return new BasicInfo(

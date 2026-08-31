@@ -273,8 +273,10 @@ class ApplicationControllerTest {
     @DisplayName("단과대 · 학과 id 가 실제로 저장되고 다시 읽힌다")
     void persistsCollegeAndMajorIds() throws Exception {
       saveOpenSchedule();
-      BasicInfo basicInfo =
-          new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 3L, 31L, 2, "2021110000");
+      // 배관만 보는 테스트다. 마스터 데이터에 있을 법한 값을 쓰면 시드가 바뀔 때
+      // 뜻 없이 깨진다 (PR #191 리뷰 지적).
+      BasicInfo basicInfo = new BasicInfo(
+          "홍길동", "hong@gmail.com", "010-1234-5678", 777L, 888L, 2, "2021110000");
       String body = objectMapper.writeValueAsString(
           new ApplicationDraftRequest(basicInfo, null));
 
@@ -288,8 +290,8 @@ class ApplicationControllerTest {
       // 비는 이유는 지원서 폼이 id 를 담아 보내지 않기 때문이다 (이슈 #184).
       mockMvc.perform(get(ME_PATH).header("Authorization", guestToken()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.basicInfo.collegeId").value(3))
-          .andExpect(jsonPath("$.data.basicInfo.majorId").value(31));
+          .andExpect(jsonPath("$.data.basicInfo.collegeId").value(777))
+          .andExpect(jsonPath("$.data.basicInfo.majorId").value(888));
     }
 
     @Test
