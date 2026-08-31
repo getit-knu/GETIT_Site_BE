@@ -21,6 +21,19 @@ public class GenerationQueryServiceImpl implements GenerationQueryService {
     return generationRepository.findByIsActiveTrue().map(GenerationSummary::from);
   }
 
+  /**
+   * 활성화 잠금 행을 공유 모드로 먼저 잡아, 이 트랜잭션이 끝날 때까지 기수 전환을 막는다.
+   *
+   * <p>{@code GenerationAdminService.lockActivation} 이 같은 행을 배타 모드로 잡는다.
+   * 그래서 전환은 여기서 잡은 공유 잠금이 풀릴 때까지 기다린다.
+   */
+  @Override
+  public Optional<GenerationSummary> findActiveForWrite() {
+    generationRepository.findByGenerationNoShared(
+        Generation.RESERVED_ACTIVATION_LOCK_GENERATION_NO);
+    return findActive();
+  }
+
   @Override
   public Optional<GenerationSummary> findById(Long generationId) {
     return generationRepository.findById(generationId).map(GenerationSummary::from);

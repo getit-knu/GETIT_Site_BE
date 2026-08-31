@@ -41,4 +41,18 @@ public interface GenerationRepository extends JpaRepository<Generation, Long> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select g from Generation g where g.generationNo = :generationNo")
   Optional<Generation> findByGenerationNoForUpdate(@Param("generationNo") Integer generationNo);
+
+  /**
+   * 같은 잠금 행을 <b>공유</b> 모드로 잡는다. (PR #169 리뷰 지적)
+   *
+   * <p>"지금 활성 기수인가"를 확인하고 쓰는 쪽이 쓴다. 확인만 하고 잠그지 않으면, 확인 직후
+   * 다른 트랜잭션이 새 기수를 활성화해도 이쪽은 그대로 커밋된다 — 방금 아카이브가 된 기수에
+   * 자료가 새로 생기거나 지워진다(TOCTOU).
+   *
+   * <p>배타 잠금({@code findByGenerationNoForUpdate})을 쓰면 강의 쓰기끼리도 전부 줄을 서게
+   * 된다. 공유 잠금이면 쓰기끼리는 함께 진행하고, 기수 전환만 이들이 끝날 때까지 기다린다.
+   */
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query("select g from Generation g where g.generationNo = :generationNo")
+  Optional<Generation> findByGenerationNoShared(@Param("generationNo") Integer generationNo);
 }
