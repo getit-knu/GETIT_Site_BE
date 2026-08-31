@@ -139,10 +139,10 @@ class ApplicationAdminControllerTest {
 
       mockMvc.perform(get(APPLICATIONS_PATH).header("Authorization", adminToken()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("홍길동"))
-          .andExpect(jsonPath("$.data.content[1]").doesNotExist())
-          .andExpect(jsonPath("$.data.totalElements").value(1))
-          .andExpect(jsonPath("$.data.page").value(0));
+          .andExpect(jsonPath("$.data.applicants.content[0].name").value("홍길동"))
+          .andExpect(jsonPath("$.data.applicants.content[1]").doesNotExist())
+          .andExpect(jsonPath("$.data.applicants.totalElements").value(1))
+          .andExpect(jsonPath("$.data.applicants.page").value(0));
     }
 
     @Test
@@ -155,8 +155,8 @@ class ApplicationAdminControllerTest {
               .header("Authorization", adminToken())
               .param("status", "DRAFT"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("김철수"))
-          .andExpect(jsonPath("$.data.totalElements").value(1));
+          .andExpect(jsonPath("$.data.applicants.content[0].name").value("김철수"))
+          .andExpect(jsonPath("$.data.applicants.totalElements").value(1));
     }
 
     @Test
@@ -172,8 +172,8 @@ class ApplicationAdminControllerTest {
               .header("Authorization", adminToken())
               .param("generationId", String.valueOf(otherGeneration.getId())))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("지난기수"))
-          .andExpect(jsonPath("$.data.totalElements").value(1));
+          .andExpect(jsonPath("$.data.applicants.content[0].name").value("지난기수"))
+          .andExpect(jsonPath("$.data.applicants.totalElements").value(1));
     }
 
     @Test
@@ -187,7 +187,7 @@ class ApplicationAdminControllerTest {
 
       mockMvc.perform(get(APPLICATIONS_PATH).header("Authorization", adminToken()).param("size", "1"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].id").value(second.getId()));
+          .andExpect(jsonPath("$.data.applicants.content[0].id").value(second.getId()));
     }
 
     @Test
@@ -201,7 +201,7 @@ class ApplicationAdminControllerTest {
               .header("Authorization", adminToken())
               .param("sort", "name,asc"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].id").value(higherId.getId()));
+          .andExpect(jsonPath("$.data.applicants.content[0].id").value(higherId.getId()));
     }
   }
 

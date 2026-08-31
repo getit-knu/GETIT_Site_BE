@@ -5,22 +5,28 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
+import com.getit.domain.recruitment.dto.ApplicantListResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
-import com.getit.domain.user.entity.College;
-import com.getit.domain.user.repository.CollegeRepository;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
+import com.getit.domain.recruitment.entity.EvaluationCriterion;
+import com.getit.domain.recruitment.entity.EvaluationScore;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
+import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
+import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
+import com.getit.domain.user.entity.College;
+import com.getit.domain.user.repository.CollegeRepository;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -52,6 +58,12 @@ class ApplicationAdminServiceTest {
 
   @Autowired
   private CollegeRepository collegeRepository;
+
+  @Autowired
+  private EvaluationCriterionRepository evaluationCriterionRepository;
+
+  @Autowired
+  private EvaluationScoreRepository evaluationScoreRepository;
 
   private Generation activeGeneration;
 
@@ -88,6 +100,103 @@ class ApplicationAdminServiceTest {
   @DisplayName("listApplicants")
   class ListApplicants {
 
+    /** 기준 둘을 만들고, 한 평가자가 지원서에 매긴 점수를 넣는다. */
+    private void score(Application application, Long evaluatorId, int first, int second) {
+      List<EvaluationCriterion> criteria =
+          evaluationCriterionRepository.findByGenerationId(activeGeneration.getId());
+      evaluationScoreRepository.save(EvaluationScore.create(
+          application.getId(), criteria.get(0).getId(), evaluatorId, first));
+      evaluationScoreRepository.save(EvaluationScore.create(
+          application.getId(), criteria.get(1).getId(), evaluatorId, second));
+    }
+
+    private void twoCriteria() {
+      evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 1, "성실성", "성실성 안내", 50));
+      evaluationCriterionRepository.save(
+          EvaluationCriterion.create(activeGeneration.getId(), 2, "역량", "역량 안내", 50));
+    }
+
+    @Test
+    @DisplayName("평가를 끝낸 평가자들의 총점 평균과 인원을 함께 준다")
+    void carriesScores() {
+      twoCriteria();
+      Application applicant = submitted(1L, "김지원");
+      score(applicant, 100L, 40, 30);
+      score(applicant, 200L, 30, 20);
+
+      ApplicantSummary summary = applicationAdminService
+          .listApplicants(null, null, PageRequest.of(0, 20)).applicants().content().get(0);
+
+      // 70 과 50 의 평균. 7.3 상세와 같은 계산이다.
+      assertThat(summary.totalScore()).isEqualTo(60.0);
+      assertThat(summary.evaluatorCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("일부 기준만 매긴 평가자는 세지 않는다")
+    void ignoresIncompleteEvaluators() {
+      twoCriteria();
+      Application applicant = submitted(1L, "김지원");
+      List<EvaluationCriterion> criteria =
+          evaluationCriterionRepository.findByGenerationId(activeGeneration.getId());
+      evaluationScoreRepository.save(
+          EvaluationScore.create(applicant.getId(), criteria.get(0).getId(), 100L, 40));
+
+      ApplicantSummary summary = applicationAdminService
+          .listApplicants(null, null, PageRequest.of(0, 20)).applicants().content().get(0);
+
+      // 넣으면 그 사람 총점이 낮게 나와 평균이 실제보다 내려간다.
+      assertThat(summary.totalScore()).isNull();
+      assertThat(summary.evaluatorCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("아무도 평가하지 않았으면 점수는 null 이다")
+    void nullWhenNotEvaluated() {
+      twoCriteria();
+      submitted(1L, "김지원");
+
+      ApplicantSummary summary = applicationAdminService
+          .listApplicants(null, null, PageRequest.of(0, 20)).applicants().content().get(0);
+
+      // 0 으로 내리면 "0 점을 받았다" 와 구분되지 않는다.
+      assertThat(summary.totalScore()).isNull();
+    }
+
+    @Test
+    @DisplayName("전체 평균은 필터를 걸어도 지원자 전체 기준이다")
+    void overviewIgnoresFilter() {
+      twoCriteria();
+      Application passed = submitted(1L, "김합격");
+      Application pending = submitted(2L, "이대기");
+      score(passed, 100L, 50, 50);
+      score(pending, 100L, 10, 10);
+      passed.decideDocumentResult(true);
+      applicationRepository.flush();
+
+      ApplicantListResult filtered = applicationAdminService
+          .listApplicants(null, ApplicationStatus.DOC_PASS, PageRequest.of(0, 20));
+
+      // 걸러진 집합의 평균이면 필터를 바꿀 때마다 "높은 편" 의 뜻이 달라진다.
+      assertThat(filtered.applicants().content()).hasSize(1);
+      assertThat(filtered.summary().averageTotalScore()).isEqualTo(60.0);
+      assertThat(filtered.summary().evaluatedCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("평가된 지원자가 없으면 전체 평균은 null 이다")
+    void overviewNullWhenNothingEvaluated() {
+      twoCriteria();
+      submitted(1L, "김지원");
+
+      ApplicantListResult result =
+          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+
+      assertThat(result.summary().averageTotalScore()).isNull();
+      assertThat(result.summary().evaluatedCount()).isZero();
+    }
+
     @Test
     @DisplayName("status 필터가 없으면 DRAFT 를 제외한 활성 기수 지원자를 반환한다")
     void excludesDraftWhenNoStatusFilter() {
@@ -95,7 +204,7 @@ class ApplicationAdminServiceTest {
       draft(2L, "김철수");
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("홍길동");
       assertThat(result.totalElements()).isEqualTo(1);
@@ -109,7 +218,7 @@ class ApplicationAdminServiceTest {
       application.submit(LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
 
       // 화면에 소속·학년 컬럼이 필요한데 id 만 내려주면 FE 가 채울 방법이 없다 (이슈 #142).
       assertThat(result.content()).singleElement()
@@ -125,7 +234,7 @@ class ApplicationAdminServiceTest {
       submitted(1L, "홍길동");
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
 
       // 임시저장 단계에서는 소속을 비워둘 수 있다. 여기서 터지면 목록 자체가 안 뜬다.
       assertThat(result.content()).singleElement()
@@ -142,7 +251,7 @@ class ApplicationAdminServiceTest {
       draft(3L, "다지원", it.getId()).submit(LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
 
       // 행마다 조회하면 N+1 이 된다. 중복 제거한 id 로 한 번만 조회한다.
       assertThat(result.content()).extracting(ApplicantSummary::college)
@@ -156,7 +265,7 @@ class ApplicationAdminServiceTest {
       draft(2L, "김철수");
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, ApplicationStatus.DRAFT, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, ApplicationStatus.DRAFT, PageRequest.of(0, 20)).applicants();
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("김철수");
     }
@@ -170,7 +279,7 @@ class ApplicationAdminServiceTest {
           2L, otherGeneration.getId(), "지난 기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("홍길동");
     }
@@ -185,7 +294,7 @@ class ApplicationAdminServiceTest {
       otherGenApplication.submit(LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
-          applicationAdminService.listApplicants(otherGeneration.getId(), null, PageRequest.of(0, 20));
+        applicationAdminService.listApplicants(otherGeneration.getId(), null, PageRequest.of(0, 20)).applicants();
 
       assertThat(result.content()).extracting(ApplicantSummary::name).containsExactly("지난 기수");
     }
@@ -212,8 +321,9 @@ class ApplicationAdminServiceTest {
       Application lowerId = submittedAt(1L, "가나다", tie);
       Application higherId = submittedAt(2L, "다바가", tie);
 
-      PageResponse<ApplicantSummary> result = applicationAdminService.listApplicants(
-          null, null, PageRequest.of(0, 20, Sort.by("name")));
+      PageResponse<ApplicantSummary> result = applicationAdminService
+          .listApplicants(null, null, PageRequest.of(0, 20, Sort.by("name")))
+          .applicants();
 
       assertThat(result.content()).extracting(ApplicantSummary::id)
           .containsExactly(higherId.getId(), lowerId.getId());

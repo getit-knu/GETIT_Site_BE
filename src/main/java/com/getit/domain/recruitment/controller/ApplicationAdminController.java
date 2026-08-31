@@ -2,7 +2,7 @@ package com.getit.domain.recruitment.controller;
 
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
-import com.getit.domain.recruitment.dto.ApplicantSummary;
+import com.getit.domain.recruitment.dto.ApplicantListResult;
 import com.getit.domain.recruitment.dto.BulkDecisionRequest;
 import com.getit.domain.recruitment.dto.BulkDecisionResult;
 import com.getit.domain.recruitment.dto.DocumentDecisionRequest;
@@ -15,7 +15,6 @@ import com.getit.domain.recruitment.service.ApplicationAdminService;
 import com.getit.domain.recruitment.service.ApplicationEvaluationService;
 import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.global.dto.ApiResponse;
-import com.getit.global.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -53,7 +52,7 @@ public class ApplicationAdminController {
    */
   @Operation(summary = "지원자 목록 조회", description = "명세서 7.1")
   @GetMapping
-  public ApiResponse<PageResponse<ApplicantSummary>> getApplicants(
+  public ApiResponse<ApplicantListResult> getApplicants(
       @RequestParam(required = false) Long generationId,
       @RequestParam(required = false) ApplicationStatus status,
       @PageableDefault(size = 20) Pageable pageable

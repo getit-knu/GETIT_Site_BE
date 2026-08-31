@@ -231,9 +231,10 @@ public class ApplicationEvaluationService {
   private EvaluationSummaryResult buildSummary(Application application, Long requesterId) {
     List<EvaluationCriterion> criteria =
         evaluationCriterionRepository.findByGenerationId(application.getGenerationId());
-    // 기준을 지워도 점수는 남는다(FK · cascade 가 없다). 지운 기준의 점수를 함께 세면
-    // 현재 기준을 다 매기지 않은 평가자도 개수가 맞아 완료로 잡히고, 옛 점수가 총점에
-    // 섞인다 (PR #154 Copilot 리뷰 지적). 현재 기준의 점수만 남긴다.
+    // 완료 판정을 기준 개수로 하므로, 현재 목록에 없는 기준의 점수가 섞이면 다 매기지 않은
+    // 평가자도 개수가 맞아 완료로 잡히고 옛 점수가 총점에 들어간다 (PR #154 리뷰).
+    // 지금은 그런 행이 남지 않지만(FK ON DELETE CASCADE, V28 + 삭제 시 명시적 정리)
+    // 판정이 개수에 기대는 한 방어는 남긴다.
     Set<Long> currentCriterionIds = criteria.stream()
         .map(EvaluationCriterion::getId)
         .collect(Collectors.toSet());

@@ -1,14 +1,39 @@
 package com.getit.domain.recruitment.repository;
 
+import com.getit.domain.recruitment.entity.ApplicationStatus;
 import com.getit.domain.recruitment.entity.EvaluationScore;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface EvaluationScoreRepository extends JpaRepository<EvaluationScore, Long> {
 
   /** 지원서에 매겨진 점수 전체 조회. (7.2 상세 · 7.3 저장) */
   List<EvaluationScore> findByApplicationId(Long applicationId);
+
+  /**
+   * 여러 지원서의 점수를 한 번에 읽는다. (이슈 #188)
+   *
+   * <p>목록(7.1)에 점수를 실으려고 줄마다 조회하면 지원자 수만큼 쿼리가 나간다
+   * (이슈 #142 에서 단과대 이름에 같은 문제가 있었다).
+   */
+  List<EvaluationScore> findByApplicationIdIn(Collection<Long> applicationIds);
+
+  /**
+   * 한 기수의 제출된 지원서 전체의 점수. 전체 평균을 낼 때 쓴다. (이슈 #188)
+   *
+   * <p>목록은 페이징되므로 현재 페이지로 평균을 내면 페이지를 넘길 때마다 기준값이 달라진다.
+   * 비교 기준은 흔들리면 안 되므로 언제나 지원자 전체에서 낸다.
+   */
+  @Query("select s from EvaluationScore s where s.applicationId in "
+      + "(select a.id from Application a "
+      + " where a.generationId = :generationId and a.status <> :excluded)")
+  List<EvaluationScore> findByGenerationIdExcludingStatus(
+      @Param("generationId") Long generationId,
+      @Param("excluded") ApplicationStatus excluded);
 
   /** upsert(7.3) 시 이미 저장된 점수가 있는지 확인하는 데 쓴다. */
   Optional<EvaluationScore> findByApplicationIdAndCriterionIdAndEvaluatorId(
