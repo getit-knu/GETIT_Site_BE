@@ -1,6 +1,7 @@
 package com.getit.domain.auth.controller;
 
 import com.getit.domain.auth.dto.MeResponse;
+import com.getit.domain.auth.dto.MeUpdateRequest;
 import com.getit.domain.auth.dto.TokenResponse;
 import com.getit.domain.auth.exception.AuthErrorCode;
 import com.getit.domain.auth.oauth2.RefreshTokenCookie;
@@ -14,6 +15,7 @@ import com.getit.global.exception.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +45,15 @@ public class AuthController {
   @GetMapping("/me")
   public ApiResponse<MeResponse> getMe(@AuthenticationPrincipal CustomUserDetails principal) {
     return ApiResponse.success(authService.getMe(principal.getUserId()));
+  }
+
+  @Operation(summary = "내 프로필 수정", description = "이슈 #147")
+  @PutMapping("/me")
+  public ApiResponse<MeResponse> updateMe(
+      @AuthenticationPrincipal CustomUserDetails principal,
+      @Valid @RequestBody MeUpdateRequest request
+  ) {
+    return ApiResponse.success(authService.updateMe(principal.getUserId(), request));
   }
 
   /**
