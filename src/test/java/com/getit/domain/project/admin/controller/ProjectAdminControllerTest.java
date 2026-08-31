@@ -148,6 +148,35 @@ class ProjectAdminControllerTest {
   }
 
   @Test
+  @DisplayName("선택 URL 을 빈 문자열로 보내도 등록된다")
+  void acceptsBlankOptionalUrls() throws Exception {
+    // 화면의 입력칸을 비워 두면 브라우저는 null 이 아니라 "" 를 보낸다.
+    // @Pattern 은 null 은 검사하지 않지만 빈 문자열은 검사해서 400 이 났다 (이슈 #176).
+    String body = objectMapper.writeValueAsString(new ProjectRequest.Write(
+        "프로젝트", "팀", "2025-FALL", "설명", List.of(), "", "", null, true, null));
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  @DisplayName("http · https 가 아닌 주소는 여전히 막힌다")
+  void stillRejectsNonHttpUrl() throws Exception {
+    String body = objectMapper.writeValueAsString(new ProjectRequest.Write(
+        "프로젝트", "팀", "2025-FALL", "설명", List.of(),
+        "javascript:alert(1)", null, null, true, null));
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("등록하고 목록에서 조회한다")
   void createsAndLists() throws Exception {
     mockMvc.perform(post(PATH)
