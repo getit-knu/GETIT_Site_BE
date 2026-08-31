@@ -5,6 +5,7 @@ import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.dto.GroupSummary;
 import com.getit.domain.user.dto.UserExportFilter;
 import com.getit.domain.user.dto.UserSummary;
+import com.getit.domain.user.dto.UserUpdateCommand;
 import com.getit.domain.user.entity.Group;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
@@ -14,7 +15,6 @@ import com.getit.domain.user.repository.UserRepository;
 import com.getit.domain.user.util.ExcelExporter;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
-import com.getit.global.exception.CommonErrorCode;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
@@ -132,15 +132,16 @@ public class UserAdminService {
    * 바꾸는 자리다. 둘 다 {@code User.leaveGroup()} 하나로 모인다.
    */
   @Transactional
-  public UserSummary updateUser(
-      Long targetUserId, Long currentUserId, Role role, Long groupId, Integer generationNo,
-      boolean unassignGroup
-  ) {
+  public UserSummary updateUser(Long targetUserId, Long currentUserId, UserUpdateCommand command) {
+    Role role = command.role();
+    Long groupId = command.groupId();
+    Integer generationNo = command.generationNo();
+    boolean unassignGroup = command.unassignGroup();
+
     User user = findUser(targetUserId);
 
     if (unassignGroup && groupId != null) {
-      throw new BusinessException(
-          CommonErrorCode.VALIDATION_FAILED, "조 배정과 해제를 함께 요청할 수 없습니다.");
+      throw new BusinessException(UserErrorCode.GROUP_ASSIGN_CONFLICT);
     }
     if (role != null) {
       validateNotSelfAdminRevocation(user, targetUserId, currentUserId, role);
