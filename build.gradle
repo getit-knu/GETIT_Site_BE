@@ -155,3 +155,24 @@ tasks.withType(JavaCompile).configureEach {
   options.encoding = 'UTF-8'
   options.compilerArgs << '-parameters'
 }
+
+/**
+ * 의존성 jar 실물을 전부 내려받기만 하는 태스크. Docker 빌드의 캐시 레이어가 쓴다.
+ *
+ * 기본 제공되는 `dependencies` 태스크는 의존성 그래프를 출력할 뿐이라 메타데이터(pom)만
+ * 받고 jar 은 받지 않는다. 그래서 소스를 복사하기 전에 그 태스크를 돌려도 캐시가 비어
+ * 있고, 실제 다운로드는 매번 bootJar 단계에서 처음부터 일어났다. 러너에서 한 번에 수백
+ * 개를 받다가 Maven Central 이 429 를 돌려주면 배포가 통째로 실패한다 (CD 33349026745).
+ *
+ * 여기서 파일까지 받아 두면 build.gradle 이 그대로인 한 그 레이어가 재사용되어,
+ * 이후 빌드는 Maven Central 을 아예 건드리지 않는다.
+ */
+tasks.register('resolveDependencies') {
+  description = '의존성 아티팩트를 내려받아 Gradle 캐시를 채운다 (Docker 빌드용)'
+  doLast {
+    int files = configurations
+        .findAll { it.canBeResolved }
+        .sum { it.resolve().size() } ?: 0
+    logger.lifecycle("의존성 아티팩트 ${files}개를 Gradle 캐시에 채웠다.")
+  }
+}
