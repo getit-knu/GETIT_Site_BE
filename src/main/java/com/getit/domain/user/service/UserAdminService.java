@@ -121,6 +121,10 @@ public class UserAdminService {
    *
    * <p>운영진 본인이 자신의 ADMIN 권한을 해제하는 요청은 거부한다 (최소 1명의 ADMIN 을
    * 보장하기 위함, 명세서 9.2).
+   *
+   * <p>부원으로 올리는데 기수가 없으면 활성 기수를 붙인다. 부원은 기수에 속해야 의미가 있고,
+   * 권한만 올린 채로 두면 강좌 목록 · 대시보드가 403 이 되고 제출 현황과 조 배정 화면에서도
+   * 사람이 사라진다 — 아무 경고 없이 쓸 수 없는 계정이 만들어진다 (이슈 #178).
    */
   @Transactional
   public UserSummary updateUser(
@@ -131,8 +135,10 @@ public class UserAdminService {
     if (role != null) {
       validateNotSelfAdminRevocation(user, targetUserId, currentUserId, role);
     }
-    if (groupId != null || generationNo != null) {
-      validateGroupGenerationConsistency(user, groupId, generationNo);
+
+    Integer resolvedGenerationNo = resolveGenerationNo(user, role, generationNo);
+    if (groupId != null || resolvedGenerationNo != null) {
+      validateGroupGenerationConsistency(user, groupId, resolvedGenerationNo);
     }
 
     if (role != null) {
@@ -141,8 +147,8 @@ public class UserAdminService {
     if (groupId != null) {
       user.assignToGroup(groupId);
     }
-    if (generationNo != null) {
-      user.updateGenerationNo(generationNo);
+    if (resolvedGenerationNo != null) {
+      user.updateGenerationNo(resolvedGenerationNo);
     }
 
     GroupSummary group = user.getGroupId() != null
@@ -158,6 +164,25 @@ public class UserAdminService {
    * 이 사용자가 조원 · 미배정자 어느 쪽에도 안 나타나는 유령 데이터가 된다. 존재하지 않는
    * generationNo 도 여기서 함께 막는다 (PR #62 Copilot 리뷰 지적).
    */
+  /**
+   * 이번 요청으로 정해질 기수. 명시하면 그 값이고, 부원으로 올리는데 기수가 없으면 활성
+   * 기수다. 그 외에는 {@code null} — 건드리지 않는다는 뜻이다.
+   *
+   * <p>활성 기수가 없으면 부원으로 올릴 수 없다. 어느 기수 소속인지 정할 수 없는 부원은
+   * 만들어 봐야 화면 어디에도 나오지 않는다.
+   */
+  private Integer resolveGenerationNo(User user, Role role, Integer requestedGenerationNo) {
+    if (requestedGenerationNo != null) {
+      return requestedGenerationNo;
+    }
+    if (role != Role.MEMBER || user.getGenerationNo() != null) {
+      return null;
+    }
+    return generationQueryService.findActive()
+        .orElseThrow(() -> new BusinessException(UserErrorCode.ACTIVE_GENERATION_NOT_FOUND))
+        .generationNo();
+  }
+
   private void validateGroupGenerationConsistency(User user, Long groupId, Integer generationNo) {
     Integer effectiveGenerationNo = generationNo != null ? generationNo : user.getGenerationNo();
     Long effectiveGroupId = groupId != null ? groupId : user.getGroupId();

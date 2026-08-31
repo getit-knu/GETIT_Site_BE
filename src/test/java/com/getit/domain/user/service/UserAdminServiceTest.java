@@ -50,7 +50,10 @@ class UserAdminServiceTest {
 
   @BeforeEach
   void setUpGeneration() {
-    generation9 = generationRepository.save(Generation.create(9, 2026));
+    Generation generation = Generation.create(9, 2026);
+    // 부원 승격이 활성 기수를 붙이므로(이슈 #178) 진행 중인 기수가 있는 상태를 기본으로 둔다.
+    generation.activate();
+    generation9 = generationRepository.save(generation);
   }
 
   private User guest(String providerId, String email, String name) {
@@ -143,7 +146,7 @@ class UserAdminServiceTest {
   class UpdateUser {
 
     @Test
-    @DisplayName("role 만 보내면 role 만 바뀐다")
+    @DisplayName("role 만 보내면 조 배정은 그대로 두고 활성 기수만 함께 붙는다")
     void updatesRoleOnly() {
       User user = guest("google-7", "g@getit.com", "부원");
 
@@ -151,6 +154,54 @@ class UserAdminServiceTest {
 
       assertThat(result.role()).isEqualTo(Role.MEMBER);
       assertThat(user.getGroupId()).isNull();
+      // 기수 없이 두면 강좌 · 대시보드가 403 이고 제출 현황 · 조 배정에서 사람이 사라진다 (#178).
+      assertThat(user.getGenerationNo()).isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("이미 기수가 있으면 그대로 둔다")
+    void keepsExistingGeneration() {
+      User user = guest("google-7b", "gb@getit.com", "부원");
+      user.updateGenerationNo(8);
+
+      userAdminService.updateUser(user.getId(), 999L, Role.MEMBER, null, null);
+
+      assertThat(user.getGenerationNo()).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("기수를 함께 보내면 그 값이 우선한다")
+    void requestedGenerationWins() {
+      User user = guest("google-7c", "gc@getit.com", "부원");
+      generationRepository.save(Generation.create(8, 2025));
+
+      userAdminService.updateUser(user.getId(), 999L, Role.MEMBER, null, 8);
+
+      assertThat(user.getGenerationNo()).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("부원이 아닌 권한 변경에는 기수를 붙이지 않는다")
+    void doesNotAssignGenerationForOtherRoles() {
+      User user = guest("google-7d", "gd@getit.com", "게스트");
+
+      userAdminService.updateUser(user.getId(), 999L, Role.GUEST, null, null);
+
+      assertThat(user.getGenerationNo()).isNull();
+    }
+
+    @Test
+    @DisplayName("활성 기수가 없으면 부원으로 올릴 수 없다")
+    void rejectsPromotionWithoutActiveGeneration() {
+      generation9.deactivate();
+      generationRepository.saveAndFlush(generation9);
+      User user = guest("google-7e", "ge@getit.com", "부원");
+
+      // 어느 기수 소속인지 정할 수 없는 부원은 만들어 봐야 화면 어디에도 나오지 않는다.
+      assertThatThrownBy(() ->
+          userAdminService.updateUser(user.getId(), 999L, Role.MEMBER, null, null))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.ACTIVE_GENERATION_NOT_FOUND);
     }
 
     @Test
