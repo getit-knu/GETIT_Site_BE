@@ -256,41 +256,82 @@ class FeedbackServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.FEEDBACK_NOT_FOUND);
     }
 
-    /**
-     * 어드민은 기수를 넘어 다룬다. 그게 이 도메인의 현재 규칙이라 여기에 못을 박아 둔다.
-     *
-     * <p>PR #167 리뷰에서 활성 기수로 제한하자는 지적이 있었다. 근거로 든
-     * {@code SubmissionService} 는 부원용이고, 부원이 지난 기수 과제에 제출하지 못하게 하는
-     * 규칙이다. 어드민 쪽은 반대로 되어 있다 — 강의 목록이 {@code generationId} 를 받아
-     * 지난 기수를 열람하고, {@code LectureAdminService.deleteLecture} 도 기수를 보지 않는다.
-     * 피드백 작성 · 수정도 마찬가지다.
-     *
-     * <p>삭제만 막으면 같은 피드백을 고칠 수는 있는데 지울 수는 없는 상태가 된다.
-     * 지난 기수를 잠그는 게 맞다면 조회 · 작성 · 수정까지 함께 정해야 한다 (이슈로 따로 냈다).
-     */
-    @Test
-    @DisplayName("지난 기수의 피드백도 작성자면 지울 수 있다 — 작성 · 수정과 같다")
-    void deletesFeedbackFromPastGeneration() {
-      FeedbackResult.CreateResult created = feedbackService.create(
-          submissionId, new FeedbackRequest.Write("지난 기수 피드백"), adminId);
-      startNewGeneration();
+  }
 
-      feedbackService.delete(created.id(), adminId);
+  /**
+   * 지난 기수의 자료는 읽기 전용이다. (이슈 #168 — PR #167 리뷰에서 시작된 결정)
+   *
+   * <p>어드민은 지난 기수를 계속 열람하므로 없는 것처럼 404 로 감추지 않고, 볼 수는 있지만
+   * 고칠 수 없다는 뜻으로 409 를 준다. 부원용 {@code SubmissionService} 가 404 를 주는 것과
+   * 다른 이유다 — 부원에게는 애초에 보이지 않는 자료다.
+   *
+   * <p>작성 · 수정 · 삭제에 모두 건다. 하나만 막으면 같은 피드백을 고칠 수는 있는데
+   * 지울 수는 없는 상태가 된다.
+   */
+  @Nested
+  @DisplayName("지난 기수는 읽기 전용")
+  class PastGenerationIsReadOnly {
 
-      assertThat(feedbackRepository.findById(created.id())).isEmpty();
-    }
-
-    /** 10기를 열어 9기(위 setUp 의 강의가 속한 기수)를 지난 기수로 만든다. */
+    /** 10기를 열어, setUp 의 강의가 속한 9기를 지난 기수로 만든다. */
     private void startNewGeneration() {
-      Generation previous = generationRepository.findAll().stream()
+      generationRepository.findAll().stream()
           .filter(Generation::isActive)
-          .findFirst()
-          .orElseThrow();
-      previous.deactivate();
+          .forEach(Generation::deactivate);
 
       Generation next = Generation.create(10, 2027);
       next.activate();
       generationRepository.saveAndFlush(next);
+    }
+
+    @Test
+    @DisplayName("지난 기수 제출물에는 피드백을 쓸 수 없다")
+    void cannotCreate() {
+      startNewGeneration();
+
+      assertThatThrownBy(() -> feedbackService.create(
+          submissionId, new FeedbackRequest.Write("뒤늦은 피드백"), adminId))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
+
+    @Test
+    @DisplayName("지난 기수 피드백은 수정할 수 없다")
+    void cannotUpdate() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("원래 내용"), adminId);
+      startNewGeneration();
+
+      assertThatThrownBy(() -> feedbackService.update(
+          created.id(), new FeedbackRequest.Write("고친 내용"), adminId))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+    }
+
+    @Test
+    @DisplayName("지난 기수 피드백은 삭제할 수 없고 내용이 그대로 남는다")
+    void cannotDeleteAndDataSurvives() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("지난 기수 피드백"), adminId);
+      startNewGeneration();
+
+      assertThatThrownBy(() -> feedbackService.delete(created.id(), adminId))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.PAST_GENERATION_READ_ONLY);
+
+      assertThat(feedbackRepository.findById(created.id()).orElseThrow().getContent())
+          .isEqualTo("지난 기수 피드백");
+    }
+
+    @Test
+    @DisplayName("남의 피드백이면 기수를 따지기 전에 먼저 막힌다")
+    void ownershipIsCheckedFirst() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("내용"), adminId);
+      startNewGeneration();
+
+      assertThatThrownBy(() -> feedbackService.delete(created.id(), 999L))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.NOT_RESOURCE_OWNER);
     }
   }
 }
