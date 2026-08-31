@@ -13,7 +13,6 @@ import com.getit.domain.recruitment.dto.ApplicationDraftRequest;
 import com.getit.domain.recruitment.dto.BasicInfo;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
-import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationQuestion;
 import com.getit.domain.recruitment.entity.QuestionType;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
