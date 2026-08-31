@@ -13,6 +13,7 @@ import com.getit.domain.recruitment.dto.ApplicationDraftRequest;
 import com.getit.domain.recruitment.dto.BasicInfo;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationAnswer;
+import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationQuestion;
 import com.getit.domain.recruitment.entity.QuestionType;
 import com.getit.domain.recruitment.entity.RecruitmentSchedule;
@@ -243,6 +244,34 @@ class ApplicationControllerTest {
               .content(draftRequestJson(null)))
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_DEADLINE_PASSED"));
+    }
+
+    @Test
+    @DisplayName("컬럼이 감당하지 못할 만큼 긴 답변은 400 이다")
+    void rejectsAnswerBeyondColumnCapacity() throws Exception {
+      saveOpenSchedule();
+      String tooLong = "가".repeat(ApplicationAnswer.MAX_ANSWER_LENGTH + 1);
+
+      // 막지 않으면 그대로 TEXT 컬럼에 들어가다 500 이 난다 (이슈 #171).
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(draftRequestJson(List.of(new ApplicationAnswerRequest(10L, tooLong, null)))))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("상한 안이면 질문의 maxLength 를 넘겨도 임시 저장은 된다")
+    void stillAcceptsLongDraftWithinCapacity() throws Exception {
+      saveOpenSchedule();
+      String longButFine = "가".repeat(5_000);
+
+      // 임시 저장은 쓰다 만 상태를 담는 자리다. 질문별 글자 수(기본 300자)는 제출 때 본다.
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(draftRequestJson(List.of(new ApplicationAnswerRequest(10L, longButFine, null)))))
+          .andExpect(status().isOk());
     }
   }
 
