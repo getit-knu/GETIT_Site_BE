@@ -253,7 +253,7 @@ public class ApplicationService {
   }
 
   /**
-   * collegeId · majorId 는 College · Major 마스터 데이터(2.6 · 2.7)가 아직 없어 항상 null 이다.
+   * collegeId · majorId 는 지원서 폼이 고른 값을 그대로 저장한다. 마스터 데이터는 2.6 · 2.7 에 있다.
    * grade 는 {@code User.studentYear} 에 대응한다 (이슈 #38 논의 필요 사항 참고).
    */
   private BasicInfo toBasicInfo(UserAccount account) {

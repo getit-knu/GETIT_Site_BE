@@ -270,6 +270,29 @@ class ApplicationControllerTest {
     }
 
     @Test
+    @DisplayName("단과대 · 학과 id 가 실제로 저장되고 다시 읽힌다")
+    void persistsCollegeAndMajorIds() throws Exception {
+      saveOpenSchedule();
+      BasicInfo basicInfo =
+          new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 3L, 31L, 2, "2021110000");
+      String body = objectMapper.writeValueAsString(
+          new ApplicationDraftRequest(basicInfo, null));
+
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isOk());
+
+      // 주석에는 "마스터 데이터가 없어 항상 null" 이라고 적혀 있었지만, 배관은 동작한다.
+      // 비는 이유는 지원서 폼이 id 를 담아 보내지 않기 때문이다 (이슈 #184).
+      mockMvc.perform(get(ME_PATH).header("Authorization", guestToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.basicInfo.collegeId").value(3))
+          .andExpect(jsonPath("$.data.basicInfo.majorId").value(31));
+    }
+
+    @Test
     @DisplayName("지원 스위치가 내려가 있으면 422 다")
     void returns422WhenApplyPaused() throws Exception {
       saveOpenSchedule();
