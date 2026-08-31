@@ -256,8 +256,8 @@ class ApplicationControllerTest {
     }
 
     @Test
-    @DisplayName("모집 시작 전이면 기한 지남이 아니라 아직 아님으로 막는다")
-    void returns422NotOpenYetBeforeStart() throws Exception {
+    @DisplayName("모집 시작 전이면 기한 지남이 아니라 모집 기간 아님으로 막는다")
+    void returns422NotOpenBeforeStart() throws Exception {
       saveNotOpenYetSchedule();
 
       // 하나로 묶으면 시작 직전에 들어온 지원자가 "제출 기한이 지났습니다" 를 본다 (이슈 #175).
@@ -266,7 +266,7 @@ class ApplicationControllerTest {
               .contentType(MediaType.APPLICATION_JSON)
               .content(draftRequestJson(null)))
           .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_OPEN_YET"));
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_OPEN"));
     }
 
     @Test

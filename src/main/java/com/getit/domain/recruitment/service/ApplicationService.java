@@ -27,6 +27,7 @@ import com.getit.domain.user.dto.UserAccount;
 import com.getit.domain.user.service.UserAccountService;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,15 @@ public class ApplicationService {
   private final UserAccountService userAccountService;
 
   /**
+   * 모집 기간 경계를 판단하는 시각 소스. (PR #179 리뷰 지적)
+   *
+   * <p>{@code LocalDateTime.now()} 를 직접 부르면 "시작 직전 · 마감 직후" 같은 경계를 테스트에서
+   * 고정할 수 없다. 하필 그 경계가 이 서비스의 판단 기준이다.
+   * {@code RecruitmentStatusService} 와 같은 {@code Clock} 을 쓴다.
+   */
+  private final Clock clock;
+
+  /**
    * 3.1. 활성 기수 · 일정이 없으면 양식 자체를 그릴 수 없으므로 6.1 · 6.3 과 동일하게 예외로 처리한다.
    */
   public ApplicationFormResult getForm(Long userId) {
@@ -64,7 +74,7 @@ public class ApplicationService {
 
     return new ApplicationFormResult(
         activeGeneration.generationNo(),
-        schedule.resolvePhase(LocalDateTime.now()),
+        schedule.resolvePhase(LocalDateTime.now(clock)),
         schedule.getDocumentEndAt(),
         resolvePrefill(userId),
         questions
@@ -110,7 +120,7 @@ public class ApplicationService {
 
     // application.getUpdatedAt() 은 이 트랜잭션이 커밋(flush)되기 전이라 아직 갱신되지 않았을 수
     // 있다. "지금 저장한 시각"은 굳이 엔티티를 거치지 않고 바로 써도 의미가 같다.
-    LocalDateTime savedAt = LocalDateTime.now();
+    LocalDateTime savedAt = LocalDateTime.now(clock);
     return new DraftSaveResult(application.getId(), application.getStatus(), savedAt);
   }
 
@@ -123,7 +133,7 @@ public class ApplicationService {
     GenerationSummary activeGeneration = generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
     findOpenSchedule(activeGeneration.id());
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
 
     Optional<Application> existing =
         applicationRepository.findByUserIdAndGenerationId(userId, activeGeneration.id());
@@ -268,9 +278,13 @@ public class ApplicationService {
 
     // 시작 전과 마감 후를 나눈다. 한 오류로 묶으면 모집 시작 직전에 들어온 지원자가
     // "제출 기한이 지났습니다" 를 보게 된다 (이슈 #175).
-    LocalDateTime now = LocalDateTime.now();
+    //
+    // 시작 전은 일정이 아직 없을 때와 같은 APPLICATION_NOT_OPEN 을 쓴다. 지원자에게는 둘 다
+    // "아직 모집을 받고 있지 않다" 는 한 가지 사실이고, 프론트가 코드로 분기하므로 같은
+    // 상황에 코드를 새로 늘리지 않는다 (PR #179 리뷰 지적).
+    LocalDateTime now = LocalDateTime.now(clock);
     if (now.isBefore(schedule.getDocumentStartAt())) {
-      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN_YET);
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN);
     }
     if (now.isAfter(schedule.getDocumentEndAt())) {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
