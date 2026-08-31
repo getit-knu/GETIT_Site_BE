@@ -2,16 +2,20 @@ package com.getit.domain.recruitment.service;
 
 import com.getit.domain.recruitment.dto.AdjacentApplicantResult;
 import com.getit.domain.recruitment.dto.ApplicantDetailResult;
+import com.getit.domain.recruitment.dto.ApplicantListResult;
 import com.getit.domain.recruitment.dto.ApplicantSummary;
 import com.getit.domain.recruitment.dto.ApplicationAnswerResult;
 import com.getit.domain.recruitment.entity.Application;
 import com.getit.domain.recruitment.entity.ApplicationStatus;
+import com.getit.domain.recruitment.entity.EvaluationCriterion;
 import com.getit.domain.recruitment.exception.RecruitmentErrorCode;
 import com.getit.domain.recruitment.repository.ApplicationAnswerRepository;
 import com.getit.domain.recruitment.repository.ApplicationRepository;
-import com.getit.domain.user.service.CollegeQueryService;
+import com.getit.domain.recruitment.repository.EvaluationCriterionRepository;
+import com.getit.domain.recruitment.repository.EvaluationScoreRepository;
 import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
+import com.getit.domain.user.service.CollegeQueryService;
 import com.getit.domain.user.util.ExcelExporter;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
@@ -19,6 +23,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -52,6 +58,8 @@ public class ApplicationAdminService {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   private final ApplicationRepository applicationRepository;
+  private final EvaluationCriterionRepository evaluationCriterionRepository;
+  private final EvaluationScoreRepository evaluationScoreRepository;
   private final CollegeQueryService collegeQueryService;
   private final ApplicationAnswerRepository applicationAnswerRepository;
   private final GenerationQueryService generationQueryService;
@@ -67,7 +75,9 @@ public class ApplicationAdminService {
    * <p>{@code pageable} 의 page · size 만 쓰고 sort 는 {@link #APPLICANT_ORDER} 로 강제한다
    * (위 필드 설명 참고).
    */
-  public PageResponse<ApplicantSummary> listApplicants(Long generationId, ApplicationStatus status, Pageable pageable) {
+  public ApplicantListResult listApplicants(
+      Long generationId, ApplicationStatus status, Pageable pageable
+  ) {
     Long targetGenerationId = resolveGenerationId(generationId);
     Pageable enforcedOrder = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), APPLICANT_ORDER);
 
@@ -82,7 +92,42 @@ public class ApplicationAdminService {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet()));
 
-    return PageResponse.from(applications, a -> ApplicantSummary.from(a, collegeNames));
+    Set<Long> criterionIds = evaluationCriterionRepository.findByGenerationId(targetGenerationId)
+        .stream()
+        .map(EvaluationCriterion::getId)
+        .collect(Collectors.toSet());
+
+    // 줄마다 점수를 조회하면 지원자 수만큼 쿼리가 나간다 (단과대 이름과 같은 이유, 이슈 #142).
+    Map<Long, List<Integer>> totalsByApplication = EvaluationTotals.byApplication(
+        evaluationScoreRepository.findByApplicationIdIn(
+            applications.getContent().stream().map(Application::getId).toList()),
+        criterionIds);
+
+    PageResponse<ApplicantSummary> page = PageResponse.from(applications,
+        application -> ApplicantSummary.from(application, collegeNames,
+            totalsByApplication.getOrDefault(application.getId(), List.of())));
+
+    return new ApplicantListResult(page, overview(targetGenerationId, criterionIds));
+  }
+
+  /**
+   * 지원자 전체 기준 집계. 필터와 무관하다. (이슈 #188)
+   *
+   * <p>걸러진 집합의 평균으로 두면 필터를 바꿀 때마다 "높은 편" 의 뜻이 달라져 비교 기준으로
+   * 쓸 수 없다. 제출 현황(8.6)이 "필터를 걸어도 전체 기준" 인 것과 같은 방식이다.
+   */
+  private ApplicantListResult.EvaluationOverview overview(Long generationId, Set<Long> criterionIds) {
+    Map<Long, List<Integer>> totals = EvaluationTotals.byApplication(
+        evaluationScoreRepository.findByGenerationIdExcludingStatus(
+            generationId, ApplicationStatus.DRAFT),
+        criterionIds);
+
+    // 평가가 하나도 끝나지 않은 지원자는 평균에서 뺀다. 0 점으로 섞으면 실제보다 낮아진다.
+    List<List<Integer>> evaluated = totals.values().stream().filter(list -> !list.isEmpty()).toList();
+    OptionalDouble average = EvaluationTotals.average(evaluated);
+
+    return new ApplicantListResult.EvaluationOverview(
+        average.isPresent() ? average.getAsDouble() : null, evaluated.size());
   }
 
   /**
