@@ -83,6 +83,25 @@ class AuthMeUpdateControllerTest {
   }
 
   @Test
+  @DisplayName("ADMIN 도 같은 엔드포인트를 쓴다")
+  void adminUsesTheSameEndpoint() throws Exception {
+    User admin = signUp("google-sub-admin-edit", "admin-edit@getit.com");
+    admin.promoteToMember(9);
+    admin.updateRole(Role.ADMIN);
+    userRepository.flush();
+
+    // 완료 조건이 세 role 모두이므로 ADMIN 도 못으로 박는다. 보안 매처가 바뀌어
+    // 관리자 접근이 막히면 여기서 잡힌다.
+    mockMvc.perform(put(ME_PATH)
+            .header("Authorization", bearerFor(admin))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body("운영진", null)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("운영진"))
+        .andExpect(jsonPath("$.data.role").value(Role.ADMIN.name()));
+  }
+
+  @Test
   @DisplayName("토큰이 없으면 401 이다")
   void requiresAuthentication() throws Exception {
     mockMvc.perform(put(ME_PATH)

@@ -3,16 +3,29 @@ package com.getit.domain.user.repository;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.entity.UserStatus;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+
+  /**
+   * 프로필 자기 수정에서 쓴다. (이슈 #147)
+   *
+   * <p>사진 교체는 이전 파일을 읽어 연결을 푸는 read-modify-write 다. 잠그지 않으면 같은
+   * 사용자의 동시 요청 둘이 같은 previousFileId 를 읽고, 진 쪽이 연결한 파일이 아무도
+   * 가리키지 않는 CONNECTED 상태로 남는다 (PR #164 리뷰 지적).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select u from User u where u.id = :id")
+  Optional<User> findByIdForUpdate(@Param("id") Long id);
 
   /** OAuth 로그인 시 기존 사용자 조회에 쓴다. */
   Optional<User> findByProviderId(String providerId);

@@ -10,4 +10,4 @@
 --   때문에, 이 표시가 없으면 자기 수정한 값이 다음 로그인에 조용히 사라진다.
 ALTER TABLE users
     ADD COLUMN profile_file_id    bigint     DEFAULT NULL AFTER profile_image_url,
-    ADD COLUMN profile_customized tinyint(1) NOT NULL DEFAULT 0 AFTER profile_file_id;
+    ADD COLUMN profile_customized bit(1)     NOT NULL DEFAULT 0 AFTER profile_file_id;

@@ -14,6 +14,7 @@ import com.getit.domain.user.dto.UserAccount;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.exception.UserErrorCode;
 import com.getit.domain.user.repository.UserRepository;
+import com.getit.global.exception.CommonErrorCode;
 import com.getit.global.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,14 +62,19 @@ class UserProfileServiceImplTest {
         new OAuthUserRegistration(PROVIDER_ID, "profile@getit.com", GOOGLE_NAME, GOOGLE_IMAGE));
   }
 
+  /** 내가 올린 공개 이미지. */
   private FileAsset publicImage(String key) {
+    return publicImageOf(key, userId);
+  }
+
+  private FileAsset publicImageOf(String key, Long uploaderId) {
     return TestStoredFiles.stored(fileAssetRepository, fileStorage,
-        "public/" + key, key + ".png", "https://cdn/" + key, 1024L, "image/png", 1L);
+        "public/" + key, key + ".png", "https://cdn/" + key, 1024L, "image/png", uploaderId);
   }
 
   private FileAsset privateFile() {
     return TestStoredFiles.stored(fileAssetRepository, fileStorage,
-        "private/spec.pdf", "명세.pdf", "https://cdn/spec", 1024L, "application/pdf", 1L);
+        "private/spec.pdf", "명세.pdf", "https://cdn/spec", 1024L, "application/pdf", userId);
   }
 
   private User reload() {
@@ -173,6 +179,21 @@ class UserProfileServiceImplTest {
           userId, new ProfileEditCommand("김겟잇", null, privateFile.getId())))
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.NOT_PUBLIC_PROFILE_IMAGE);
+    }
+
+    @Test
+    @DisplayName("남이 올린 파일은 프로필 사진으로 쓸 수 없다")
+    void rejectsSomeoneElsesFile() {
+      FileAsset othersImage = publicImageOf("theirs", userId + 1000);
+
+      // 막지 않으면 남이 올려둔 파일을 먼저 연결해 버릴 수 있고,
+      // 정작 올린 사람은 FILE_ALREADY_CONNECTED 로 자기 파일을 못 쓴다.
+      assertThatThrownBy(() -> userProfileService.editMyProfile(
+          userId, new ProfileEditCommand("김겟잇", null, othersImage.getId())))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CommonErrorCode.NOT_RESOURCE_OWNER);
+      assertThat(fileAssetRepository.findById(othersImage.getId()).orElseThrow().getStatus())
+          .isEqualTo(FileStatus.PENDING);
     }
 
     @Test
