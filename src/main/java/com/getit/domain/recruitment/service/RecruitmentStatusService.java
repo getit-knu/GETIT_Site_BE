@@ -36,6 +36,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RecruitmentStatusService implements RecruitmentStatusQueryService {
 
+  /**
+   * 서류 기간인데 스위치가 내려가 있을 때 쓰는 문구. (이슈 #170)
+   *
+   * <p>단계는 그대로 {@code DOCUMENT_OPEN} 이다. 단계를 새로 만들면 명세서 0.5 의 열거값과
+   * 프론트가 함께 바뀌어야 하는데, 여닫는 것은 일시적인 일이라 단계로 남길 성격이 아니다.
+   * 지원 가능 여부는 {@code applyEnabled} 가 이미 표현한다.
+   */
+  private static final String PAUSED_MESSAGE = "지원 접수가 일시 중지되었습니다";
+
   private final RecruitmentScheduleRepository recruitmentScheduleRepository;
   private final GenerationQueryService generationQueryService;
   private final Clock clock;
@@ -64,13 +73,17 @@ public class RecruitmentStatusService implements RecruitmentStatusQueryService {
     RecruitmentPhase phase = schedule.resolvePhase(now);
     Long dDay = resolveDDay(phase, schedule, now.toLocalDate());
 
+    // 일정만 보지 않는다. 운영진이 내린 스위치도 함께 본다 (이슈 #170).
+    boolean applyEnabled = schedule.acceptsApplicationAt(now);
+    boolean paused = phase == RecruitmentPhase.DOCUMENT_OPEN && !applyEnabled;
+
     return new RecruitmentStatusResult(
         generation.generationNo(),
         generation.year(),
         phase,
         dDay,
-        resolveMessage(phase, dDay),
-        phase == RecruitmentPhase.DOCUMENT_OPEN,
+        paused ? PAUSED_MESSAGE : resolveMessage(phase, dDay),
+        applyEnabled,
         RecruitmentStatusResult.ScheduleWindow.from(schedule)
     );
   }

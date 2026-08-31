@@ -1,5 +1,6 @@
 package com.getit.domain.recruitment.controller;
 
+import com.getit.domain.recruitment.dto.ApplyToggleRequest;
 import com.getit.domain.recruitment.dto.RecruitmentScheduleResult;
 import com.getit.domain.recruitment.dto.RecruitmentScheduleUpdateRequest;
 import com.getit.domain.recruitment.dto.ScheduleUpdateCommand;
@@ -41,5 +42,20 @@ public class RecruitmentScheduleController {
         request.documentEndAt(),
         request.interviewStartAt()
     )));
+  }
+
+  /**
+   * 지원 접수를 여닫는다. (이슈 #170)
+   *
+   * <p>일정과 별개다. 서류 기간 중이라도 내리면 지원이 막히고, 일정 값은 그대로 남는다.
+   * 급히 멈추려고 마감일을 과거로 당기면 원래 일정이 지워지고 공개 화면의 D-day 까지
+   * 함께 망가진다.
+   */
+  @Operation(summary = "지원 접수 열기 · 닫기", description = "이슈 #170")
+  @PutMapping("/apply-enabled")
+  public ApiResponse<RecruitmentScheduleResult> changeApplyEnabled(
+      @Valid @RequestBody ApplyToggleRequest request
+  ) {
+    return ApiResponse.success(recruitmentScheduleService.changeApplyEnabled(request.enabled()));
   }
 }

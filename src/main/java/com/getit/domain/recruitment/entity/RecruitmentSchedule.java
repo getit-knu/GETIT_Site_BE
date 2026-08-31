@@ -51,6 +51,18 @@ public class RecruitmentSchedule extends BaseTimeEntity {
   @Column(nullable = false)
   private LocalDateTime interviewEndAt;
 
+  /**
+   * 운영진이 손으로 여닫는 지원 스위치. (이슈 #170)
+   *
+   * <p>일정과 별개다. 일정은 "언제 여는가"이고 이 값은 "지금 열어 두는가"다. 서류 기간
+   * 중이라도 이걸 내리면 지원이 막힌다. 일정 값은 그대로 남으므로 공개 화면의 D-day 와
+   * 일정 표시는 망가지지 않는다.
+   *
+   * <p>기본은 열림이다. 끄는 것은 사고가 났을 때뿐이라, 켜 두는 쪽이 기본이어야 한다.
+   */
+  @Column(nullable = false)
+  private boolean applyEnabled = true;
+
   @Builder(access = AccessLevel.PRIVATE)
   private RecruitmentSchedule(
       Long generationId,
@@ -110,6 +122,16 @@ public class RecruitmentSchedule extends BaseTimeEntity {
       return RecruitmentPhase.INTERVIEW;
     }
     return RecruitmentPhase.FINAL_ANNOUNCED;
+  }
+
+  /** 지원을 여닫는다. 일정은 건드리지 않는다. (이슈 #170) */
+  public void changeApplyEnabled(boolean applyEnabled) {
+    this.applyEnabled = applyEnabled;
+  }
+
+  /** 지금 지원을 받을 수 있는 상태인지. 일정과 스위치를 함께 본다. */
+  public boolean acceptsApplicationAt(LocalDateTime now) {
+    return applyEnabled && resolvePhase(now) == RecruitmentPhase.DOCUMENT_OPEN;
   }
 
   /** 6.2 PUT. interviewEndAt 은 totalEndAt 으로 재동기화한다. */

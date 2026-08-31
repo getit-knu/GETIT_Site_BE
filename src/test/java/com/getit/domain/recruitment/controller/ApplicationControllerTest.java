@@ -244,6 +244,24 @@ class ApplicationControllerTest {
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_DEADLINE_PASSED"));
     }
+
+    @Test
+    @DisplayName("지원 스위치가 내려가 있으면 422 다")
+    void returns422WhenApplyPaused() throws Exception {
+      saveOpenSchedule();
+      RecruitmentSchedule schedule =
+          recruitmentScheduleRepository.findByGenerationId(activeGeneration.getId()).orElseThrow();
+      schedule.changeApplyEnabled(false);
+      recruitmentScheduleRepository.saveAndFlush(schedule);
+
+      // 공개 화면 표시만 바꾸고 여기가 열려 있으면 스위치가 의미가 없다 (이슈 #170).
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(draftRequestJson(null)))
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_PAUSED"));
+    }
   }
 
   @Nested
