@@ -10,10 +10,35 @@ WORKDIR /build
 COPY gradlew ./
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon > /dev/null 2>&1 || true
+RUN chmod +x gradlew
+
+# 의존성 jar 를 먼저 받아 레이어로 굳힌다. build.gradle 이 그대로면 이 레이어가 재사용되어
+# 다음 빌드는 Maven Central 을 아예 건드리지 않는다.
+#
+# 기본 `dependencies` 태스크는 그래프를 출력할 뿐이라 pom 만 받고 jar 은 받지 않는다.
+# 그래서 이 레이어가 있어도 실제 다운로드는 매번 아래 bootJar 단계에서 처음부터 일어났다.
+# resolveDependencies 는 파일까지 받는다 (build.gradle 참고).
+#
+# 재시도를 감싼 이유: 러너에서 한 번에 수백 개를 받으면 Maven Central 이 429
+# (Too Many Requests) 를 돌려준다. GHA 캐시가 비어 전부 새로 받는 날 실제로 터졌다
+# (CD 33349026745). 코드 문제가 아니라 남의 서버 사정이므로 기다렸다 다시 받는다.
+#
+# 예전에는 이 줄이 `|| true` 로 실패를 삼켰다. 그러면 절반만 받은 상태가 성공한 레이어로
+# 굳어서, 정작 bootJar 가 나머지를 받다가 같은 429 에 걸린다. 실패하면 실패하게 둔다.
+RUN for attempt in 1 2 3 4 5; do \
+      ./gradlew resolveDependencies --no-daemon --quiet && break; \
+      echo "의존성 내려받기 실패 ($attempt/5). 30초 뒤 다시 시도한다."; \
+      [ "$attempt" = 5 ] && exit 1; \
+      sleep 30; \
+    done
 
 COPY src src
-RUN ./gradlew bootJar --no-daemon -x test
+RUN for attempt in 1 2 3; do \
+      ./gradlew bootJar --no-daemon -x test && break; \
+      echo "빌드 실패 ($attempt/3). 30초 뒤 다시 시도한다."; \
+      [ "$attempt" = 3 ] && exit 1; \
+      sleep 30; \
+    done
 
 # 레이어로 쪼갠다. 의존성은 잘 안 바뀌므로 재배포 시 이 레이어를 그대로 재사용한다.
 RUN cp build/libs/*-SNAPSHOT.jar app.jar 2>/dev/null || cp build/libs/*.jar app.jar
