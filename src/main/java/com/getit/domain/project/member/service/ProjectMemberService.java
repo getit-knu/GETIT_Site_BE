@@ -36,6 +36,9 @@ public class ProjectMemberService {
         .map(GroupWithMembersResult::name)
         .orElseThrow(() -> new BusinessException(ProjectErrorCode.NOT_ASSIGNED_TO_GROUP));
 
+    // 동시 제출 둘이 같은 max + 1 을 읽어 order 가 겹칠 수 있다. 겹쳐도 목록 정렬은
+    // order 다음에 id 로 갈리므로 순서가 흔들리지 않는다. 어드민이 order 를 직접 넣는
+    // 경로에도 유일성 제약이 없어, 여기만 직렬화해도 얻는 게 없다 (PR #165 리뷰).
     int order = projectRepository.findMaxOrder() + 1;
     Project saved = projectRepository.save(Project.submit(request.toCommand(teamName), order));
 

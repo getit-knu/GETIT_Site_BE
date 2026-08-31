@@ -103,6 +103,18 @@ class ProjectRepositoryTest {
   }
 
   @Test
+  @DisplayName("order 가 겹쳐도 id 로 갈려 정렬이 흔들리지 않는다")
+  void breaksOrderTiesById() {
+    // 동시 제출 둘이 같은 max + 1 을 읽으면 order 가 겹칠 수 있다 (PR #165 리뷰).
+    Project first = project("먼저", "2025-FALL", false, 1);
+    Project second = project("나중", "2025-FALL", false, 1);
+
+    assertThat(projectRepository.searchBySemester(null, null, PageRequest.of(0, 10)))
+        .extracting(Project::getId)
+        .containsExactly(first.getId(), second.getId());
+  }
+
+  @Test
   @DisplayName("findMaxOrder: 비어 있으면 0")
   void findMaxOrder() {
     assertThat(projectRepository.findMaxOrder()).isZero();

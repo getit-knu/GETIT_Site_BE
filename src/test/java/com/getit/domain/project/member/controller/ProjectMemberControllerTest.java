@@ -107,6 +107,32 @@ class ProjectMemberControllerTest {
   }
 
   @Test
+  @DisplayName("토큰이 없으면 401 이다")
+  void requiresAuthentication() throws Exception {
+    mockMvc.perform(post(PATH)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(BODY))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("description 이 상한을 넘으면 400 이다")
+  void rejectsTooLongDescription() throws Exception {
+    Group group = groupRepository.save(Group.create(activeGeneration.getId(), "3조"));
+    User member = guest("google-sub-project-long-desc");
+    member.promoteToMember(activeGeneration.getGenerationNo());
+    member.assignToGroup(group.getId());
+    userRepository.flush();
+
+    // 상한이 없으면 검증을 통과한 뒤 TEXT 컬럼에 넣다가 500 이 난다.
+    mockMvc.perform(post(PATH)
+            .header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(BODY.replace("\"설명\"", "\"" + "가".repeat(20_001) + "\"")))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("GUEST 는 부원 API 를 쓸 수 없다")
   void guestIsForbidden() throws Exception {
     User guest = guest("google-sub-project-guest");
