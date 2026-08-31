@@ -67,9 +67,14 @@ class RecruitmentScheduleControllerTest {
     return LocalDateTime.of(2026, month, day, 0, 0);
   }
 
-  /** Jackson 은 초가 0 이어도 생략하지 않는다. LocalDateTime#toString() 과 달라 별도로 맞춘다. */
+  /**
+   * Jackson 은 초가 0 이어도 생략하지 않는다. LocalDateTime#toString() 과 달라 별도로 맞춘다.
+   *
+   * <p>오프셋 {@code +09:00} 이 붙는다. 없이 내보내면 브라우저가 UTC 로 읽어 9 시간을 민다
+   * (이슈 #177).
+   */
   private String iso(LocalDateTime dateTime) {
-    return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+    return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")) + "+09:00";
   }
 
   private String updateRequestJson(int totalStartMonth) throws Exception {

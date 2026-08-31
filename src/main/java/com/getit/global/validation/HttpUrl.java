@@ -25,8 +25,12 @@ import jakarta.validation.constraints.Size;
  *
  * <p>길이는 컬럼에 맞춘 512 자다.
  *
- * <p>{@code null} 은 통과한다 — 이런 주소는 대체로 선택값이고, 필수 여부는 쓰는 쪽에서
- * {@code @NotBlank} 로 따로 정한다.
+ * <p>{@code null} 과 빈 문자열은 통과한다 — 이런 주소는 대체로 선택값이고, 필수 여부는
+ * 쓰는 쪽에서 {@code @NotBlank} 로 따로 정한다.
+ *
+ * <p>빈 문자열을 정규식에 넣어 둔 이유가 있다. {@code @Pattern} 은 {@code null} 은 검사하지
+ * 않지만 빈 문자열은 검사한다. 화면의 입력칸을 비워 두면 브라우저는 {@code null} 이 아니라
+ * {@code ""} 를 보내므로, 선택값인데도 400 이 났다 (이슈 #176).
  *
  * <p>규칙을 한 곳에 둔다. 필드마다 정규식을 적어두면 새 필드가 생길 때 빠뜨리게 되고,
  * 실제로 운영진 링크만 막고 프로젝트 · 강의 링크가 열려 있는 상태가 한동안 있었다.
@@ -36,7 +40,7 @@ import jakarta.validation.constraints.Size;
 @Constraint(validatedBy = {})
 @ReportAsSingleViolation
 @Size(max = 512)
-@Pattern(regexp = "^https?://\\S+$")
+@Pattern(regexp = "^$|^https?://\\S+$")
 @Documented
 public @interface HttpUrl {
 

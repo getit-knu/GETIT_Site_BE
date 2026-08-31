@@ -266,8 +266,13 @@ public class ApplicationService {
     RecruitmentSchedule schedule = recruitmentScheduleRepository.findByGenerationId(generationId)
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
 
+    // 시작 전과 마감 후를 나눈다. 한 오류로 묶으면 모집 시작 직전에 들어온 지원자가
+    // "제출 기한이 지났습니다" 를 보게 된다 (이슈 #175).
     LocalDateTime now = LocalDateTime.now();
-    if (now.isBefore(schedule.getDocumentStartAt()) || now.isAfter(schedule.getDocumentEndAt())) {
+    if (now.isBefore(schedule.getDocumentStartAt())) {
+      throw new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN_YET);
+    }
+    if (now.isAfter(schedule.getDocumentEndAt())) {
       throw new BusinessException(RecruitmentErrorCode.APPLICATION_DEADLINE_PASSED);
     }
     // 공개 화면의 표시만 바꾸고 여기를 열어 두면 스위치가 의미가 없다 (이슈 #170).

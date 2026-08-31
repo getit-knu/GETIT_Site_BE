@@ -101,6 +101,16 @@ class ApplicationControllerTest {
         now.plusDays(10)));
   }
 
+  /** now 가 서류 접수 시작 전인 일정. (이슈 #175) */
+  private void saveNotOpenYetSchedule() {
+    LocalDateTime now = LocalDateTime.now();
+    recruitmentScheduleRepository.save(RecruitmentSchedule.create(
+        activeGeneration.getId(),
+        now.plusDays(1), now.plusDays(30),
+        now.plusDays(3), now.plusDays(10),
+        now.plusDays(20)));
+  }
+
   /** now 가 서류 접수 마감을 지난 일정. */
   private void saveClosedSchedule() {
     LocalDateTime now = LocalDateTime.now();
@@ -154,7 +164,7 @@ class ApplicationControllerTest {
       mockMvc.perform(get(FORM_PATH).header("Authorization", guestToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.generationNo").value(9))
-          .andExpect(jsonPath("$.data.deadline").value("2026-09-10T23:59:59"))
+          .andExpect(jsonPath("$.data.deadline").value("2026-09-10T23:59:59+09:00"))
           .andExpect(jsonPath("$.data.questions[0].content").value("지원 동기"))
           .andExpect(jsonPath("$.data.questions[0].placeholder").doesNotExist());
     }
@@ -243,6 +253,20 @@ class ApplicationControllerTest {
               .content(draftRequestJson(null)))
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.error.code").value("APPLICATION_DEADLINE_PASSED"));
+    }
+
+    @Test
+    @DisplayName("모집 시작 전이면 기한 지남이 아니라 아직 아님으로 막는다")
+    void returns422NotOpenYetBeforeStart() throws Exception {
+      saveNotOpenYetSchedule();
+
+      // 하나로 묶으면 시작 직전에 들어온 지원자가 "제출 기한이 지났습니다" 를 본다 (이슈 #175).
+      mockMvc.perform(put(DRAFT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(draftRequestJson(null)))
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.error.code").value("APPLICATION_NOT_OPEN_YET"));
     }
 
     @Test
