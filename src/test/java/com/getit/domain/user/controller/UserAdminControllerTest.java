@@ -139,17 +139,22 @@ class UserAdminControllerTest {
   class UpdateUser {
 
     @Test
-    @DisplayName("role 을 변경한다")
+    @DisplayName("role 을 변경하면 활성 기수가 함께 붙는다")
     void updatesRole() throws Exception {
+      Generation generation = Generation.create(9, 2026);
+      generation.activate();
+      generationRepository.save(generation);
       User target = guest("google-5", "e@getit.com", "부원");
       String body = objectMapper.writeValueAsString(new UserUpdateRequest(Role.MEMBER, null, null));
 
+      // 기수 없이 부원이 되면 강좌 · 대시보드가 403 이 된다 (이슈 #178).
       mockMvc.perform(put(USERS_PATH + "/" + target.getId())
               .header("Authorization", adminToken())
               .contentType(MediaType.APPLICATION_JSON)
               .content(body))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.role").value("MEMBER"));
+          .andExpect(jsonPath("$.data.role").value("MEMBER"))
+          .andExpect(jsonPath("$.data.generationNo").value(9));
     }
 
     @Test
