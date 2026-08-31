@@ -1,5 +1,7 @@
 package com.getit.domain.lecture.admin.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -205,6 +207,64 @@ class FeedbackControllerTest {
               .header("Authorization", memberToken())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(new FeedbackRequest.Write("수정된 내용"))))
+          .andExpect(status().isForbidden());
+    }
+  }
+
+  @Nested
+  @DisplayName("DELETE /api/admin/feedbacks/{feedbackId}")
+  class Delete {
+
+    @Test
+    @DisplayName("작성자 본인이면 204 로 삭제된다")
+    void deletesFeedback() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 1L, "지울 내용"));
+
+      mockMvc.perform(delete("/api/admin/feedbacks/" + feedback.getId())
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNoContent());
+
+      assertThat(feedbackRepository.findById(feedback.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("작성자가 아니면 403 이고 남아 있다")
+    void returns403WhenNotAuthor() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 999L, "남의 피드백"));
+
+      mockMvc.perform(delete("/api/admin/feedbacks/" + feedback.getId())
+              .header("Authorization", adminToken()))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.error.code").value("NOT_RESOURCE_OWNER"));
+
+      assertThat(feedbackRepository.findById(feedback.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("없는 피드백이면 404 다")
+    void returns404WhenMissing() throws Exception {
+      mockMvc.perform(delete("/api/admin/feedbacks/999999")
+              .header("Authorization", adminToken()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("FEEDBACK_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("토큰이 없으면 401 이다")
+    void rejectsAnonymous() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 1L, "내용"));
+
+      mockMvc.perform(delete("/api/admin/feedbacks/" + feedback.getId()))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("ADMIN 이 아니면 403 이다")
+    void rejectsNonAdmin() throws Exception {
+      Feedback feedback = feedbackRepository.save(Feedback.create(submissionId, 1L, "내용"));
+
+      mockMvc.perform(delete("/api/admin/feedbacks/" + feedback.getId())
+              .header("Authorization", memberToken()))
           .andExpect(status().isForbidden());
     }
   }
