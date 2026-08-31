@@ -19,6 +19,8 @@ import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -85,17 +87,27 @@ class UserAdminServiceTest {
 
     @Test
     @DisplayName("엑셀 내보내기도 탈퇴한 사용자를 뺀다")
-    void excelExcludesWithdrawnUsers() {
+    void excelExcludesWithdrawnUsers() throws IOException {
       guest("google-alive2", "alive2@getit.com", "남는사람");
       User leaves = guest("google-gone2", "gone2@getit.com", "나간사람");
       leaves.withdraw();
       userRepository.flush();
 
       // 같은 쿼리를 쓰므로 함께 반영돼야 한다.
-      byte[] xlsx = userAdminService.exportUsersExcel(
+      byte[] excel = userAdminService.exportUsersExcel(
           new UserExportFilter(null, null, null, null));
 
-      assertThat(xlsx).isNotEmpty();
+      // 바이트가 비지 않았다는 것만 보면 필터가 풀려도 통과한다. 시트를 열어 이름을 본다.
+      try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+        Sheet sheet = workbook.getSheetAt(0);
+        List<String> names = new ArrayList<>();
+        for (int row = 1; row <= sheet.getLastRowNum(); row++) {
+          names.add(sheet.getRow(row).getCell(0).getStringCellValue());
+        }
+
+        assertThat(names).contains("남는사람");
+        assertThat(names).doesNotContain("나간사람");
+      }
       assertThat(leaves.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
     }
 
