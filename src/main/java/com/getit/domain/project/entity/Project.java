@@ -113,5 +113,24 @@ public class Project extends BaseTimeEntity {
   public void updateOrder(int order) { this.order = order; }
 
   /** 반려한 것을 다시 승인할 수도 있으므로 PENDING 에서만 오는 것으로 보지 않는다. */
-  public void changeStatus(ProjectStatus status) { this.status = status; }
+  /**
+   * 반려 사유. 반려 상태일 때만 있다. (이슈 #190)
+   *
+   * <p>다시 승인하면 비운다. 남겨 두면 공개된 프로젝트에 반려 사유가 붙어 있는 이상한
+   * 상태가 된다.
+   */
+  @Column(length = 500)
+  private String rejectReason;
+
+  /** 승인 · 대기로 되돌린다. 반려 사유는 비운다. */
+  public void changeStatus(ProjectStatus status) {
+    this.status = status;
+    this.rejectReason = null;
+  }
+
+  /** 사유를 남기며 반려한다. */
+  public void reject(String reason) {
+    this.status = ProjectStatus.REJECTED;
+    this.rejectReason = reason;
+  }
 }

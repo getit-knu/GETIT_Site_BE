@@ -22,7 +22,8 @@ public record MemberProjectResult(
     Long fileId,
     String thumbnailUrl,
     ProjectStatus status,
-    String statusLabel
+    String statusLabel,
+    String rejectReason
 ) {
 
   public static MemberProjectResult of(Project project, String thumbnailUrl) {
@@ -38,6 +39,7 @@ public record MemberProjectResult(
         project.getFileId(),
         thumbnailUrl,
         project.getStatus(),
-        project.getStatus().getLabel());
+        project.getStatus().getLabel(),
+        project.getRejectReason());
   }
 }

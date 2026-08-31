@@ -145,6 +145,47 @@ class ProjectMemberServiceTest {
     }
 
     @Test
+    @DisplayName("반려되면 부원이 사유를 볼 수 있다")
+    void memberSeesRejectReason() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+      projectAdminService.reject(submitted.id(), "설명이 너무 짧습니다");
+
+      // 사유를 남겨도 볼 곳이 없으면 부원은 같은 이유로 다시 낸다 (이슈 #190).
+      List<MemberProjectResult> mine =
+          projectMemberService.getMyProjects(memberInGroup.getId());
+
+      assertThat(mine).hasSize(1);
+      assertThat(mine.get(0).status()).isEqualTo(ProjectStatus.REJECTED);
+      assertThat(mine.get(0).rejectReason()).isEqualTo("설명이 너무 짧습니다");
+    }
+
+    @Test
+    @DisplayName("다시 승인되면 사유가 사라진다")
+    void reasonDisappearsWhenApproved() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+      projectAdminService.reject(submitted.id(), "설명 보강 필요");
+      projectAdminService.changeStatus(submitted.id(), ProjectStatus.APPROVED);
+
+      List<MemberProjectResult> mine =
+          projectMemberService.getMyProjects(memberInGroup.getId());
+
+      assertThat(mine.get(0).status()).isEqualTo(ProjectStatus.APPROVED);
+      assertThat(mine.get(0).rejectReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("조가 없으면 빈 목록이다")
+    void emptyWhenNoGroup() {
+      User unassigned = member("google-sub-no-group-list");
+      userRepository.flush();
+
+      // 등록은 조가 있어야 하므로 낸 것도 없다. 오류로 나누면 화면이 두 경우를 따로 다뤄야 한다.
+      assertThat(projectMemberService.getMyProjects(unassigned.getId())).isEmpty();
+    }
+
+    @Test
     @DisplayName("추천 배치는 부원이 정할 수 없다")
     void memberCannotFeatureOwnProject() {
       MemberProjectResult submitted =
@@ -152,7 +193,7 @@ class ProjectMemberServiceTest {
       projectAdminService.changeStatus(submitted.id(), ProjectStatus.APPROVED);
 
       ProjectResult.Item item = projectAdminService
-          .getProjects(null, PageRequest.of(0, 10)).content().stream()
+          .getProjects(null, null, PageRequest.of(0, 10)).content().stream()
           .filter(project -> project.id().equals(submitted.id()))
           .findFirst().orElseThrow();
       assertThat(item.isFeatured()).isFalse();

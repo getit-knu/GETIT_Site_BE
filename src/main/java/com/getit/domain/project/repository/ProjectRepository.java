@@ -33,6 +33,14 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
   List<Project> findByIsFeaturedTrueAndStatusOrderByOrderAscIdAsc(ProjectStatus status);
 
+  /**
+   * 우리 조가 낸 프로젝트. 최신순. (이슈 #190)
+   *
+   * <p>프로젝트는 조 명의로 등록되므로 조 이름으로 찾는다 — 개인이 아니라 조의 것이라
+   * 낸 사람이 아니어도 같은 조원이면 상태와 반려 사유를 봐야 한다.
+   */
+  List<Project> findByTeamNameOrderByIdDesc(String teamName);
+
   @Query("select coalesce(max(p.order), 0) from Project p")
   int findMaxOrder();
 }

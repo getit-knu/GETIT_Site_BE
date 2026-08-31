@@ -49,6 +49,23 @@ public class ProjectMemberService {
     return MemberProjectResult.of(saved, thumbnailUrl(saved.getFileId()));
   }
 
+  /**
+   * 우리 조가 낸 프로젝트 목록. (이슈 #190)
+   *
+   * <p>등록만 있고 조회가 없어서, 반려 사유를 남겨도 부원이 볼 방법이 없었다.
+   *
+   * <p>조에 배정되지 않았으면 빈 목록이다. 등록은 조가 있어야 하므로 낸 것도 없다 —
+   * 여기서 오류를 내면 화면이 "조가 없다" 와 "낸 것이 없다" 를 따로 다뤄야 한다.
+   */
+  @Transactional(readOnly = true)
+  public List<MemberProjectResult> getMyProjects(Long userId) {
+    return memberGroupService.findMyGroup(userId)
+        .map(group -> projectRepository.findByTeamNameOrderByIdDesc(group.name()).stream()
+            .map(project -> MemberProjectResult.of(project, thumbnailUrl(project.getFileId())))
+            .toList())
+        .orElseGet(List::of);
+  }
+
   private String thumbnailUrl(Long fileId) {
     return fileId == null ? null : fileQueryService.findById(fileId).url();
   }

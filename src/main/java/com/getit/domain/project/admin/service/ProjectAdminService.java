@@ -30,10 +30,17 @@ public class ProjectAdminService {
   private final ProjectRepository projectRepository;
   private final FileQueryService fileQueryService;
 
-  public PageResponse<ProjectResult.Item> getProjects(String semester, Pageable pageable) {
+  /**
+   * @param status 생략하면 전체. 어드민은 승인 대기 중인 것도 봐야 하므로 기본이 전체다
+   *               (이슈 #148). 다만 "승인 대기만 모아 보기" 가 필요해 필터를 열었다 —
+   *               화면에서 거르면 현재 페이지 안에서만 걸러져 페이지를 넘길 때마다 결과가
+   *               달라진다 (이슈 #190)
+   */
+  public PageResponse<ProjectResult.Item> getProjects(
+      String semester, ProjectStatus status, Pageable pageable
+  ) {
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-    // 어드민은 승인 대기 중인 것도 봐야 하므로 상태로 거르지 않는다 (이슈 #148).
-    Page<Project> page = projectRepository.searchBySemester(semester, null, pageOnly);
+    Page<Project> page = projectRepository.searchBySemester(semester, status, pageOnly);
     Map<Long, String> thumbnails = resolveThumbnails(page.getContent());
     return PageResponse.from(page, project -> ProjectResult.Item.of(project, thumbnails.get(project.getId())));
   }
@@ -73,6 +80,24 @@ public class ProjectAdminService {
       throw new BusinessException(ProjectErrorCode.PROJECT_STATUS_UNCHANGED);
     }
     project.changeStatus(status);
+    return toItem(project);
+  }
+
+  /**
+   * 사유를 남기며 반려한다. (이슈 #190)
+   *
+   * <p>사유 없이 반려하면 부원은 반려된 것만 알고 이유를 모른다. 그러면 같은 이유로 다시
+   * 낸다 — 이 기능이 있는 이유가 그것이다.
+   *
+   * <p>다시 승인하면 사유는 비워진다({@link Project#changeStatus}). 공개된 프로젝트에 반려
+   * 사유가 붙어 있는 상태를 만들지 않는다.
+   */
+  public ProjectResult.Item reject(Long projectId, String reason) {
+    Project project = findProject(projectId);
+    if (project.getStatus() == ProjectStatus.REJECTED) {
+      throw new BusinessException(ProjectErrorCode.PROJECT_STATUS_UNCHANGED);
+    }
+    project.reject(reason);
     return toItem(project);
   }
 
