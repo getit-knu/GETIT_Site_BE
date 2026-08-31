@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,5 +40,19 @@ public class ProjectMemberController {
       @Valid @RequestBody ProjectSubmitRequest request
   ) {
     return ApiResponse.success(projectMemberService.submitProject(principal.getUserId(), request));
+  }
+
+  /**
+   * 우리 조가 낸 프로젝트. 상태와 반려 사유를 여기서 본다. (이슈 #190)
+   *
+   * <p>등록만 있고 조회가 없어서, 반려 사유를 남겨도 부원이 볼 방법이 없었다.
+   * 프로젝트는 조 명의라 낸 사람이 아니어도 같은 조원이면 보인다.
+   */
+  @Operation(summary = "우리 조 프로젝트 목록", description = "이슈 #190")
+  @GetMapping
+  public ApiResponse<List<MemberProjectResult>> getMyProjects(
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ApiResponse.success(projectMemberService.getMyProjects(principal.getUserId()));
   }
 }

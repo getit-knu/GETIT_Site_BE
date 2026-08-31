@@ -32,8 +32,19 @@ public class Project extends BaseTimeEntity {
   @Column(nullable = false, length = 100)
   private String title;
 
+  /** 화면에 보여줄 팀 이름. 소유 판정에는 쓰지 않는다 — {@link #groupId} 를 본다. */
   @Column(name = "team_name", nullable = false, length = 100)
   private String teamName;
+
+  /**
+   * 낸 조. 어드민이 직접 등록한 프로젝트는 {@code null} 이다. (PR #197 리뷰 지적)
+   *
+   * <p>조 이름은 기수 안에서만 유일하고(uk_user_group_generation_name) 어드민이 바꿀 수도
+   * 있어 소유 판정에 쓸 수 없다. 이름으로 찾으면 같은 이름을 쓴 지난 기수 조의 것이 섞이고,
+   * 이름을 바꾸면 그 조가 낸 것이 통째로 사라진다.
+   */
+  @Column(name = "group_id")
+  private Long groupId;
 
   @Column(nullable = false, length = 50)
   private String semester;
@@ -74,9 +85,10 @@ public class Project extends BaseTimeEntity {
   private ProjectStatus status;
 
   @Builder(access = AccessLevel.PRIVATE)
-  private Project(ProjectCommand command, int order, ProjectStatus status) {
+  private Project(ProjectCommand command, int order, ProjectStatus status, Long groupId) {
     this.title = command.title();
     this.teamName = command.teamName();
+    this.groupId = groupId;
     this.semester = command.semester();
     this.description = command.description();
     this.techStacks = command.techStacks();
@@ -94,8 +106,9 @@ public class Project extends BaseTimeEntity {
   }
 
   /** 부원이 자기 조 명의로 낸다. 어드민이 승인해야 공개된다 (이슈 #148). */
-  public static Project submit(ProjectCommand command, int order) {
-    return Project.builder().command(command).order(order).status(ProjectStatus.PENDING).build();
+  public static Project submit(ProjectCommand command, int order, Long groupId) {
+    return Project.builder()
+        .command(command).order(order).status(ProjectStatus.PENDING).groupId(groupId).build();
   }
 
   public void update(ProjectCommand command) {
@@ -113,5 +126,32 @@ public class Project extends BaseTimeEntity {
   public void updateOrder(int order) { this.order = order; }
 
   /** 반려한 것을 다시 승인할 수도 있으므로 PENDING 에서만 오는 것으로 보지 않는다. */
-  public void changeStatus(ProjectStatus status) { this.status = status; }
+  /**
+   * 반려 사유. 반려 상태일 때만 있다. (이슈 #190)
+   *
+   * <p>다시 승인하면 비운다. 남겨 두면 공개된 프로젝트에 반려 사유가 붙어 있는 이상한
+   * 상태가 된다.
+   */
+  @Column(length = 500)
+  private String rejectReason;
+
+  /**
+   * 승인 · 대기로 바꾼다. 반려 사유는 비운다.
+   *
+   * <p>반려는 받지 않는다. 여기로 반려하면 사유 없는 반려가 만들어져, 부원이 이유를 알게
+   * 하려던 것이 그대로 뚫린다 (PR #197 리뷰 지적). 반려는 {@link #reject} 로만 한다.
+   */
+  public void changeStatus(ProjectStatus status) {
+    if (status == ProjectStatus.REJECTED) {
+      throw new IllegalArgumentException("반려는 사유와 함께 reject 로 처리한다");
+    }
+    this.status = status;
+    this.rejectReason = null;
+  }
+
+  /** 사유를 남기며 반려한다. */
+  public void reject(String reason) {
+    this.status = ProjectStatus.REJECTED;
+    this.rejectReason = reason;
+  }
 }

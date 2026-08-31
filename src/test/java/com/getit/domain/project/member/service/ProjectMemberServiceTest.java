@@ -145,6 +145,47 @@ class ProjectMemberServiceTest {
     }
 
     @Test
+    @DisplayName("반려되면 부원이 사유를 볼 수 있다")
+    void memberSeesRejectReason() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+      projectAdminService.reject(submitted.id(), "설명이 너무 짧습니다");
+
+      // 사유를 남겨도 볼 곳이 없으면 부원은 같은 이유로 다시 낸다 (이슈 #190).
+      List<MemberProjectResult> mine =
+          projectMemberService.getMyProjects(memberInGroup.getId());
+
+      assertThat(mine).hasSize(1);
+      assertThat(mine.get(0).status()).isEqualTo(ProjectStatus.REJECTED);
+      assertThat(mine.get(0).rejectReason()).isEqualTo("설명이 너무 짧습니다");
+    }
+
+    @Test
+    @DisplayName("다시 승인되면 사유가 사라진다")
+    void reasonDisappearsWhenApproved() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+      projectAdminService.reject(submitted.id(), "설명 보강 필요");
+      projectAdminService.changeStatus(submitted.id(), ProjectStatus.APPROVED);
+
+      List<MemberProjectResult> mine =
+          projectMemberService.getMyProjects(memberInGroup.getId());
+
+      assertThat(mine.get(0).status()).isEqualTo(ProjectStatus.APPROVED);
+      assertThat(mine.get(0).rejectReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("조가 없으면 빈 목록이다")
+    void emptyWhenNoGroup() {
+      User unassigned = member("google-sub-no-group-list");
+      userRepository.flush();
+
+      // 등록은 조가 있어야 하므로 낸 것도 없다. 오류로 나누면 화면이 두 경우를 따로 다뤄야 한다.
+      assertThat(projectMemberService.getMyProjects(unassigned.getId())).isEmpty();
+    }
+
+    @Test
     @DisplayName("추천 배치는 부원이 정할 수 없다")
     void memberCannotFeatureOwnProject() {
       MemberProjectResult submitted =
@@ -152,7 +193,7 @@ class ProjectMemberServiceTest {
       projectAdminService.changeStatus(submitted.id(), ProjectStatus.APPROVED);
 
       ProjectResult.Item item = projectAdminService
-          .getProjects(null, PageRequest.of(0, 10)).content().stream()
+          .getProjects(null, null, PageRequest.of(0, 10)).content().stream()
           .filter(project -> project.id().equals(submitted.id()))
           .findFirst().orElseThrow();
       assertThat(item.isFeatured()).isFalse();
@@ -176,12 +217,43 @@ class ProjectMemberServiceTest {
   class AdminDecision {
 
     @Test
+    @DisplayName("changeStatus 로는 반려할 수 없다")
+    void cannotRejectWithoutReason() {
+      MemberProjectResult submitted =
+          projectMemberService.submitProject(memberInGroup.getId(), request(null));
+
+      // 여기로 반려하면 사유 없는 반려가 만들어져, 부원이 이유를 알게 하려던 것이
+      // 그대로 뚫린다 (PR #197 리뷰).
+      assertThatThrownBy(() ->
+          projectAdminService.changeStatus(submitted.id(), ProjectStatus.REJECTED))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("지난 기수의 같은 이름 조에는 보이지 않는다")
+    void doesNotLeakToSameNamedGroupOfAnotherGeneration() {
+      projectMemberService.submitProject(memberInGroup.getId(), request(null));
+
+      // 조 이름은 기수 안에서만 유일하다. 8기에도 "3조" 가 있을 수 있다.
+      Generation previous = generationRepository.save(Generation.create(8, 2025));
+      Group sameNameLastYear = groupRepository.save(Group.create(previous.getId(), "3조"));
+      User lastYearMember = member("google-sub-last-year");
+      lastYearMember.assignToGroup(sameNameLastYear.getId());
+      userRepository.flush();
+
+      // 이름으로 찾으면 지난 기수 조원에게 올해 프로젝트가 보였다 (PR #197 리뷰).
+      assertThat(projectMemberService.getMyProjects(lastYearMember.getId())).isEmpty();
+      assertThat(projectMemberService.getMyProjects(memberInGroup.getId())).hasSize(1);
+    }
+
+    @Test
     @DisplayName("반려한 것을 다시 승인할 수 있다")
     void canApproveAfterRejecting() {
       MemberProjectResult submitted =
           projectMemberService.submitProject(memberInGroup.getId(), request(null));
 
-      projectAdminService.changeStatus(submitted.id(), ProjectStatus.REJECTED);
+      // 반려는 사유와 함께만 할 수 있다. changeStatus 로는 막힌다 (PR #197 리뷰).
+      projectAdminService.reject(submitted.id(), "설명 보강 필요");
       assertThat(showcaseTitles()).doesNotContain("우리 조 프로젝트");
 
       // 사람이 판단을 바꿀 수 있어야 한다.

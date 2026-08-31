@@ -56,7 +56,7 @@ class ProjectAdminServiceTest {
       seed("A", "2025-FALL", 1);
       seed("C", "2024-SPRING", 1);
 
-      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", null, PageRequest.of(0, 20));
 
       assertThat(result.content()).extracting(ProjectResult.Item::title).containsExactly("A", "B");
     }
@@ -68,7 +68,7 @@ class ProjectAdminServiceTest {
           "key", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L));
       projectAdminService.createProject(write("썸네일", "2025-FALL", file.getId(), 1));
 
-      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", null, PageRequest.of(0, 20));
 
       assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("http://localhost:8080/api/public/files/key");
     }
@@ -78,7 +78,7 @@ class ProjectAdminServiceTest {
     void nullThumbnailWhenNoFile() {
       seed("파일없음", "2025-FALL", 1);
 
-      var result = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
+      var result = projectAdminService.getProjects("2025-FALL", null, PageRequest.of(0, 20));
 
       assertThat(result.content().get(0).thumbnailUrl()).isNull();
     }
@@ -126,7 +126,7 @@ class ProjectAdminServiceTest {
       Long fileId = saveFile("k1");
       Long id = projectAdminService.createProject(write("썸네일", "2025-FALL", fileId, 1)).id();
 
-      var list = projectAdminService.getProjects("2025-FALL", PageRequest.of(0, 20));
+      var list = projectAdminService.getProjects("2025-FALL", null, PageRequest.of(0, 20));
       assertThat(list.content().get(0).fileId()).isEqualTo(fileId);
 
       ProjectResult.Item updated = projectAdminService.updateProject(id, write("수정", "2025-FALL", fileId, 1));

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
 import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.project.admin.dto.ProjectRejectRequest;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
@@ -28,6 +29,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -88,11 +90,18 @@ class ProjectAdminControllerTest {
     mockMvc.perform(get(PATH).header("Authorization", token)).andExpect(status().isForbidden());
   }
 
+  private MockHttpServletRequestBuilder rejectRequest(Long projectId, String reason) throws Exception {
+    return post(PATH + "/" + projectId + "/reject")
+        .header("Authorization", adminToken())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new ProjectRejectRequest(reason)));
+  }
+
   /** 부원이 낸 승인 대기 프로젝트. (이슈 #148) */
   private Long pendingProjectId() {
     ProjectCommand command = new ProjectCommand(
         "부원 프로젝트", "3조", "2026-SPRING", null, List.of(), null, null, false, null);
-    return projectRepository.save(Project.submit(command, 1)).getId();
+    return projectRepository.save(Project.submit(command, 1, null)).getId();
   }
 
   @Test
@@ -107,13 +116,69 @@ class ProjectAdminControllerTest {
   }
 
   @Test
-  @DisplayName("반려하면 200 과 REJECTED 를 준다")
+  @DisplayName("반려하면 200 과 REJECTED · 사유를 준다")
   void rejectsPendingProject() throws Exception {
     Long projectId = pendingProjectId();
 
-    mockMvc.perform(post(PATH + "/" + projectId + "/reject").header("Authorization", adminToken()))
+    mockMvc.perform(rejectRequest(projectId, "설명이 너무 짧습니다"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value(ProjectStatus.REJECTED.name()));
+        .andExpect(jsonPath("$.data.status").value(ProjectStatus.REJECTED.name()))
+        .andExpect(jsonPath("$.data.rejectReason").value("설명이 너무 짧습니다"));
+  }
+
+  @Test
+  @DisplayName("사유 없이 반려할 수 없다")
+  void requiresRejectReason() throws Exception {
+    Long projectId = pendingProjectId();
+
+    // 사유가 비면 부원은 지금과 똑같이 이유를 모른다. 그게 이 기능이 있는 이유다 (이슈 #190).
+    mockMvc.perform(rejectRequest(projectId, "  "))
+        .andExpect(status().isBadRequest());
+    mockMvc.perform(post(PATH + "/" + projectId + "/reject")
+            .header("Authorization", adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("다시 승인하면 반려 사유가 지워진다")
+  void clearsReasonWhenApprovedAgain() throws Exception {
+    Long projectId = pendingProjectId();
+    mockMvc.perform(rejectRequest(projectId, "설명 보강 필요"));
+
+    // 남겨 두면 공개된 프로젝트에 반려 사유가 붙어 있는 상태가 된다.
+    mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", adminToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value(ProjectStatus.APPROVED.name()))
+        .andExpect(jsonPath("$.data.rejectReason").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("status 로 승인 대기만 모아 본다")
+  void filtersByStatus() throws Exception {
+    Long pending = pendingProjectId();
+    Long rejected = pendingProjectId();
+    mockMvc.perform(rejectRequest(rejected, "사유"));
+
+    mockMvc.perform(get(PATH).param("status", ProjectStatus.PENDING.name())
+            .header("Authorization", adminToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content.length()").value(1))
+        .andExpect(jsonPath("$.data.content[0].id").value(pending));
+  }
+
+  @Test
+  @DisplayName("status 를 생략하면 상태와 무관하게 전부 나온다")
+  void listsAllWithoutStatus() throws Exception {
+    pendingProjectId();
+    Long rejected = pendingProjectId();
+    mockMvc.perform(rejectRequest(rejected, "사유"));
+
+    // 어드민은 승인 대기 중인 것도 봐야 하므로 기본이 전체다 (이슈 #148).
+    mockMvc.perform(get(PATH).header("Authorization", adminToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content.length()").value(2));
   }
 
   @Test
@@ -143,7 +208,10 @@ class ProjectAdminControllerTest {
 
     mockMvc.perform(post(PATH + "/" + projectId + "/approve").header("Authorization", token))
         .andExpect(status().isForbidden());
-    mockMvc.perform(post(PATH + "/" + projectId + "/reject").header("Authorization", token))
+    mockMvc.perform(post(PATH + "/" + projectId + "/reject")
+            .header("Authorization", token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(new ProjectRejectRequest("사유"))))
         .andExpect(status().isForbidden());
   }
 

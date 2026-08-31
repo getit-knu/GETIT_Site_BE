@@ -21,7 +21,8 @@ public class ProjectResult {
       @JsonProperty("isFeatured") boolean isFeatured,
       int order,
       ProjectStatus status,
-      String statusLabel
+      String statusLabel,
+      String rejectReason
   ) {
 
     public static Item of(Project project, String thumbnailUrl) {
@@ -39,7 +40,8 @@ public class ProjectResult {
           project.isFeatured(),
           project.getOrder(),
           project.getStatus(),
-          project.getStatus().getLabel());
+          project.getStatus().getLabel(),
+          project.getRejectReason());
     }
   }
 }

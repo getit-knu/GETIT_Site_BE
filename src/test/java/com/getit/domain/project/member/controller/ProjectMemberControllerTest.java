@@ -1,10 +1,14 @@
 package com.getit.domain.project.member.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.getit.domain.auth.jwt.JwtProvider;
+import com.getit.domain.project.admin.service.ProjectAdminService;
+import com.getit.domain.project.entity.Project;
+import com.getit.domain.project.repository.ProjectRepository;
 import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.setting.generation.entity.Generation;
 import com.getit.domain.setting.generation.repository.GenerationRepository;
@@ -53,6 +57,12 @@ class ProjectMemberControllerTest {
 
   @Autowired
   private GenerationRepository generationRepository;
+
+  @Autowired
+  private ProjectAdminService projectAdminService;
+
+  @Autowired
+  private ProjectRepository projectRepository;
 
   private Generation activeGeneration;
 
@@ -141,6 +151,61 @@ class ProjectMemberControllerTest {
             .header("Authorization", bearerFor(guest))
             .contentType(MediaType.APPLICATION_JSON)
             .content(BODY))
+        .andExpect(status().isForbidden());
+  }
+
+  /** 조에 배정된 부원 하나를 만든다. */
+  private User memberInGroup(String providerId, Group group) {
+    User member = guest(providerId);
+    member.promoteToMember(activeGeneration.getGenerationNo());
+    member.assignToGroup(group.getId());
+    userRepository.flush();
+    return member;
+  }
+
+  @Test
+  @DisplayName("GET — 우리 조 프로젝트를 반려 사유와 함께 준다")
+  void listsOwnProjectsWithRejectReason() throws Exception {
+    Group group = groupRepository.save(Group.create(activeGeneration.getId(), "3조"));
+    User member = memberInGroup("google-sub-list", group);
+
+    mockMvc.perform(post(PATH)
+        .header("Authorization", bearerFor(member))
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(BODY));
+    Project submitted = projectRepository.findByGroupIdOrderByIdDesc(group.getId()).get(0);
+    projectAdminService.reject(submitted.getId(), "설명이 너무 짧습니다");
+
+    mockMvc.perform(get(PATH).header("Authorization", bearerFor(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].status").value(ProjectStatus.REJECTED.name()))
+        .andExpect(jsonPath("$.data[0].rejectReason").value("설명이 너무 짧습니다"));
+  }
+
+  @Test
+  @DisplayName("GET — 조에 배정되지 않았으면 빈 목록이다")
+  void emptyWhenNotAssignedToGroup() throws Exception {
+    User member = guest("google-sub-list-nogroup");
+    member.promoteToMember(activeGeneration.getGenerationNo());
+    userRepository.flush();
+
+    mockMvc.perform(get(PATH).header("Authorization", bearerFor(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  @Test
+  @DisplayName("GET — 토큰이 없으면 401 이다")
+  void listRequiresAuthentication() throws Exception {
+    mockMvc.perform(get(PATH)).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("GET — GUEST 는 쓸 수 없다")
+  void listRejectsGuest() throws Exception {
+    User guest = guest("google-sub-list-guest");
+
+    mockMvc.perform(get(PATH).header("Authorization", bearerFor(guest)))
         .andExpect(status().isForbidden());
   }
 }

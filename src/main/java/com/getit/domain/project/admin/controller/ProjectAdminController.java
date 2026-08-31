@@ -1,5 +1,6 @@
 package com.getit.domain.project.admin.controller;
 
+import com.getit.domain.project.admin.dto.ProjectRejectRequest;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
 import com.getit.domain.project.entity.ProjectStatus;
@@ -36,9 +37,10 @@ public class ProjectAdminController {
   @GetMapping
   public ApiResponse<PageResponse<ProjectResult.Item>> getProjects(
       @RequestParam(required = false) String semester,
+      @RequestParam(required = false) ProjectStatus status,
       @PageableDefault(size = 20) Pageable pageable
   ) {
-    return ApiResponse.success(projectAdminService.getProjects(semester, pageable));
+    return ApiResponse.success(projectAdminService.getProjects(semester, status, pageable));
   }
 
   @Operation(summary = "프로젝트 등록", description = "명세서 12.2")
@@ -63,10 +65,19 @@ public class ProjectAdminController {
     return ApiResponse.success(projectAdminService.changeStatus(id, ProjectStatus.APPROVED));
   }
 
-  @Operation(summary = "프로젝트 반려", description = "이슈 #148")
+  /**
+   * 반려 사유를 필수로 받는다. (이슈 #190)
+   *
+   * <p>선택으로 두면 대부분 비어 오고, 부원은 지금과 똑같이 이유를 모른 채 같은 이유로
+   * 다시 낸다. 그게 이 기능이 있는 이유다.
+   */
+  @Operation(summary = "프로젝트 반려", description = "이슈 #148 · #190")
   @PostMapping("/{id}/reject")
-  public ApiResponse<ProjectResult.Item> rejectProject(@PathVariable Long id) {
-    return ApiResponse.success(projectAdminService.changeStatus(id, ProjectStatus.REJECTED));
+  public ApiResponse<ProjectResult.Item> rejectProject(
+      @PathVariable Long id,
+      @Valid @RequestBody ProjectRejectRequest request
+  ) {
+    return ApiResponse.success(projectAdminService.reject(id, request.reason()));
   }
 
   @Operation(summary = "프로젝트 삭제", description = "명세서 12.4")
