@@ -68,9 +68,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
    * 없음(null)"과 "미배정 조회(값이 있어야 하는데 값 자체가 없는 조건)"를 구분할 수 없기 때문이다.
    * (9.6 조회에서 groupId=null 로 findByGenerationNoAndStatus 를 쓰는 것과 달리, 여기는 필터
    * 조합이 많아 derived method 로 나누면 경우의 수가 너무 많아진다)
+   *
+   * <p>탈퇴한 사용자는 제외한다. 삭제(9.3)가 soft delete 인데 이 목록이 걸러 주지 않아,
+   * 어드민이 부원을 지워도 목록에서 사라지지 않았다 (이슈 #183). 9.5 엑셀 내보내기도 같은
+   * 쿼리를 쓰므로 함께 반영된다.
+   *
+   * <p>탈퇴자를 따로 보는 화면이 생기면 그때 status 필터를 파라미터로 노출한다. 지금은
+   * 그런 화면이 없어 조건을 고정한다 — 쓰지 않는 파라미터를 미리 열어 두면 어느 값이
+   * 기본인지가 흐려진다.
    */
   @Query("select u from User u "
-      + "where (:keyword is null or lower(u.name) like lower(concat('%', :keyword, '%')) "
+      + "where u.deletedAt is null "
+      + "and (:keyword is null or lower(u.name) like lower(concat('%', :keyword, '%')) "
       + "or lower(u.email) like lower(concat('%', :keyword, '%'))) "
       + "and (:role is null or u.role = :role) "
       + "and (:generationNo is null or u.generationNo = :generationNo) "
