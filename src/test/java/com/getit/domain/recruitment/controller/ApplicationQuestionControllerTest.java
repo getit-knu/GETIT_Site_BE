@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
 import com.getit.domain.recruitment.dto.ApplicationQuestionRequest;
 import com.getit.domain.recruitment.dto.QuestionOrderRequest;
+import com.getit.domain.recruitment.entity.ApplicationAnswer;
 import com.getit.domain.recruitment.entity.ApplicationQuestion;
 import com.getit.domain.recruitment.entity.QuestionType;
 import com.getit.domain.recruitment.repository.ApplicationQuestionRepository;
@@ -230,6 +231,53 @@ class ApplicationQuestionControllerTest {
     private void assertThatOrderIs(Long questionId, int expectedOrder) {
       ApplicationQuestion question = applicationQuestionRepository.findById(questionId).orElseThrow();
       assertThat(question.getOrder()).isEqualTo(expectedOrder);
+    }
+  }
+
+  /**
+   * 질문 설정이 컬럼을 넘어서지 못하게 막는다. (이슈 #171)
+   *
+   * <p>운영진이 지원자 답변 컬럼보다 큰 maxLength 를 걸면, 그 값을 지킨 답변조차 저장하지
+   * 못한다 — 제출 검증은 통과하고 DB 에서 터진다.
+   */
+  @Nested
+  @DisplayName("질문 설정의 물리적 상한")
+  class ColumnLimits {
+
+    @Test
+    @DisplayName("답변 컬럼이 담지 못할 maxLength 는 400 이다")
+    void rejectsMaxLengthBeyondAnswerColumn() throws Exception {
+      String body = objectMapper.writeValueAsString(new ApplicationQuestionRequest(
+          QuestionType.TEXT, "지원 동기", true, ApplicationAnswer.MAX_ANSWER_LENGTH + 1, null));
+
+      mockMvc.perform(post(QUESTIONS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("maxLength 가 0 이하이면 400 이다")
+    void rejectsNonPositiveMaxLength() throws Exception {
+      String body = objectMapper.writeValueAsString(new ApplicationQuestionRequest(
+          QuestionType.TEXT, "지원 동기", true, 0, null));
+
+      mockMvc.perform(post(QUESTIONS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("질문 내용이 컬럼(500자)을 넘으면 400 이다")
+    void rejectsTooLongContent() throws Exception {
+      mockMvc.perform(post(QUESTIONS_PATH)
+              .header("Authorization", adminToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(textRequestJson("가".repeat(501))))
+          .andExpect(status().isBadRequest());
     }
   }
 }

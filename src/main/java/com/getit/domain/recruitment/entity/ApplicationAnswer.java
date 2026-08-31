@@ -31,6 +31,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApplicationAnswer extends BaseTimeEntity {
 
+  /**
+   * 답변 하나가 담을 수 있는 최대 글자 수. 컬럼이 감당하는 물리적 상한이다.
+   *
+   * <p>{@code answerText} 는 {@code TEXT}(65,535 바이트)이고 DB 문자셋은 {@code utf8mb4} 라
+   * 글자당 최대 4 바이트다. 4 바이트 문자 16,383 개는 65,532 바이트라 아직 들어가고,
+   * <b>16,384 자부터</b> 넘친다. 여유를 두어 16,000 으로 끊는다.
+   *
+   * <p>질문별 글자 수 제한({@code ApplicationQuestion.maxLength}, TEXT 기본 300 자)과는 다른
+   * 층이다. 그쪽은 운영진이 정하는 정책이고 제출 시점에만 본다. 이쪽은 무엇을 설정하든
+   * 넘을 수 없는 바닥이다 — 없으면 임시저장에서 그대로 컬럼에 들어가다 500 이 난다 (이슈 #171).
+   */
+  public static final int MAX_ANSWER_LENGTH = 16_000;
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
