@@ -255,5 +255,42 @@ class FeedbackServiceTest {
           .isInstanceOf(BusinessException.class)
           .hasFieldOrPropertyWithValue("errorCode", LectureErrorCode.FEEDBACK_NOT_FOUND);
     }
+
+    /**
+     * 어드민은 기수를 넘어 다룬다. 그게 이 도메인의 현재 규칙이라 여기에 못을 박아 둔다.
+     *
+     * <p>PR #167 리뷰에서 활성 기수로 제한하자는 지적이 있었다. 근거로 든
+     * {@code SubmissionService} 는 부원용이고, 부원이 지난 기수 과제에 제출하지 못하게 하는
+     * 규칙이다. 어드민 쪽은 반대로 되어 있다 — 강의 목록이 {@code generationId} 를 받아
+     * 지난 기수를 열람하고, {@code LectureAdminService.deleteLecture} 도 기수를 보지 않는다.
+     * 피드백 작성 · 수정도 마찬가지다.
+     *
+     * <p>삭제만 막으면 같은 피드백을 고칠 수는 있는데 지울 수는 없는 상태가 된다.
+     * 지난 기수를 잠그는 게 맞다면 조회 · 작성 · 수정까지 함께 정해야 한다 (이슈로 따로 냈다).
+     */
+    @Test
+    @DisplayName("지난 기수의 피드백도 작성자면 지울 수 있다 — 작성 · 수정과 같다")
+    void deletesFeedbackFromPastGeneration() {
+      FeedbackResult.CreateResult created = feedbackService.create(
+          submissionId, new FeedbackRequest.Write("지난 기수 피드백"), adminId);
+      startNewGeneration();
+
+      feedbackService.delete(created.id(), adminId);
+
+      assertThat(feedbackRepository.findById(created.id())).isEmpty();
+    }
+
+    /** 10기를 열어 9기(위 setUp 의 강의가 속한 기수)를 지난 기수로 만든다. */
+    private void startNewGeneration() {
+      Generation previous = generationRepository.findAll().stream()
+          .filter(Generation::isActive)
+          .findFirst()
+          .orElseThrow();
+      previous.deactivate();
+
+      Generation next = Generation.create(10, 2027);
+      next.activate();
+      generationRepository.saveAndFlush(next);
+    }
   }
 }
