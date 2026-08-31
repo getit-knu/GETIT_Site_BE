@@ -1,9 +1,12 @@
 package com.getit.domain.user.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.user.entity.College;
 import com.getit.domain.user.entity.Major;
 import com.getit.domain.user.repository.CollegeRepository;
@@ -16,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 2.6 GET /api/public/colleges · 2.7 GET /api/public/majors */
@@ -29,6 +33,9 @@ class CollegeMajorControllerTest {
 
   @Autowired
   private MockMvc mockMvc;
+
+  @Autowired
+  private ObjectMapper objectMapper;
 
   @Autowired
   private CollegeRepository collegeRepository;
@@ -129,15 +136,26 @@ class CollegeMajorControllerTest {
     @DisplayName("쿼리 파라미터 방식과 같은 결과다")
     void matchesQueryParamVariant() throws Exception {
       majorRepository.save(Major.create(business.getId(), "경영학과"));
+      majorRepository.save(Major.create(business.getId(), "경영정보학과"));
 
-      String nested = mockMvc.perform(get(COLLEGES_PATH + "/" + business.getId() + "/majors"))
-          .andReturn().getResponse().getContentAsString();
-      String query = mockMvc.perform(
-              get(MAJORS_PATH).param("collegeId", business.getId().toString()))
-          .andReturn().getResponse().getContentAsString();
+      JsonNode nested = dataOf(COLLEGES_PATH + "/" + business.getId() + "/majors", null);
+      JsonNode query = dataOf(MAJORS_PATH, business.getId().toString());
 
       // 같은 서비스 메서드를 쓰므로 동작이 갈라지면 안 된다.
-      org.assertj.core.api.Assertions.assertThat(nested).isEqualTo(query);
+      //
+      // 응답 문자열을 그대로 비교하면 필드 순서나 포맷이 달라졌을 때 뜻이 같은데도 깨진다.
+      // 파싱해서 data 만 구조로 비교한다 (PR #194 리뷰 지적).
+      assertThat(nested).isEqualTo(query);
+    }
+
+    /** 응답에서 {@code data} 만 떼어 구조로 비교할 수 있게 파싱한다. */
+    private JsonNode dataOf(String path, String collegeId) throws Exception {
+      MockHttpServletRequestBuilder request = get(path);
+      if (collegeId != null) {
+        request = request.param("collegeId", collegeId);
+      }
+      String body = mockMvc.perform(request).andReturn().getResponse().getContentAsString();
+      return objectMapper.readTree(body).get("data");
     }
   }
 }
