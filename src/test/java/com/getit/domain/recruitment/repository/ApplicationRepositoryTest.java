@@ -31,7 +31,7 @@ class ApplicationRepositoryTest {
 
   private Application submitted(Long userId, Long generationId, String name) {
     Application application = draft(userId, generationId, name);
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     return application;
   }
 
@@ -151,9 +151,9 @@ class ApplicationRepositoryTest {
     @DisplayName("페이징 없이 정렬 기준대로 전체 조회한다")
     void findsAllMatchingSorted() {
       Application first = draft(1L, 9L, "홍길동");
-      first.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+      first.submit(LocalDateTime.of(2026, 9, 1, 10, 0), LocalDateTime.of(2026, 9, 1, 10, 0));
       Application second = draft(2L, 9L, "김철수");
-      second.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+      second.submit(LocalDateTime.of(2026, 9, 1, 11, 0), LocalDateTime.of(2026, 9, 1, 11, 0));
       draft(3L, 9L, "이영희");
       submitted(4L, 8L, "다른 기수");
 
@@ -290,9 +290,9 @@ class ApplicationRepositoryTest {
     @DisplayName("다음은 정렬 기준(submittedAt desc, id desc)에서 현재 바로 뒤 id 를 반환한다")
     void findsNextId() {
       Application oldest = draft(1L, 9L, "홍길동");
-      oldest.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+      oldest.submit(LocalDateTime.of(2026, 9, 1, 10, 0), LocalDateTime.of(2026, 9, 1, 10, 0));
       Application middle = draft(2L, 9L, "김철수");
-      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0), LocalDateTime.of(2026, 9, 1, 11, 0));
 
       List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
           9L, ApplicationStatus.SUBMITTED, middle.getSubmittedAt(), middle.getId(), PageRequest.of(0, 1));
@@ -304,9 +304,9 @@ class ApplicationRepositoryTest {
     @DisplayName("이전은 정렬 기준에서 현재 바로 앞 id 를 반환한다")
     void findsPreviousId() {
       Application middle = draft(1L, 9L, "홍길동");
-      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0));
+      middle.submit(LocalDateTime.of(2026, 9, 1, 11, 0), LocalDateTime.of(2026, 9, 1, 11, 0));
       Application newest = draft(2L, 9L, "김철수");
-      newest.submit(LocalDateTime.of(2026, 9, 1, 12, 0));
+      newest.submit(LocalDateTime.of(2026, 9, 1, 12, 0), LocalDateTime.of(2026, 9, 1, 12, 0));
 
       List<Long> previous = applicationRepository.findPreviousIdByGenerationIdAndStatus(
           9L, ApplicationStatus.SUBMITTED, middle.getSubmittedAt(), middle.getId(), PageRequest.of(0, 1));
@@ -319,9 +319,9 @@ class ApplicationRepositoryTest {
     void tieBreaksById() {
       LocalDateTime tie = LocalDateTime.of(2026, 9, 1, 11, 0);
       Application lowerId = draft(1L, 9L, "홍길동");
-      lowerId.submit(tie);
+      lowerId.submit(tie, tie);
       Application higherId = draft(2L, 9L, "김철수");
-      higherId.submit(tie);
+      higherId.submit(tie, tie);
 
       List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
           9L, ApplicationStatus.SUBMITTED, higherId.getSubmittedAt(), higherId.getId(), PageRequest.of(0, 1));
@@ -333,7 +333,7 @@ class ApplicationRepositoryTest {
     @DisplayName("더 이상 없으면 빈 리스트를 반환한다")
     void returnsEmptyWhenNoMore() {
       Application only = draft(1L, 9L, "홍길동");
-      only.submit(LocalDateTime.of(2026, 9, 1, 10, 0));
+      only.submit(LocalDateTime.of(2026, 9, 1, 10, 0), LocalDateTime.of(2026, 9, 1, 10, 0));
 
       List<Long> next = applicationRepository.findNextIdByGenerationIdAndStatus(
           9L, ApplicationStatus.SUBMITTED, only.getSubmittedAt(), only.getId(), PageRequest.of(0, 1));

@@ -126,27 +126,30 @@ public class ApplicationService {
 
   /**
    * 3.4. 제출. 검증 순서는 명세서 그대로: 활성 기수 → 서류 기간 → 기존 상태 → 기본 정보 →
-   * 필수 답변 → 글자수. {@code request} 가 없으면(본문 없이 제출) 이미 저장된 draft 값으로 검증한다.
+   * 필수 답변 → 글자수.
+   *
+   * <p>요청 본문의 {@code privacyConsent} 를 반드시 확인한다 (이슈 #203). 그래서 본문 없이
+   * 저장된 draft 를 그대로 제출하던 경로는 더 이상 허용하지 않는다 — 허용하면 동의 없이
+   * 제출하는 우회로가 된다.
+   *
+   * <p>로그인 시 받는 동의({@code users.privacy_consented_at})는 여기서 확인하지 않는다.
+   * 그 동의는 신규 가입자 온보딩에서만 받으므로, 이미 가입해 있던 회원은 동의 기록이 비어
+   * 있다. 여기서 막으면 기존 회원 전원이 지원 자체를 못 하게 된다.
    */
   @Transactional
   public SubmitResult submit(Long userId, ApplicationDraftRequest request) {
     GenerationSummary activeGeneration = generationQueryService.findActive()
         .orElseThrow(() -> new BusinessException(RecruitmentErrorCode.APPLICATION_NOT_OPEN));
     findOpenSchedule(activeGeneration.id());
+    assertSubmissionPrivacyConsent(request);
     LocalDateTime now = LocalDateTime.now(clock);
 
     Optional<Application> existing =
         applicationRepository.findByUserIdAndGenerationId(userId, activeGeneration.id());
     existing.ifPresent(this::assertDraft);
 
-    Application application;
-    if (request != null) {
-      application = upsertApplication(userId, activeGeneration.id(), request.basicInfo());
-      upsertAnswers(application.getId(), request.answers());
-    } else {
-      application = existing.orElseThrow(() -> new BusinessException(
-          CommonErrorCode.VALIDATION_FAILED, "제출할 지원서가 없습니다. 기본 정보와 답변을 함께 보내주세요."));
-    }
+    Application application = upsertApplication(userId, activeGeneration.id(), request.basicInfo());
+    upsertAnswers(application.getId(), request.answers());
 
     ApplicationSubmissionValidator.validateBasicInfo(application);
 
@@ -156,8 +159,22 @@ public class ApplicationService {
     ApplicationSubmissionValidator.validateRequiredAnswers(questions, answers);
     ApplicationSubmissionValidator.validateAnswerLengths(questions, answers);
 
-    application.submit(now);
-    return new SubmitResult(application.getId(), application.getStatus(), now);
+    application.submit(now, now);
+    return new SubmitResult(
+        application.getId(), application.getStatus(), now, application.getPrivacyConsentedAt());
+  }
+
+  /**
+   * 지원서 항목에 대한 동의 확인. 본문이 없거나 {@code true} 가 아니면 거부한다 (이슈 #203).
+   *
+   * <p>이슈는 {@code VALIDATION_FAILED} 를 제안했지만 도메인 코드를 쓴다. 그 코드는 {@code @Valid}
+   * 실패 전용이라, 재사용하면 프론트가 "형식이 틀렸다"와 "동의를 받지 못했다"를 코드로 구분할
+   * 수 없다. DTO 애너테이션으로 걸지 못하는 이유는 이 DTO 가 임시 저장(3.3)과 공용이기 때문이다.
+   */
+  private void assertSubmissionPrivacyConsent(ApplicationDraftRequest request) {
+    if (request == null || !Boolean.TRUE.equals(request.privacyConsent())) {
+      throw new BusinessException(RecruitmentErrorCode.PRIVACY_CONSENT_REQUIRED);
+    }
   }
 
   /**

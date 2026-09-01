@@ -68,7 +68,7 @@ class UserPromotionServiceTest {
     Application application = applicationRepository.save(Application.createDraft(
         userId, generation.getId(), "지원자", "app@getit.com", "010-1234-5678",
         collegeId, majorId, 3, "2021110000"));
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     application.decideDocumentResult(true);
     application.decideFinalResult(true);
     return application;
@@ -163,7 +163,7 @@ class UserPromotionServiceTest {
       Application notFinalPass = applicationRepository.save(Application.createDraft(
           user.getId(), generation.getId(), "지원자", "app@getit.com", "010-1234-5678",
           null, null, 3, "2021110000"));
-      notFinalPass.submit(LocalDateTime.now());
+      notFinalPass.submit(LocalDateTime.now(), LocalDateTime.now());
 
       UserPromotionResult result = userPromotionService.promote(
           generation.getId(), List.of(notFinalPass.getId()));

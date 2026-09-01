@@ -289,7 +289,7 @@ class UserAdminControllerTest {
       Application application = applicationRepository.save(Application.createDraft(
           applicant.getId(), generation.getId(), "지원자", "app@getit.com", "010-1234-5678",
           null, null, 3, "2021110000"));
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
       application.decideDocumentResult(true);
       application.decideFinalResult(true);
       String body = objectMapper.writeValueAsString(new PromoteRequest(generation.getId(), null));

@@ -67,7 +67,7 @@ class ApplicationEvaluationServiceTest {
 
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     return application;
   }
 
@@ -258,7 +258,7 @@ class ApplicationEvaluationServiceTest {
       Application application = applicationRepository.save(Application.createDraft(
           1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
           null, null, 2, "2021110000"));
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
       EvaluationCriterion criterion = criterion(otherGeneration.getId(), 1, "전공 적합성", 60);
 
       assertThatThrownBy(() -> applicationEvaluationService.saveScores(new EvaluationSubmission(
@@ -446,7 +446,7 @@ class ApplicationEvaluationServiceTest {
       Application application = applicationRepository.save(Application.createDraft(
           1L, otherGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678",
           null, null, 2, "2021110000"));
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
 
       assertThatThrownBy(() -> applicationEvaluationService.decide(application.getId(), true))
           .isInstanceOf(BusinessException.class)
@@ -521,7 +521,7 @@ class ApplicationEvaluationServiceTest {
       Application otherGenerationApplication = applicationRepository.save(Application.createDraft(
           1L, otherGeneration.getId(), "지난기수", "old@gmail.com", "010-0000-0000",
           null, null, 2, null));
-      otherGenerationApplication.submit(LocalDateTime.now());
+      otherGenerationApplication.submit(LocalDateTime.now(), LocalDateTime.now());
       Application activeApplication = submitted(2L, "홍길동");
 
       BulkDecisionResult result = applicationEvaluationService.decideBulk(

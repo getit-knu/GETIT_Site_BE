@@ -84,6 +84,16 @@ public class Application extends BaseTimeEntity {
   @Column
   private LocalDateTime submittedAt;
 
+  /**
+   * 지원서 개인정보 수집·이용에 동의한 시각. 제출 전(DRAFT)에는 null. (이슈 #203)
+   *
+   * <p>{@code submittedAt} 과 사실상 같은 시각이지만 컬럼을 따로 둔다. 로그인 동의
+   * ({@code users.privacy_consented_at})와 수집 항목·목적이 다른 별개의 동의라, "제출했으니
+   * 동의한 것"으로 갈음하면 어느 동의를 언제 받았는지 입증할 근거가 남지 않는다.
+   */
+  @Column
+  private LocalDateTime privacyConsentedAt;
+
   @Builder(access = AccessLevel.PRIVATE)
   private Application(
       Long userId,
@@ -161,10 +171,16 @@ public class Application extends BaseTimeEntity {
     this.studentNumber = studentNumber;
   }
 
-  /** 3.4 제출. 통과해야 할 검증은 전부 서비스 레이어에서 먼저 끝낸 뒤 호출된다. */
-  public void submit(LocalDateTime submittedAt) {
+  /**
+   * 3.4 제출. 통과해야 할 검증은 전부 서비스 레이어에서 먼저 끝낸 뒤 호출된다.
+   *
+   * <p>동의 시각을 인자로 받는다 (이슈 #203). 여기서 {@code submittedAt} 을 그대로 복사하면
+   * 동의를 받지 않은 제출에도 동의 시각이 찍혀, 기록이 입증 자료로서 의미를 잃는다.
+   */
+  public void submit(LocalDateTime submittedAt, LocalDateTime privacyConsentedAt) {
     this.status = ApplicationStatus.SUBMITTED;
     this.submittedAt = submittedAt;
+    this.privacyConsentedAt = privacyConsentedAt;
   }
 
   /**

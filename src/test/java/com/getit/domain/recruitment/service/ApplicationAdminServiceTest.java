@@ -86,13 +86,13 @@ class ApplicationAdminServiceTest {
 
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     return application;
   }
 
   private Application submittedAt(Long userId, String name, LocalDateTime submittedAt) {
     Application application = draft(userId, name);
-    application.submit(submittedAt);
+    application.submit(submittedAt, submittedAt);
     return application;
   }
 
@@ -215,7 +215,7 @@ class ApplicationAdminServiceTest {
     void includesCollegeNameAndGrade() {
       College college = collegeRepository.save(College.create("IT융합대학"));
       Application application = draft(1L, "홍길동", college.getId());
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
         applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
@@ -246,9 +246,9 @@ class ApplicationAdminServiceTest {
     void resolvesCollegeNamesInBatch() {
       College it = collegeRepository.save(College.create("IT융합대학"));
       College biz = collegeRepository.save(College.create("경영대학"));
-      draft(1L, "가지원", it.getId()).submit(LocalDateTime.now());
-      draft(2L, "나지원", biz.getId()).submit(LocalDateTime.now());
-      draft(3L, "다지원", it.getId()).submit(LocalDateTime.now());
+      draft(1L, "가지원", it.getId()).submit(LocalDateTime.now(), LocalDateTime.now());
+      draft(2L, "나지원", biz.getId()).submit(LocalDateTime.now(), LocalDateTime.now());
+      draft(3L, "다지원", it.getId()).submit(LocalDateTime.now(), LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
         applicationAdminService.listApplicants(null, null, PageRequest.of(0, 20)).applicants();
@@ -291,7 +291,7 @@ class ApplicationAdminServiceTest {
       Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
       Application otherGenApplication = applicationRepository.save(Application.createDraft(
           2L, otherGeneration.getId(), "지난 기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
-      otherGenApplication.submit(LocalDateTime.now());
+      otherGenApplication.submit(LocalDateTime.now(), LocalDateTime.now());
 
       PageResponse<ApplicantSummary> result =
         applicationAdminService.listApplicants(otherGeneration.getId(), null, PageRequest.of(0, 20)).applicants();

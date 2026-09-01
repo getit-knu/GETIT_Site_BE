@@ -52,12 +52,18 @@ public class ApplicationController {
     return ApiResponse.success(applicationService.saveDraft(principal.getUserId(), request));
   }
 
-  /** 본문 없이 저장된 draft 를 그대로 제출하는 것도 허용한다. (명세서 3.4) */
+  /**
+   * 지원서 제출. (명세서 3.4)
+   *
+   * <p>본문을 반드시 받는다. 이전에는 저장된 draft 를 본문 없이 그대로 제출할 수 있었으나,
+   * 개인정보 수집·이용 동의({@code privacyConsent})를 본문으로 받게 되면서 그 경로가 동의를
+   * 건너뛰는 우회로가 되기 때문이다 (이슈 #203).
+   */
   @Operation(summary = "지원서 제출", description = "명세서 3.4")
   @PostMapping("/me/submit")
   public ApiResponse<SubmitResult> submit(
       @AuthenticationPrincipal CustomUserDetails principal,
-      @Valid @RequestBody(required = false) ApplicationDraftRequest request
+      @Valid @RequestBody ApplicationDraftRequest request
   ) {
     return ApiResponse.success(applicationService.submit(principal.getUserId(), request));
   }

@@ -127,7 +127,7 @@ class ApplicationControllerTest {
 
   private String draftRequestJson(List<ApplicationAnswerRequest> answers) throws Exception {
     BasicInfo basicInfo = new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, "2021110000");
-    return objectMapper.writeValueAsString(new ApplicationDraftRequest(basicInfo, answers));
+    return objectMapper.writeValueAsString(new ApplicationDraftRequest(basicInfo, answers, true));
   }
 
   @Nested
@@ -232,7 +232,7 @@ class ApplicationControllerTest {
       saveOpenSchedule();
       Application application = applicationRepository.save(Application.createDraft(
           1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, null));
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
 
       mockMvc.perform(put(DRAFT_PATH)
               .header("Authorization", guestToken())
@@ -278,7 +278,7 @@ class ApplicationControllerTest {
       BasicInfo basicInfo = new BasicInfo(
           "홍길동", "hong@gmail.com", "010-1234-5678", 777L, 888L, 2, "2021110000");
       String body = objectMapper.writeValueAsString(
-          new ApplicationDraftRequest(basicInfo, null));
+          new ApplicationDraftRequest(basicInfo, null, true));
 
       mockMvc.perform(put(DRAFT_PATH)
               .header("Authorization", guestToken())
@@ -399,7 +399,7 @@ class ApplicationControllerTest {
       saveOpenSchedule();
       Application application = applicationRepository.save(Application.createDraft(
           1L, activeGeneration.getId(), "홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, null));
-      application.submit(LocalDateTime.now());
+      application.submit(LocalDateTime.now(), LocalDateTime.now());
 
       mockMvc.perform(get(RESULT_PATH).header("Authorization", guestToken()))
           .andExpect(status().isOk())

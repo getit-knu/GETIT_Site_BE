@@ -7,5 +7,8 @@ import java.time.LocalDateTime;
 public record SubmitResult(
     Long id,
     ApplicationStatus status,
-    LocalDateTime submittedAt
+    LocalDateTime submittedAt,
+
+    /** 개인정보 수집·이용에 동의한 시각. (이슈 #203) */
+    LocalDateTime privacyConsentedAt
 ) { }

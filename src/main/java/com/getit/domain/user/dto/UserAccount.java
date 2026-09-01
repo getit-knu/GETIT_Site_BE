@@ -3,6 +3,7 @@ package com.getit.domain.user.dto;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.entity.UserStatus;
+import java.time.LocalDateTime;
 
 /**
  * 다른 도메인에 노출하는 사용자 정보.
@@ -25,7 +26,10 @@ public record UserAccount(
     String profileImageUrl,
     Role role,
     Integer generationNo,
-    UserStatus status
+    UserStatus status,
+
+    /** 개인정보 수집·이용에 동의한 시각. 아직 동의하지 않았으면 null. (이슈 #203) */
+    LocalDateTime privacyConsentedAt
 ) {
 
   /** user 패키지 내부에서만 호출한다. */
@@ -42,7 +46,8 @@ public record UserAccount(
         user.getProfileImageUrl(),
         user.getRole(),
         user.getGenerationNo(),
-        user.getStatus()
+        user.getStatus(),
+        user.getPrivacyConsentedAt()
     );
   }
 }

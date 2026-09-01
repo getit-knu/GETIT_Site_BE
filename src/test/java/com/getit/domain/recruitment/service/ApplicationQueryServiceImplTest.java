@@ -28,7 +28,7 @@ class ApplicationQueryServiceImplTest {
   private Application finalPass(Long userId, Long generationId, String name) {
     Application application = applicationRepository.save(Application.createDraft(
         userId, generationId, name, name + "@gmail.com", "010-1234-5678", null, null, 2, "2021110000"));
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     application.decideDocumentResult(true);
     application.decideFinalResult(true);
     return application;

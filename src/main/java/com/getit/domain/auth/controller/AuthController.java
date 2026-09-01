@@ -2,6 +2,7 @@ package com.getit.domain.auth.controller;
 
 import com.getit.domain.auth.dto.MeResponse;
 import com.getit.domain.auth.dto.MeUpdateRequest;
+import com.getit.domain.auth.dto.PrivacyConsentRequest;
 import com.getit.domain.auth.dto.TokenResponse;
 import com.getit.domain.auth.exception.AuthErrorCode;
 import com.getit.domain.auth.oauth2.RefreshTokenCookie;
@@ -54,6 +55,27 @@ public class AuthController {
       @Valid @RequestBody MeUpdateRequest request
   ) {
     return ApiResponse.success(authService.updateMe(principal.getUserId(), request));
+  }
+
+  /**
+   * 개인정보 수집·이용 동의. (이슈 #203)
+   *
+   * <p>인증이 필요하다. 누가 동의했는지를 남기는 것이 목적이라 익명 호출은 의미가 없다.
+   *
+   * <p>본문은 선택이다. 프론트는 신규 가입자 온보딩 화면에서 본문 없이 호출한다.
+   * 응답은 갱신된 {@link MeResponse} 라, 프론트가 {@code privacyConsentedAt} 으로 다음 화면
+   * 진행 여부를 판단한다.
+   *
+   * <p>이미 동의한 사용자가 다시 호출해도 200 이다. 최초 동의 시각은 유지되므로 프론트가
+   * 중복 호출을 걸러낼 필요가 없다.
+   */
+  @Operation(summary = "개인정보 수집·이용 동의", description = "이슈 #203")
+  @PostMapping("/consent")
+  public ApiResponse<MeResponse> consent(
+      @AuthenticationPrincipal CustomUserDetails principal,
+      @Valid @RequestBody(required = false) PrivacyConsentRequest request
+  ) {
+    return ApiResponse.success(authService.consentToPrivacy(principal.getUserId()));
   }
 
   /**
