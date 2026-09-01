@@ -86,7 +86,7 @@ class ApplicationScheduleBoundaryTest {
 
   private ApplicationDraftRequest draft() {
     return new ApplicationDraftRequest(
-        new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, null), null);
+        new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, null), null, true);
   }
 
   @Test

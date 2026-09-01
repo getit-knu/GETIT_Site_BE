@@ -46,7 +46,7 @@ class DashboardSummaryServiceTest {
 
     Application submitted = applicationRepository.save(Application.createDraft(
         1L, generationId, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000"));
-    submitted.submit(LocalDateTime.now());
+    submitted.submit(LocalDateTime.now(), LocalDateTime.now());
     applicationRepository.save(Application.createDraft(
         2L, generationId, "임시저장", "draft@gmail.com", "010-1234-5678", null, null, 2, "2021110001"));
 

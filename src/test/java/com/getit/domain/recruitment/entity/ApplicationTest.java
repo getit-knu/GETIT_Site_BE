@@ -54,7 +54,7 @@ class ApplicationTest {
         1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
     LocalDateTime submittedAt = LocalDateTime.of(2026, 9, 8, 21, 3, 44);
 
-    application.submit(submittedAt);
+    application.submit(submittedAt, submittedAt);
 
     assertThat(application.getStatus()).isEqualTo(ApplicationStatus.SUBMITTED);
     assertThat(application.getSubmittedAt()).isEqualTo(submittedAt);
@@ -65,7 +65,7 @@ class ApplicationTest {
   void decideDocumentResultTruePassesToDocPass() {
     Application application = Application.createDraft(
         1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
 
     application.decideDocumentResult(true);
 
@@ -77,7 +77,7 @@ class ApplicationTest {
   void decideDocumentResultFalseFailsToDocFail() {
     Application application = Application.createDraft(
         1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
 
     application.decideDocumentResult(false);
 
@@ -89,7 +89,7 @@ class ApplicationTest {
   void decideFinalResultTruePassesToFinalPass() {
     Application application = Application.createDraft(
         1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     application.decideDocumentResult(true);
 
     application.decideFinalResult(true);
@@ -102,7 +102,7 @@ class ApplicationTest {
   void decideFinalResultFalseFailsToFinalFail() {
     Application application = Application.createDraft(
         1L, 9L, "홍길동", "hong@gmail.com", "010-1234-5678", null, null, 2, "2021110000");
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     application.decideDocumentResult(true);
 
     application.decideFinalResult(false);

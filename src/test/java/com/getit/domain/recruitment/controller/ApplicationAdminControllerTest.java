@@ -97,13 +97,13 @@ class ApplicationAdminControllerTest {
 
   private Application submitted(Long userId, String name) {
     Application application = draft(userId, name);
-    application.submit(LocalDateTime.now());
+    application.submit(LocalDateTime.now(), LocalDateTime.now());
     return application;
   }
 
   private Application submittedAt(Long userId, String name, LocalDateTime submittedAt) {
     Application application = draft(userId, name);
-    application.submit(submittedAt);
+    application.submit(submittedAt, submittedAt);
     return application;
   }
 
@@ -166,7 +166,7 @@ class ApplicationAdminControllerTest {
       Generation otherGeneration = generationRepository.save(Generation.create(8, 2026));
       Application other = applicationRepository.save(Application.createDraft(
           2L, otherGeneration.getId(), "지난기수", "old@gmail.com", "010-0000-0000", null, null, 2, null));
-      other.submit(LocalDateTime.now());
+      other.submit(LocalDateTime.now(), LocalDateTime.now());
 
       mockMvc.perform(get(APPLICATIONS_PATH)
               .header("Authorization", adminToken())

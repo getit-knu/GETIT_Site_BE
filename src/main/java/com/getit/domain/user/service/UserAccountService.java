@@ -3,6 +3,7 @@ package com.getit.domain.user.service;
 import com.getit.domain.user.dto.OAuthRegistrationResult;
 import com.getit.domain.user.dto.OAuthUserRegistration;
 import com.getit.domain.user.dto.UserAccount;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -34,4 +35,16 @@ public interface UserAccountService {
    * 소비자가 매번 걸러내지 않도록 여기서 처리한다.
    */
   Optional<UserAccount> findActiveById(Long userId);
+
+  /**
+   * 개인정보 수집·이용 동의를 기록한다. (이슈 #203)
+   *
+   * <p>이미 동의한 사용자는 최초 동의 시각을 그대로 둔다 — 재호출로 시각이 밀리면 입증에 쓸
+   * 값이 최신 요청 시각으로 덮인다. 그래서 호출부가 중복 호출을 걸러낼 필요가 없다(멱등).
+   *
+   * @param consentedAt 동의 시각. 호출부가 {@code Clock} 으로 만들어 넘긴다
+   * @return 기록 이후의 사용자 정보
+   * @throws com.getit.global.exception.BusinessException 활동 중인 사용자가 없으면
+   */
+  UserAccount recordPrivacyConsent(Long userId, LocalDateTime consentedAt);
 }

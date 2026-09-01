@@ -20,5 +20,18 @@ import java.util.List;
  */
 public record ApplicationDraftRequest(
     BasicInfo basicInfo,
-    @Valid List<ApplicationAnswerRequest> answers
+    @Valid List<ApplicationAnswerRequest> answers,
+
+    /**
+     * 개인정보 수집·이용 동의 여부. (이슈 #203)
+     *
+     * <p>여기에 {@code @NotNull} 을 걸지 않는다. 이 DTO 는 임시 저장(3.3)과 공용이고, 임시
+     * 저장 단계에서는 아직 동의를 받지 않아도 되기 때문이다. 제출(3.4)에서 값이 {@code TRUE}
+     * 인지는 서비스가 확인하고 {@code PRIVACY_CONSENT_REQUIRED} 로 거부한다 — 비즈니스 규칙
+     * 위반이라 {@code VALIDATION_FAILED} 로 묶으면 프론트가 코드로 분기할 수 없다.
+     *
+     * <p>{@code Boolean} 을 유지한다. {@code boolean} 이면 필드가 없을 때 false 로 역직렬화돼
+     * "누락"과 "동의하지 않음"이 구분되지 않는다.
+     */
+    Boolean privacyConsent
 ) { }

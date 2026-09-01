@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
@@ -92,6 +93,19 @@ public class User extends SoftDeletableEntity {
    */
   @Column(nullable = false)
   private boolean profileCustomized;
+
+  /**
+   * 개인정보 수집·이용에 동의한 시각. 아직 동의하지 않았으면 null. (이슈 #203)
+   *
+   * <p>FE 가 {@code <a href>} 로 구글에 바로 넘어가는 구조라 OAuth 진입 자체를 서버가 막기
+   * 어렵다. 그래서 로그인은 막지 않고, 프론트가 콜백의 {@code isNewUser} 로 신규 가입자를
+   * 가려내 온보딩에서 {@code POST /api/auth/consent} 를 호출해 기록한다.
+   *
+   * <p>온보딩은 신규 가입자만 보므로 이 기능 이전에 가입해 있던 회원은 이 값이 계속 null 이다.
+   * 따라서 이 값으로 다른 기능을 막으면 안 된다 — 지원서 API 도 이 값을 보지 않는다.
+   */
+  @Column
+  private LocalDateTime privacyConsentedAt;
 
   /** 소속 기수. GUEST 는 아직 소속이 없으므로 null. */
   @Column
@@ -217,6 +231,22 @@ public class User extends SoftDeletableEntity {
     if (major != null) {
       this.major = major;
     }
+  }
+
+  /**
+   * 개인정보 수집·이용 동의를 기록한다. (이슈 #203)
+   *
+   * <p>이미 동의한 사용자는 최초 시각을 그대로 둔다. 재호출로 시각이 밀리면 "언제 동의를
+   * 받았는지"를 입증하는 값이 최신 요청 시각으로 덮여 기록의 의미가 사라진다.
+   *
+   * @return 이번 호출로 새로 기록했으면 {@code true}
+   */
+  public boolean consentToPrivacy(LocalDateTime consentedAt) {
+    if (privacyConsentedAt != null) {
+      return false;
+    }
+    this.privacyConsentedAt = consentedAt;
+    return true;
   }
 
   /** 최종 합격자 승격. (9.4 POST /admin/users/promote) */
