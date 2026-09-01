@@ -1,12 +1,16 @@
 package com.getit.domain.user.service;
 
-import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileConnectionService;
+import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.user.dto.ProfileEditCommand;
 import com.getit.domain.user.dto.UserAccount;
+import com.getit.domain.user.entity.College;
+import com.getit.domain.user.entity.Major;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.exception.UserErrorCode;
+import com.getit.domain.user.repository.CollegeRepository;
+import com.getit.domain.user.repository.MajorRepository;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.global.exception.BusinessException;
 import com.getit.global.exception.CommonErrorCode;
@@ -24,6 +28,8 @@ public class UserProfileServiceImpl implements UserProfileService {
   private final UserRepository userRepository;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
+  private final CollegeRepository collegeRepository;
+  private final MajorRepository majorRepository;
 
   /**
    * 사진은 파일 id 로 받는다. 주소를 그대로 받으면 아무 주소나 넣을 수 있고, 우리가 올린
@@ -53,6 +59,10 @@ public class UserProfileServiceImpl implements UserProfileService {
     user.editProfile(command.name(), command.phoneNumber(), newImageUrl,
         imageChanged ? newFileId : null);
 
+    if (command.changesAffiliation()) {
+      applyAffiliation(user, command.collegeId(), command.majorId());
+    }
+
     if (imageChanged) {
       fileConnectionService.connectAll(List.of(newFileId));
       if (previousFileId != null) {
@@ -60,6 +70,35 @@ public class UserProfileServiceImpl implements UserProfileService {
       }
     }
     return UserAccount.from(user);
+  }
+
+  /**
+   * 단과대 · 학과를 id 로 받아 이름으로 바꿔 넣는다. (이슈 #199)
+   *
+   * <p>{@code User} 는 소속을 이름으로 들고 있다. 승격(9.4)이 지원서의 id 를 이름으로 바꿔
+   * 복사하는 것과 같은 방식이다.
+   *
+   * <p>이름이 아니라 id 로 받는 이유는 값을 통일하기 위해서다. 자유 입력으로 열면
+   * "컴퓨터학부" 와 "컴퓨터공학부" 가 섞여 나중에 손으로 정리해야 한다.
+   *
+   * <p>둘은 함께 와야 한다. 학과는 단과대에 속하므로 한쪽만 바꾸는 것은 뜻이 없고,
+   * 그대로 두면 "IT대학 / 경영학과" 같은 조합이 저장된다.
+   */
+  private void applyAffiliation(User user, Long collegeId, Long majorId) {
+    if (collegeId == null || majorId == null) {
+      throw new BusinessException(UserErrorCode.AFFILIATION_INCOMPLETE);
+    }
+
+    College college = collegeRepository.findById(collegeId)
+        .orElseThrow(() -> new BusinessException(UserErrorCode.COLLEGE_NOT_FOUND));
+    Major major = majorRepository.findById(majorId)
+        .orElseThrow(() -> new BusinessException(UserErrorCode.MAJOR_NOT_FOUND));
+
+    if (!major.getCollegeId().equals(college.getId())) {
+      throw new BusinessException(UserErrorCode.MAJOR_NOT_IN_COLLEGE);
+    }
+
+    user.updateAffiliation(college.getName(), major.getName());
   }
 
   private String validProfileImageUrl(Long fileId, Long userId) {

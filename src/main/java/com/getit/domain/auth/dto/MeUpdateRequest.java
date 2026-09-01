@@ -17,10 +17,12 @@ import jakarta.validation.constraints.Size;
 public record MeUpdateRequest(
     @NotBlank @Size(max = 50) String name,
     @Size(max = 20) String phoneNumber,
-    @Positive Long profileFileId
+    @Positive Long profileFileId,
+    @Positive Long collegeId,
+    @Positive Long majorId
 ) {
 
   public ProfileEditCommand toCommand() {
-    return new ProfileEditCommand(name, phoneNumber, profileFileId);
+    return new ProfileEditCommand(name, phoneNumber, profileFileId, collegeId, majorId);
   }
 }
