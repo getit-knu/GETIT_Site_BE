@@ -107,14 +107,15 @@ class UserProfileServiceImplTest {
     }
 
     @Test
-    @DisplayName("학과·학번·권한 같은 값은 자기 수정으로 바뀌지 않는다")
-    void doesNotTouchFieldsOutsideSelfEdit() {
+    @DisplayName("학번·권한·기수·상태는 자기 수정으로 바꿀 수 없다")
+    void doesNotTouchFieldsSelfEditCannotChange() {
       User before = reload();
 
       userProfileService.editMyProfile(userId, new ProfileEditCommand("김겟잇", null, null, null, null));
 
+      // 심사와 운영이 정하는 값이라 요청에 실을 자리 자체가 없다. 학과는 여기서 빠졌다 —
+      // 이제 본인이 고칠 수 있고(이슈 #199), 안 보냈을 때 그대로인지는 소속 수정 쪽에서 본다.
       User after = reload();
-      assertThat(after.getMajor()).isEqualTo(before.getMajor());
       assertThat(after.getStudentNumber()).isEqualTo(before.getStudentNumber());
       assertThat(after.getRole()).isEqualTo(before.getRole());
       assertThat(after.getGenerationNo()).isEqualTo(before.getGenerationNo());
