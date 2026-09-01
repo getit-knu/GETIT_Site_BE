@@ -125,9 +125,12 @@ class ApplicationControllerTest {
     return "Bearer " + jwtProvider.createAccessToken(1L, "guest@getit.com", Role.GUEST);
   }
 
+  private BasicInfo basicInfo() {
+    return new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, "2021110000");
+  }
+
   private String draftRequestJson(List<ApplicationAnswerRequest> answers) throws Exception {
-    BasicInfo basicInfo = new BasicInfo("홍길동", "hong@gmail.com", "010-1234-5678", 1L, 11L, 2, "2021110000");
-    return objectMapper.writeValueAsString(new ApplicationDraftRequest(basicInfo, answers, true));
+    return objectMapper.writeValueAsString(new ApplicationDraftRequest(basicInfo(), answers, true));
   }
 
   @Nested
@@ -386,6 +389,36 @@ class ApplicationControllerTest {
               .content(draftRequestJson(null)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("REQUIRED_ANSWER_MISSING"));
+    }
+
+    /**
+     * 본문 없이 저장된 draft 를 그대로 제출하던 경로를 막았다. 본문을 {@code required = true} 로
+     * 두면 이 호출이 INVALID_REQUEST 로 떨어져 프론트가 "동의 없음" 을 구분하지 못한다
+     * (PR #204 리뷰 지적).
+     */
+    @Test
+    @DisplayName("본문 없이 제출하면 동의를 받지 못했으므로 PRIVACY_CONSENT_REQUIRED 다")
+    void returns400WithDomainCodeWhenBodyMissing() throws Exception {
+      saveOpenSchedule();
+
+      mockMvc.perform(post(SUBMIT_PATH)
+              .header("Authorization", guestToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("PRIVACY_CONSENT_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("개인정보 동의가 false 면 400 이다")
+    void returns400WhenConsentFalse() throws Exception {
+      saveOpenSchedule();
+
+      mockMvc.perform(post(SUBMIT_PATH)
+              .header("Authorization", guestToken())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(
+                  new ApplicationDraftRequest(basicInfo(), null, false))))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("PRIVACY_CONSENT_REQUIRED"));
     }
   }
 

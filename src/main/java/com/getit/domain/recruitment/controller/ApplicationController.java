@@ -55,15 +55,20 @@ public class ApplicationController {
   /**
    * 지원서 제출. (명세서 3.4)
    *
-   * <p>본문을 반드시 받는다. 이전에는 저장된 draft 를 본문 없이 그대로 제출할 수 있었으나,
-   * 개인정보 수집·이용 동의({@code privacyConsent})를 본문으로 받게 되면서 그 경로가 동의를
-   * 건너뛰는 우회로가 되기 때문이다 (이슈 #203).
+   * <p>이전에는 저장된 draft 를 본문 없이 그대로 제출할 수 있었으나, 개인정보 수집·이용
+   * 동의({@code privacyConsent})를 본문으로 받게 되면서 그 경로가 동의를 건너뛰는 우회로가
+   * 되므로 더 이상 허용하지 않는다 (이슈 #203).
+   *
+   * <p>다만 본문을 {@code required = true} 로 막지는 않는다. 그러면 본문 없는 호출이
+   * {@code HttpMessageNotReadableException} → {@code INVALID_REQUEST} 로 떨어져, 같은 "동의를
+   * 받지 못했다" 는 상황인데도 프론트가 받는 코드가 갈린다 (PR #204 리뷰 지적). 서비스가
+   * null 을 {@code PRIVACY_CONSENT_REQUIRED} 로 거부한다.
    */
   @Operation(summary = "지원서 제출", description = "명세서 3.4")
   @PostMapping("/me/submit")
   public ApiResponse<SubmitResult> submit(
       @AuthenticationPrincipal CustomUserDetails principal,
-      @Valid @RequestBody ApplicationDraftRequest request
+      @Valid @RequestBody(required = false) ApplicationDraftRequest request
   ) {
     return ApiResponse.success(applicationService.submit(principal.getUserId(), request));
   }

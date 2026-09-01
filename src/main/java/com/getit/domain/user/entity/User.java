@@ -98,8 +98,11 @@ public class User extends SoftDeletableEntity {
    * 개인정보 수집·이용에 동의한 시각. 아직 동의하지 않았으면 null. (이슈 #203)
    *
    * <p>FE 가 {@code <a href>} 로 구글에 바로 넘어가는 구조라 OAuth 진입 자체를 서버가 막기
-   * 어렵다. 그래서 로그인은 막지 않고 로그인 이후 {@code POST /api/auth/consent} 로 기록하며,
-   * 동의 전에는 개인정보를 실제로 수집하는 지원서 임시 저장·제출을 거부한다.
+   * 어렵다. 그래서 로그인은 막지 않고, 프론트가 콜백의 {@code isNewUser} 로 신규 가입자를
+   * 가려내 온보딩에서 {@code POST /api/auth/consent} 를 호출해 기록한다.
+   *
+   * <p>온보딩은 신규 가입자만 보므로 이 기능 이전에 가입해 있던 회원은 이 값이 계속 null 이다.
+   * 따라서 이 값으로 다른 기능을 막으면 안 된다 — 지원서 API 도 이 값을 보지 않는다.
    */
   @Column
   private LocalDateTime privacyConsentedAt;
