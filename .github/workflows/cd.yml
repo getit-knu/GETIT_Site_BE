@@ -305,13 +305,23 @@ jobs:
 
       # 컨테이너가 떴다고 애플리케이션이 뜬 것은 아니다.
       # Flyway 마이그레이션과 JVM 기동에 시간이 걸린다.
-      - name: 헬스체크
+      # 배포 성공 여부는 VM 안에서 판정한다.
+      #
+      # 공개 URL 로 확인하면 배포와 무관한 이유로 실패한다. 실제로 Cloudflare 프록시를 켠
+      # 뒤 러너가 30회 내내 403 을 받아 배포가 실패로 떴다 — 앱은 정상이었다. 러너 IP 는
+      # 데이터센터 대역이라 봇 차단에 그대로 걸린다.
+      #
+      # 여기서 보려는 것은 "방금 올린 이미지가 떴는가" 이고, 그건 앱 바로 앞에서 봐야 한다.
+      - name: 헬스체크 (VM 내부)
         if: steps.gate.outputs.proceed == 'true'
         run: |
-          URL="${{ vars.HEALTHCHECK_URL }}"
-          echo "확인 대상: $URL"
+          ssh -i ~/.ssh/deploy_key "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
           for i in $(seq 1 30); do
-            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" || echo 000)
+            # curl 은 접속 자체가 안 되면 %{http_code} 로 000 을 찍고 종료코드도 0 이 아니다.
+            # `|| echo 000` 으로 이으면 그 000 뒤에 하나가 더 붙어 000000 이 나온다.
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              http://localhost:8080/actuator/health) || CODE=000
             if [ "$CODE" = "200" ]; then
               echo "정상 기동 확인 (${i}회차)"
               exit 0
@@ -319,9 +329,24 @@ jobs:
             echo "  ${i}/30 — HTTP $CODE, 10초 후 재시도"
             sleep 10
           done
-          echo "::error::5분 안에 헬스체크가 통과하지 못했습니다."
-          echo "::error::VM 에서 'docker compose logs app --tail 100' 으로 원인을 확인하세요."
+          echo "5분 안에 기동하지 못했습니다."
           exit 1
+          REMOTE
+
+      # 공개 경로(DNS · Cloudflare · nginx)가 살아 있는지도 본다. 다만 이걸로 배포를
+      # 실패시키지는 않는다 — CDN 설정 때문에 정상 배포가 실패로 뜨면 잘못된 신호다.
+      - name: 공개 경로 확인 (실패해도 배포는 진행)
+        if: steps.gate.outputs.proceed == 'true'
+        continue-on-error: true
+        run: |
+          URL="${{ vars.HEALTHCHECK_URL }}"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL") || CODE=000
+          if [ "$CODE" = "200" ]; then
+            echo "공개 경로 정상: $URL"
+          else
+            echo "::warning::공개 경로가 HTTP $CODE 다 ($URL). 앱은 VM 내부 확인을 통과했으므로"
+            echo "::warning::DNS · Cloudflare · nginx 쪽을 확인한다. 러너 IP 가 봇 차단에 걸리면 403 이 난다."
+          fi
 
       - name: 실패 시 로그 수집
         if: failure() && steps.gate.outputs.proceed == 'true'
