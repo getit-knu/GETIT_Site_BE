@@ -3,6 +3,7 @@ package com.getit.domain.user.service;
 import com.getit.domain.user.dto.OAuthRegistrationResult;
 import com.getit.domain.user.dto.OAuthUserRegistration;
 import com.getit.domain.user.dto.UserAccount;
+import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.exception.UserErrorCode;
 import com.getit.domain.user.repository.UserRepository;
@@ -26,6 +27,11 @@ public class UserAccountServiceImpl implements UserAccountService {
     return userRepository.findByProviderId(registration.providerId())
         .map(existing -> {
           existing.updateProfile(registration.name(), registration.profileImageUrl());
+          if (existing.isDeleted()) {
+            existing.activate();
+            existing.updateRole(Role.GUEST);
+            return new OAuthRegistrationResult(UserAccount.from(existing), true);
+          }
           return new OAuthRegistrationResult(UserAccount.from(existing), false);
         })
         .orElseGet(() -> {
