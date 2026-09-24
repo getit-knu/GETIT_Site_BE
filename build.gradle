@@ -84,6 +84,8 @@ dependencies {
   // --- test -----------------------------------------------------------------
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
   testImplementation 'org.springframework.security:spring-security-test'
+  // 구조 규칙을 테스트로 강제한다. 도메인 경계는 리뷰로만 지키기 어렵다.
+  testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
