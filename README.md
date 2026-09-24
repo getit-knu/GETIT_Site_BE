@@ -12,7 +12,6 @@ GETIT 동아리 통합 사이트 백엔드. 공개 사이트 · 부원 LMS · �
 | Spring Boot | 3.5.16 |
 | Gradle | Wrapper 사용 (`./gradlew`) |
 | DB | MySQL 8.4 / 테스트는 H2 |
-| 캐시·토큰 | Redis 7 |
 | 문서 | SpringDoc OpenAPI 3 |
 
 로컬 JDK 버전은 상관없다. Gradle toolchain 이 Java 21 로 컴파일하며, 없으면 자동으로 받아온다.
@@ -21,7 +20,7 @@ GETIT 동아리 통합 사이트 백엔드. 공개 사이트 · 부원 LMS · �
 
 ```bash
 cp .env.example .env          # 값을 채운다. .env 는 커밋하지 않는다
-docker compose up -d          # MySQL · Redis 기동
+docker compose up -d          # MySQL 기동
 ./gradlew bootRun             # 기본 프로파일 = local
 ```
 
@@ -29,6 +28,17 @@ docker compose up -d          # MySQL · Redis 기동
 |---|---|
 | http://localhost:8080 | API |
 | http://localhost:8080/swagger-ui.html | Swagger UI |
+
+`.env.example` 을 복사해 DB 비밀번호와 `JWT_SECRET` 만 채우면 앱은 뜬다.
+Google 값은 주석 처리된 채로 두면 되고, 그 상태에서 되는 것과 안 되는 것은 다음과 같다.
+
+| | 상태 |
+|---|---|
+| 기동 · Swagger · 공개 API | 된다 |
+| 파일 업로드 | 된다 — `FILE_AZURE_ENABLED` 가 꺼져 있어 `./uploads` 에 저장한다 |
+| Google 로그인 | **안 된다** — `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` 주석을 풀고 값을 채워야 한다 |
+
+주석을 풀고 **빈 값으로 두면 기동 자체가 실패한다.** 채울 때만 주석을 해제한다.
 
 ```bash
 ./gradlew test                # 테스트 (외부 인프라 불필요, H2 사용)
@@ -78,6 +88,20 @@ com.getit
 
 **패키지 = 소유권.** 자기 패키지 밖의 파일은 수정하지 않고 소유자에게 요청한다.
 각자 Controller → Service → Repository → Entity 를 자기 패키지 안에서 끝낸다.
+B 이탈 후 `lecture` · `qna` · `project` · `file` 은 R 이 함께 관리한다.
+
+### 왜 레이어가 아니라 도메인으로 나누는가
+
+`controller/` · `service/` · `repository/` 를 최상위에 두는 레이어 분할이라면
+기능 하나를 고칠 때마다 서로 다른 네 디렉터리를 건드리게 된다.
+여러 명이 동시에 작업하는 저장소에서는 그 네 디렉터리가 전부 공유 지점이 되어
+**서로 무관한 기능끼리도 PR 마다 충돌한다.**
+
+도메인으로 나누면 기능 하나가 디렉터리 하나 안에서 끝나므로
+소유권 경계와 디렉터리 경계가 일치하고, 충돌 지점이 `global` 과
+도메인 간 계약 두 곳으로 좁혀진다. 그 대가로 도메인끼리 Repository 를
+직접 참조하면 경계가 곧바로 무너지기 때문에, 아래 크로스 도메인 규칙이
+선택이 아니라 이 구조의 전제다.
 
 ### 절대 건드리지 않는 파일 (작업 분할 계획 4.1)
 
@@ -144,17 +168,25 @@ git diff --numstat main...HEAD -- src/main | awk '{s+=$1} END {print s" 줄"}'
 
 ## CI
 
-`main` 으로의 push · PR 마다 `.github/workflows/ci.yml` 이 돈다.
+`main` 으로의 push · PR 마다 `.github/workflows/ci.yml` 의 세 job 이 돈다.
 
-1. `.env` 가 커밋되지 않았는지 확인
-2. JDK 21 설치 후 `./gradlew build` (테스트는 H2 라 컨테이너 불필요)
-3. 실패 시 테스트 리포트를 아티팩트로 업로드
+| job | 하는 일 |
+|---|---|
+| 정적 검사 | `.env` 가 커밋되지 않았는지 확인 → `./gradlew spotlessCheck` |
+| 빌드 · 테스트 | `./gradlew build` (H2 라 컨테이너 불필요). 실패 시 테스트 리포트 업로드 |
+| 스키마 검증 | `./gradlew schemaTest` — Flyway 마이그레이션과 엔티티가 어긋나지 않는지 확인 |
+
+같은 브랜치에 연속 push 하면 이전 실행은 취소된다.
 
 `main` 브랜치 보호 규칙에서 이 체크를 필수로 걸어두면 깨진 코드가 머지되지 않는다.
 
 ## 현재 상태
 
-`global` 공통 인프라와 패키지 골격만 구성된 상태다. 각 도메인 패키지는 비어 있다.
+전 도메인이 구현돼 운영 중이다. `api.getit.io.kr` 로 배포되며,
+`main` 에 머지되면 `.github/workflows/cd.yml` 이 이미지를 빌드해 Azure VM 에 올린다.
 
-> ⚠️ **`SecurityConfig` 는 임시 설정이다.** JWT 필터가 아직 없어 local · dev 는 전 경로 permitAll 이고,
-> prod 만 `/api/public/**` 외 401 을 반환한다. auth 작업에서 명세서 1.1 의 권한 규칙으로 교체한다.
+인증은 Google OAuth2 로그인 + JWT 로 동작한다 (`domain.auth`).
+`SecurityConfig` 는 `/api/public/**` 과 문서 경로만 열어 두고,
+`/api/admin/**` 은 ADMIN 롤, 그 외는 인증을 요구한다.
+
+스키마는 dev · prod 에서 Flyway 로 관리한다. local 만 `ddl-auto: update` 다.
