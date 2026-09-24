@@ -90,6 +90,31 @@ class UserAccountServiceImplTest {
       assertThat(result.account().role()).isEqualTo(Role.MEMBER);
       assertThat(result.account().generationNo()).isEqualTo(9);
     }
+
+    @Test
+    @DisplayName("소프트 삭제된 사용자가 재로그인하면 복구되고 GUEST 로 초기화된다")
+    void reactivatesSoftDeletedUserAndResetsRoleToGuest() {
+      // given: MEMBER 로 승격되어 있다가 탈퇴(soft delete) 처리된 사용자
+      userAccountService.registerOrUpdateOAuthUser(registration("홍길동", null));
+      User user = userRepository.findByProviderId(PROVIDER_ID).orElseThrow();
+      user.promoteToMember(9);
+      user.withdraw();
+      userRepository.flush();
+
+      // when: 같은 providerId 로 다시 OAuth 로그인한다
+      OAuthRegistrationResult result =
+          userAccountService.registerOrUpdateOAuthUser(registration("홍길동", null));
+
+      // then 1: User 엔티티가 activate() 되어 소프트 삭제가 풀려 있어야 한다
+      User reactivated = userRepository.findByProviderId(PROVIDER_ID).orElseThrow();
+      assertThat(reactivated.isDeleted()).isFalse();
+
+      // then 2: 기존 권한(MEMBER)과 무관하게 GUEST 로 초기화되어야 한다
+      assertThat(reactivated.getRole()).isEqualTo(Role.GUEST);
+
+      // then 3: 계정이 사실상 다시 만들어진 것이므로 isNewUser 는 true 여야 한다
+      assertThat(result.newUser()).isTrue();
+    }
   }
 
   @Nested
