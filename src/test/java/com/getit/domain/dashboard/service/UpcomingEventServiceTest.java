@@ -77,4 +77,28 @@ class UpcomingEventServiceTest {
   void returnsEmptyWhenNoActiveGeneration() {
     assertThat(upcomingEventService.getUpcomingEvents()).isEmpty();
   }
+
+  @Test
+  @DisplayName("이미 지난 행사는 빠지고, 고정한 시계를 따라간다")
+  void followsTheFixedClock() {
+    Generation generation = Generation.create(9, 2026);
+    generation.activate();
+    Long generationId = generationRepository.save(generation).getId();
+
+    // 고정 시계 기준으로 하나는 지났고 하나는 남았다.
+    eventRepository.save(Event.create(
+        new EventCommand("지난 행사", "IT5호관", TODAY.minusDays(3), TODAY.minusDays(3),
+            true, EventType.EVENT),
+        generationId));
+    eventRepository.save(Event.create(
+        new EventCommand("다가올 행사", "IT5호관", TODAY.plusDays(3), TODAY.plusDays(3),
+            true, EventType.EVENT),
+        generationId));
+
+    List<UpcomingEventResult> results = upcomingEventService.getUpcomingEvents();
+
+    // 조회가 시계를 무시하고 실제 날짜를 읽으면, 둘 다 과거가 되어 빈 목록이 된다 (이슈 #207).
+    assertThat(results).extracting(UpcomingEventResult::title).containsExactly("다가올 행사");
+    assertThat(results.get(0).dDay()).isEqualTo(3L);
+  }
 }
