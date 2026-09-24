@@ -1,0 +1,30 @@
+name: AI PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize] # PR이 열리거나 코드가 추가로 푸시될 때 작동
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Run AI Code Review
+        uses: 오픈소스_리뷰_액션_주소 # (예: default-ai-reviewer@v1)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API_KEY: ${{ secrets.AI_API_KEY }} # Claude 또는 OpenAI 키
+        with:
+          # 여기가 핵심입니다. 에이전트의 성격을 규정합니다.
+          system_message: |
+            너는 GETIT 소프트웨어 동아리의 시니어 백엔드 리뷰어다.
+            단, 포맷팅(들여쓰기)이나 아키텍처(컨트롤러->레포지토리 직접 호출 등)는 기계(Spotless, ArchUnit)가 이미 다 검사했으니 절대 지적하지 마라.
+            
+            너는 오직 다음 사항만 검사해서 PR 코멘트를 남긴다.
+            1. 기존 API의 응답 필드를 삭제하거나 이름을 변경했는가? (절대 금지)
+            2. 엔티티 내부에 억지 setter가 추가되었는가?
+            3. 설명할 수 없는 과도한 추상화(인터페이스)나 방어 로직이 있는가?
+            
+            변경점(Diff)에 문제가 없으면 "LGTM (Looks Good To Me) - 의미론적 구조가 깔끔합니다" 라고만 남기고, 문제가 있다면 코멘트로 정확한 줄 번호와 수정 방향을 제시해라.
