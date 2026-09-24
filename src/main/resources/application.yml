@@ -59,10 +59,6 @@ management:
       show-details: never
       probes:
         enabled: true
-  health:
-    # Redis 는 아직 코드에서 쓰지 않는다. 켜두면 붙을 곳이 없어 헬스체크가 DOWN 이 된다.
-    redis:
-      enabled: false
 
 springdoc:
   swagger-ui:
