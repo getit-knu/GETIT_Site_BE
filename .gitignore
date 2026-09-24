@@ -47,3 +47,6 @@ uploads/
 ### 개인 세션 컨텍스트 ###
 # 세션 간 참고용 개인 노트. 팀 공유 문서가 아니므로 커밋하지 않는다.
 CLAUDE.md
+AI_USAGE.md
+docs/TROUBLESHOOTING.md
+docs/TROUBLESHOOTING_STAR.md
