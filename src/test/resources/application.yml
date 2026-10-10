@@ -15,6 +15,11 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+    properties:
+      hibernate:
+        # 쿼리 수를 세는 테스트(QueryCounter)가 Statistics 를 읽는다.
+        # 운영 설정에는 켜지 않는다 — 통계 수집 자체가 비용이다.
+        generate_statistics: true
 
 
   # oauth2Login 은 ClientRegistrationRepository 빈을 요구한다.
