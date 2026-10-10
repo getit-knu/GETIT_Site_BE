@@ -32,11 +32,15 @@ import org.springframework.transaction.annotation.Transactional;
 class CategoryQueryCountTest {
 
   private static final long EXPECTED_QUERIES = 2;
+  private static final long EXPECTED_ADMIN_TREE_QUERIES = 3;
   private static final int MANY_TRACKS = 10;
   private static final int SUB_CATEGORIES_PER_TRACK = 3;
 
   @Autowired
   private CategoryQueryService categoryQueryService;
+
+  @Autowired
+  private CategoryService categoryService;
 
   @Autowired
   private TrackRepository trackRepository;
@@ -82,6 +86,21 @@ class CategoryQueryCountTest {
             늘어났다면 트랙마다 하위 분류를 다시 읽고 있다 (N+1). 측정값 %d 회"""
             .formatted(MANY_TRACKS, MANY_TRACKS * SUB_CATEGORIES_PER_TRACK, EXPECTED_QUERIES, queries))
         .isEqualTo(EXPECTED_QUERIES);
+  }
+
+  @Test
+  @DisplayName("어드민 트리 조회는 트랙 · 하위 분류가 늘어도 세 번의 쿼리로 끝난다")
+  void readsAdminTreeInThreeQueries() {
+    createTracks(MANY_TRACKS);
+
+    long queries = queryCounter.countDuring(categoryService::getCategoryTree);
+
+    assertThat(queries)
+        .as("""
+            트랙 조회 1회 + 하위 분류 일괄 조회 1회 + 강의 수 일괄 집계 1회.
+            트랙 %d 개 · 하위 분류 %d 개에서 측정값 %d 회"""
+            .formatted(MANY_TRACKS, MANY_TRACKS * SUB_CATEGORIES_PER_TRACK, queries))
+        .isEqualTo(EXPECTED_ADMIN_TREE_QUERIES);
   }
 
   private void createTracks(int trackCount) {
