@@ -31,7 +31,8 @@ close #
 ## 다른 사람 소유 파일을 건드렸다면
 
 <!--
-SecurityConfig · application*.yml · global/dto · GlobalExceptionHandler → R
-User · Generation 엔티티 → A
+무엇을 왜 건드렸는지 적습니다. 대상:
+SecurityConfig · application*.yml · global/dto · GlobalExceptionHandler · User · Generation 엔티티
+자세한 내용은 docs/ARCHITECTURE.md 의 "함께 쓰는 파일" 참조.
 해당 없으면 이 섹션을 지웁니다.
 -->
