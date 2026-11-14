@@ -6,6 +6,7 @@ import java.util.List;
  * 내 가상 투자 현황. (이슈 #222)
  *
  * @param unit 투자금을 넣는 단위(원). FE 가 입력 단위로 그대로 쓴다
+ * @param ownProjectIds 내 조가 낸 출전 프로젝트 id. FE 가 "우리 팀" 카드를 미리 막는 데 쓴다. (이슈 #228)
  * @param maskedPhoneNumber {@code 010-****-1234} 형태. 아직 번호를 낸 적이 없으면 null
  */
 public record FestaPortfolioResult(
@@ -13,7 +14,8 @@ public record FestaPortfolioResult(
     long unit,
     long remaining,
     String maskedPhoneNumber,
-    List<Investment> investments
+    List<Investment> investments,
+    List<Long> ownProjectIds
 ) {
 
   public record Investment(Long projectId, long amount) { }

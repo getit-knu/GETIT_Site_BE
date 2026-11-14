@@ -59,6 +59,7 @@ public class ProjectAdminService {
     Project created = Project.create(request.toCommand(), order);
     applyFesta(created, request);
     created.updateDetails(request.toDetails());
+    applyGroup(created, request);
     Project saved = projectRepository.save(created);
     replaceThumbnail(null, saved.getFileId());
     projectImageService.replace(saved.getId(), request.galleryFileIds(), request.descriptionImageFileIds());
@@ -75,9 +76,20 @@ public class ProjectAdminService {
     }
     applyFesta(project, request);
     project.updateDetails(request.toDetails());
+    applyGroup(project, request);
     replaceThumbnail(oldFileId, project.getFileId());
     projectImageService.replace(projectId, request.galleryFileIds(), request.descriptionImageFileIds());
     return toItem(project);
+  }
+
+  /**
+   * groupId 를 안 보내면 건드리지 않는다. 부원이 낸 프로젝트를 어드민이 고칠 때 소속 조가 지워지면
+   * "우리 조 프로젝트" 목록에서 사라지고 FESTA 투자 금지도 풀린다. 그래서 조를 비우는 것은 지원하지 않는다.
+   */
+  private void applyGroup(Project project, ProjectRequest.Write request) {
+    if (request.groupId() != null) {
+      project.assignGroup(request.groupId());
+    }
   }
 
   /** festaEntry 를 안 보내면 건드리지 않는다. FESTA 를 모르는 기존 요청이 출전 설정을 지우면 안 된다. */

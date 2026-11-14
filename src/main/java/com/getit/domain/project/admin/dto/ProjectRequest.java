@@ -32,7 +32,8 @@ public class ProjectRequest {
       @Size(max = 512) @HttpUrl String playStoreUrl,
       @Size(max = 512) @HttpUrl String appStoreUrl,
       @Size(max = 5) List<@Positive Long> galleryFileIds,
-      @Size(max = 10) List<@Positive Long> descriptionImageFileIds
+      @Size(max = 10) List<@Positive Long> descriptionImageFileIds,
+      @Positive Long groupId
   ) {
 
     public ProjectDetails toDetails() {

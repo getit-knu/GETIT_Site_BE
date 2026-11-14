@@ -368,4 +368,30 @@ class FestaControllerTest {
     mockMvc.perform(delete(ADMIN + "/investments").header("Authorization", bearer(memberOfMyGroup("x4"))))
         .andExpect(status().isForbidden());
   }
+
+  @Test
+  @DisplayName("어드민이 조를 지정해 만든 출전 프로젝트에도 우리 조 투자 금지가 걸린다 (이슈 #228)")
+  void adminCreatedProjectBlocksOwnGroup() throws Exception {
+    Project adminCreated = Project.create(new ProjectCommand(
+        "어드민 등록", "팀", "2026-FALL", "설명", List.of(), null, null, false, null), 9);
+    adminCreated.assignGroup(myGroup.getId());
+    adminCreated.updateFesta(true, 9);
+    projectRepository.saveAndFlush(adminCreated);
+
+    save(memberOfMyGroup("o1"), body(PHONE, true, adminCreated.getId(), 100_000))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("OWN_GROUP_PROJECT"));
+  }
+
+  @Test
+  @DisplayName("포트폴리오 응답에 내 조의 출전 프로젝트 id 를 싣는다 (이슈 #228)")
+  void listsOwnProjectIds() throws Exception {
+    mockMvc.perform(get(PORTFOLIO).header("Authorization", bearer(memberOfMyGroup("o2"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.ownProjectIds.length()").value(1))
+        .andExpect(jsonPath("$.data.ownProjectIds[0]").value(myGroupProject.getId()));
+
+    mockMvc.perform(get(PORTFOLIO).header("Authorization", bearer(guest("o3"))))
+        .andExpect(jsonPath("$.data.ownProjectIds.length()").value(0));
+  }
 }

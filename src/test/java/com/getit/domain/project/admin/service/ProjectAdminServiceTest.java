@@ -43,7 +43,7 @@ class ProjectAdminServiceTest {
 
   private ProjectRequest.Write write(String title, String semester, Long fileId, Integer order) {
     return new ProjectRequest.Write(title, "팀", semester, "설명",
-        List.of("React"), "https://code", "https://demo", fileId, false, order, null, null, null, null, null, null, null, null);
+        List.of("React"), "https://code", "https://demo", fileId, false, order, null, null, null, null, null, null, null, null, null);
   }
 
   private Project seed(String title, String semester, int order) {
@@ -281,7 +281,7 @@ class ProjectAdminServiceTest {
 
     private ProjectRequest.Write withFesta(Boolean entry, Integer festaOrder) {
       return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명",
-          List.of(), null, null, null, false, 1, entry, festaOrder, null, null, null, null, null, null);
+          List.of(), null, null, null, false, 1, entry, festaOrder, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -341,7 +341,7 @@ class ProjectAdminServiceTest {
     private ProjectRequest.Write request(List<Long> gallery, List<Long> description) {
       return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명", List.of(), null, null, null, false, 1,
           null, null, "한 줄 소개", ProgressStatus.LIVE, "https://play.google.com/x", "https://apps.apple.com/y",
-          gallery, description);
+          gallery, description, null);
     }
 
     @Test
@@ -374,7 +374,7 @@ class ProjectAdminServiceTest {
       Long id = item.id();
       ProjectResult.Item cleared = projectAdminService.updateProject(id,
           new ProjectRequest.Write("t", "팀", "2025-FALL", "설명", List.of(), null, null, null, false, 1,
-              null, null, null, null, null, null, null, null));
+              null, null, null, null, null, null, null, null, null));
       assertThat(cleared.oneLiner()).isNull();
       assertThat(cleared.progressStatus()).isNull();
       assertThat(cleared.progressStatusLabel()).isNull();
@@ -431,6 +431,48 @@ class ProjectAdminServiceTest {
 
       assertThat(statusOf(g1)).isEqualTo(FileStatus.PENDING);
       assertThat(statusOf(d1)).isEqualTo(FileStatus.PENDING);
+    }
+  }
+
+  @Nested
+  @DisplayName("소속 조 (이슈 #228)")
+  class GroupId {
+
+    private ProjectRequest.Write withGroup(Long groupId) {
+      return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명", List.of(), null, null, null, false, 1,
+          null, null, null, null, null, null, null, null, groupId);
+    }
+
+    @Test
+    @DisplayName("등록할 때 조를 지정하면 저장하고 응답에 싣는다")
+    void createsWithGroup() {
+      ProjectResult.Item item = projectAdminService.createProject(withGroup(7L));
+
+      assertThat(item.groupId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("수정할 때 groupId 를 안 보내면 기존 조를 유지한다")
+    void keepsGroupWhenOmitted() {
+      Long id = projectAdminService.createProject(withGroup(7L)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, withGroup(null));
+
+      assertThat(updated.groupId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("수정할 때 groupId 를 보내면 조를 바꾼다")
+    void changesGroup() {
+      Long id = projectAdminService.createProject(withGroup(7L)).id();
+
+      assertThat(projectAdminService.updateProject(id, withGroup(8L)).groupId()).isEqualTo(8L);
+    }
+
+    @Test
+    @DisplayName("조를 안 정한 프로젝트는 groupId 가 null 이다")
+    void nullWhenNotAssigned() {
+      assertThat(projectAdminService.createProject(withGroup(null)).groupId()).isNull();
     }
   }
 }
