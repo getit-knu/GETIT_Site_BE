@@ -327,4 +327,45 @@ class FestaControllerTest {
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString(PHONE))));
   }
+
+  @Test
+  @DisplayName("초기화: 토글이 켜져 있으면 거부하고 데이터는 그대로다 (이슈 #229)")
+  void resetRejectedWhileOpen() throws Exception {
+    save(guest("x1"), body(PHONE, true, projectA.getId(), 1_000_000)).andExpect(status().isOk());
+
+    mockMvc.perform(delete(ADMIN + "/investments").header("Authorization", adminBearer()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("FESTA_RESET_WHILE_OPEN"));
+
+    mockMvc.perform(get(ADMIN + "/results").header("Authorization", adminBearer()))
+        .andExpect(jsonPath("$.data.investorCount").value(1));
+  }
+
+  @Test
+  @DisplayName("초기화: 토글이 꺼져 있으면 투자 내역과 전화번호를 모두 지운다 (이슈 #229)")
+  void resetClearsEverythingWhenClosed() throws Exception {
+    User first = guest("x2");
+    save(first, body(PHONE, true, projectA.getId(), 1_000_000)).andExpect(status().isOk());
+    save(guest("x3"), body("010-2222-3333", true, projectB.getId(), 500_000)).andExpect(status().isOk());
+    featureToggleRepository.findById(FeatureKey.MOCK_INVESTMENT).orElseThrow().updateEnabled(false, 1L);
+    featureToggleRepository.flush();
+
+    mockMvc.perform(delete(ADMIN + "/investments").header("Authorization", adminBearer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletedInvestorCount").value(2));
+
+    mockMvc.perform(get(ADMIN + "/results").header("Authorization", adminBearer()))
+        .andExpect(jsonPath("$.data.investorCount").value(0))
+        .andExpect(jsonPath("$.data.projects[0].totalAmount").value(0));
+    mockMvc.perform(get(PORTFOLIO).header("Authorization", bearer(first)))
+        .andExpect(jsonPath("$.data.maskedPhoneNumber").value(nullValue()))
+        .andExpect(jsonPath("$.data.investments.length()").value(0));
+  }
+
+  @Test
+  @DisplayName("초기화는 어드민만 할 수 있다 (이슈 #229)")
+  void resetAdminOnly() throws Exception {
+    mockMvc.perform(delete(ADMIN + "/investments").header("Authorization", bearer(memberOfMyGroup("x4"))))
+        .andExpect(status().isForbidden());
+  }
 }

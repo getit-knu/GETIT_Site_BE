@@ -2,6 +2,7 @@ package com.getit.domain.festa.controller;
 
 import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.domain.festa.dto.FestaPhoneDestroyResult;
+import com.getit.domain.festa.dto.FestaResetResult;
 import com.getit.domain.festa.dto.FestaResultsResult;
 import com.getit.domain.festa.service.FestaAdminService;
 import com.getit.global.dto.ApiResponse;
@@ -40,6 +41,12 @@ public class FestaAdminController {
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=festa-investors.csv")
         .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
         .body(csv);
+  }
+
+  @Operation(summary = "투자 데이터 초기화(리허설용)", description = "이슈 #229. 토글이 꺼져 있을 때만")
+  @DeleteMapping("/investments")
+  public ApiResponse<FestaResetResult> resetAll(@AuthenticationPrincipal CustomUserDetails principal) {
+    return ApiResponse.success(festaAdminService.resetAll(principal.getUserId()));
   }
 
   @Operation(summary = "투자자 전화번호 일괄 파기", description = "이슈 #222")
