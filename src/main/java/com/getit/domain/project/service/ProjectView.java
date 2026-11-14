@@ -1,5 +1,6 @@
 package com.getit.domain.project.service;
 
+import com.getit.domain.project.entity.ProgressStatus;
 import com.getit.domain.project.entity.Project;
 import java.util.List;
 
@@ -15,7 +16,11 @@ public record ProjectView(
     Long fileId,
     boolean isFeatured,
     int order,
-    Long groupId
+    Long groupId,
+    String oneLiner,
+    ProgressStatus progressStatus,
+    String playStoreUrl,
+    String appStoreUrl
 ) {
 
   public static ProjectView from(Project project) {
@@ -31,6 +36,10 @@ public record ProjectView(
         project.getFileId(),
         project.isFeatured(),
         project.getOrder(),
-        project.getGroupId());
+        project.getGroupId(),
+        project.getOneLiner(),
+        project.getProgressStatus(),
+        project.getPlayStoreUrl(),
+        project.getAppStoreUrl());
   }
 }

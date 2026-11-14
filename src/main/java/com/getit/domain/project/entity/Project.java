@@ -1,6 +1,7 @@
 package com.getit.domain.project.entity;
 
 import com.getit.domain.project.dto.ProjectCommand;
+import com.getit.domain.project.dto.ProjectDetails;
 import com.getit.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -75,6 +76,21 @@ public class Project extends BaseTimeEntity {
   @Column(name = "festa_order", nullable = true)
   private Integer festaOrder;
 
+  /** 카드 소개 문구. 없으면 FE 가 description 을 잘라 쓴다. (이슈 #221) */
+  @Column(name = "one_liner", length = 60)
+  private String oneLiner;
+
+  @Enumerated(EnumType.STRING)
+  @JdbcTypeCode(SqlTypes.VARCHAR)
+  @Column(name = "progress_status", length = 20)
+  private ProgressStatus progressStatus;
+
+  @Column(name = "play_store_url", length = 512)
+  private String playStoreUrl;
+
+  @Column(name = "app_store_url", length = 512)
+  private String appStoreUrl;
+
   @Column(name = "project_order", nullable = false)
   private int order;
 
@@ -134,6 +150,14 @@ public class Project extends BaseTimeEntity {
   }
 
   public void updateOrder(int order) { this.order = order; }
+
+  /** 확장 필드는 통째로 바꾼다. 비어 있는 값은 비운다. (이슈 #221) */
+  public void updateDetails(ProjectDetails details) {
+    this.oneLiner = details.oneLiner();
+    this.progressStatus = details.progressStatus();
+    this.playStoreUrl = details.playStoreUrl();
+    this.appStoreUrl = details.appStoreUrl();
+  }
 
   /** 출전을 끄면 순서도 비운다. 꺼진 프로젝트에 순서가 남아 있으면 다시 켤 때 엉뚱한 자리에 간다. */
   public void updateFesta(boolean festaEntry, Integer festaOrder) {

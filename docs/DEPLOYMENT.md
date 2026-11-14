@@ -421,7 +421,7 @@ ssh -i GETIT_key.pem azureuser@40.82.154.5 'cd /opt/getit && ./backup-db.sh'
 
 ```
 LECTURE_MATERIAL · ASSIGNMENT      → private/{uuid}.ext  서명 주소 5분
-PROFILE_IMAGE · PROJECT_THUMBNAIL  → public/{uuid}.ext   고정 주소, 캐시 가능
+PROFILE_IMAGE · PROJECT_THUMBNAIL · PROJECT_IMAGE  → public/{uuid}.ext   고정 주소, 캐시 가능
 ```
 
 `FILE_AZURE_ENABLED=true` 면 프론트가 Blob 으로 **직접** 올린다. 파일 바이트가 VM 을

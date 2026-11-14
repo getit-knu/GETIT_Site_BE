@@ -5,10 +5,12 @@ import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
+import com.getit.domain.project.dto.ProjectImages;
 import com.getit.domain.project.entity.Project;
 import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.exception.ProjectErrorCode;
 import com.getit.domain.project.repository.ProjectRepository;
+import com.getit.domain.project.service.ProjectImageService;
 import com.getit.global.dto.PageResponse;
 import com.getit.global.exception.BusinessException;
 import java.util.HashMap;
@@ -31,6 +33,7 @@ public class ProjectAdminService {
   private final ProjectRepository projectRepository;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
+  private final ProjectImageService projectImageService;
 
   /**
    * @param status 생략하면 전체. 어드민은 승인 대기 중인 것도 봐야 하므로 기본이 전체다
@@ -44,7 +47,10 @@ public class ProjectAdminService {
     Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     Page<Project> page = projectRepository.searchBySemester(semester, status, pageOnly);
     Map<Long, String> thumbnails = resolveThumbnails(page.getContent());
-    return PageResponse.from(page, project -> ProjectResult.Item.of(project, thumbnails.get(project.getId())));
+    Map<Long, ProjectImages> images = projectImageService.findAll(
+        page.getContent().stream().map(Project::getId).toList());
+    return PageResponse.from(page, project -> ProjectResult.Item.of(
+        project, thumbnails.get(project.getId()), images.getOrDefault(project.getId(), ProjectImages.EMPTY)));
   }
 
   @Transactional
@@ -52,8 +58,10 @@ public class ProjectAdminService {
     int order = request.order() == null ? projectRepository.findMaxOrder() + 1 : request.order();
     Project created = Project.create(request.toCommand(), order);
     applyFesta(created, request);
+    created.updateDetails(request.toDetails());
     Project saved = projectRepository.save(created);
     replaceThumbnail(null, saved.getFileId());
+    projectImageService.replace(saved.getId(), request.galleryFileIds(), request.descriptionImageFileIds());
     return toItem(saved);
   }
 
@@ -66,7 +74,9 @@ public class ProjectAdminService {
       project.updateOrder(request.order());
     }
     applyFesta(project, request);
+    project.updateDetails(request.toDetails());
     replaceThumbnail(oldFileId, project.getFileId());
+    projectImageService.replace(projectId, request.galleryFileIds(), request.descriptionImageFileIds());
     return toItem(project);
   }
 
@@ -79,7 +89,8 @@ public class ProjectAdminService {
 
   private ProjectResult.Item toItem(Project project) {
     Map<Long, String> thumbnails = resolveThumbnails(List.of(project));
-    return ProjectResult.Item.of(project, thumbnails.get(project.getId()));
+    return ProjectResult.Item.of(
+        project, thumbnails.get(project.getId()), projectImageService.findOne(project.getId()));
   }
 
   /**
@@ -121,6 +132,7 @@ public class ProjectAdminService {
   public void deleteProject(Long projectId) {
     Project project = findProject(projectId);
     replaceThumbnail(project.getFileId(), null);
+    projectImageService.removeAll(projectId);
     projectRepository.delete(project);
   }
 

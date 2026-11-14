@@ -3,11 +3,13 @@ package com.getit.domain.project.member.service;
 import com.getit.domain.file.service.FileConnectionService;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
+import com.getit.domain.project.dto.ProjectImages;
 import com.getit.domain.project.entity.Project;
 import com.getit.domain.project.exception.ProjectErrorCode;
 import com.getit.domain.project.member.dto.MemberProjectResult;
 import com.getit.domain.project.member.dto.ProjectSubmitRequest;
 import com.getit.domain.project.repository.ProjectRepository;
+import com.getit.domain.project.service.ProjectImageService;
 import com.getit.domain.user.dto.GroupWithMembersResult;
 import com.getit.domain.user.service.MemberGroupService;
 import com.getit.global.exception.BusinessException;
@@ -29,6 +31,7 @@ public class ProjectMemberService {
   private final MemberGroupService memberGroupService;
   private final FileQueryService fileQueryService;
   private final FileConnectionService fileConnectionService;
+  private final ProjectImageService projectImageService;
 
   /**
    * 등록하면 승인 대기 상태로 들어간다. 어드민이 승인해야 공개 쇼케이스(2.4)에 나온다.
@@ -43,14 +46,16 @@ public class ProjectMemberService {
     // order 다음에 id 로 갈리므로 순서가 흔들리지 않는다. 어드민이 order 를 직접 넣는
     // 경로에도 유일성 제약이 없어, 여기만 직렬화해도 얻는 게 없다 (PR #165 리뷰).
     int order = projectRepository.findMaxOrder() + 1;
-    Project saved = projectRepository.save(
-        Project.submit(request.toCommand(group.name()), order, group.id()));
+    Project submitted = Project.submit(request.toCommand(group.name()), order, group.id());
+    submitted.updateDetails(request.toDetails());
+    Project saved = projectRepository.save(submitted);
 
     // 연결해 두지 않으면 미연결 파일 정리 배치(OrphanFileCleaner)가 썸네일을 지운다.
     if (saved.getFileId() != null) {
       fileConnectionService.connectAll(List.of(saved.getFileId()));
     }
-    return MemberProjectResult.of(saved, thumbnailUrl(saved.getFileId()));
+    projectImageService.replace(saved.getId(), request.galleryFileIds(), request.descriptionImageFileIds());
+    return MemberProjectResult.of(saved, thumbnailUrl(saved.getFileId()), projectImageService.findOne(saved.getId()));
   }
 
   /**
@@ -82,9 +87,12 @@ public class ProjectMemberService {
 
     // Map.of() 같은 불변 맵은 null 키로 조회하면 NPE 를 던진다. 썸네일이 없는 프로젝트가
     // 섞여 있으므로 먼저 걸러낸다 (이슈 #142 에서 단과대 이름에 같은 문제가 있었다).
+    Map<Long, ProjectImages> images = projectImageService.findAll(
+        projects.stream().map(Project::getId).toList());
     return projects.stream()
         .map(project -> MemberProjectResult.of(project,
-            project.getFileId() == null ? null : urlByFileId.get(project.getFileId())))
+            project.getFileId() == null ? null : urlByFileId.get(project.getFileId()),
+            images.getOrDefault(project.getId(), ProjectImages.EMPTY)))
         .toList();
   }
 

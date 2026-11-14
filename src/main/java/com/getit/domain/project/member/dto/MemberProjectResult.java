@@ -1,5 +1,7 @@
 package com.getit.domain.project.member.dto;
 
+import com.getit.domain.project.dto.ProjectImages;
+import com.getit.domain.project.entity.ProgressStatus;
 import com.getit.domain.project.entity.Project;
 import com.getit.domain.project.entity.ProjectStatus;
 import java.util.List;
@@ -23,10 +25,18 @@ public record MemberProjectResult(
     String thumbnailUrl,
     ProjectStatus status,
     String statusLabel,
-    String rejectReason
+    String rejectReason,
+    String oneLiner,
+    ProgressStatus progressStatus,
+    String progressStatusLabel,
+    String playStoreUrl,
+    String appStoreUrl,
+    List<Long> galleryFileIds,
+    List<String> galleryImageUrls,
+    List<Long> descriptionImageFileIds
 ) {
 
-  public static MemberProjectResult of(Project project, String thumbnailUrl) {
+  public static MemberProjectResult of(Project project, String thumbnailUrl, ProjectImages images) {
     return new MemberProjectResult(
         project.getId(),
         project.getTitle(),
@@ -40,6 +50,14 @@ public record MemberProjectResult(
         thumbnailUrl,
         project.getStatus(),
         project.getStatus().getLabel(),
-        project.getRejectReason());
+        project.getRejectReason(),
+        project.getOneLiner(),
+        project.getProgressStatus(),
+        project.getProgressStatus() == null ? null : project.getProgressStatus().getLabel(),
+        project.getPlayStoreUrl(),
+        project.getAppStoreUrl(),
+        images.galleryFileIds(),
+        images.galleryImageUrls(),
+        images.descriptionImageFileIds());
   }
 }

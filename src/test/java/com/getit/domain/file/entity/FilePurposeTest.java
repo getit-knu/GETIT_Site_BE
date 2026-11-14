@@ -31,6 +31,7 @@ class FilePurposeTest {
   void smallPurposesHave5MbLimit() {
     assertThat(FilePurpose.PROFILE_IMAGE.getMaxSizeBytes()).isEqualTo(5 * 1024 * 1024L);
     assertThat(FilePurpose.PROJECT_THUMBNAIL.getMaxSizeBytes()).isEqualTo(5 * 1024 * 1024L);
+    assertThat(FilePurpose.PROJECT_IMAGE.getMaxSizeBytes()).isEqualTo(5 * 1024 * 1024L);
   }
 
   @Test

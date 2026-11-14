@@ -1,5 +1,6 @@
 package com.getit.domain.project.dto;
 
+import com.getit.domain.project.entity.ProgressStatus;
 import java.util.List;
 import org.springframework.data.domain.Page;
 
@@ -36,6 +37,12 @@ public record ProjectShowcaseResult(
       List<String> techStacks,
       String codeUrl,
       String demoUrl,
-      String thumbnailUrl
+      String thumbnailUrl,
+      String oneLiner,
+      ProgressStatus progressStatus,
+      String progressStatusLabel,
+      String playStoreUrl,
+      String appStoreUrl,
+      List<String> galleryImageUrls
   ) { }
 }

@@ -11,6 +11,7 @@ import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
 import com.getit.domain.project.dto.ProjectCommand;
+import com.getit.domain.project.entity.ProgressStatus;
 import com.getit.domain.project.entity.Project;
 import com.getit.domain.project.exception.ProjectErrorCode;
 import com.getit.domain.project.repository.ProjectRepository;
@@ -42,7 +43,7 @@ class ProjectAdminServiceTest {
 
   private ProjectRequest.Write write(String title, String semester, Long fileId, Integer order) {
     return new ProjectRequest.Write(title, "팀", semester, "설명",
-        List.of("React"), "https://code", "https://demo", fileId, false, order, null, null);
+        List.of("React"), "https://code", "https://demo", fileId, false, order, null, null, null, null, null, null, null, null);
   }
 
   private Project seed(String title, String semester, int order) {
@@ -280,7 +281,7 @@ class ProjectAdminServiceTest {
 
     private ProjectRequest.Write withFesta(Boolean entry, Integer festaOrder) {
       return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명",
-          List.of(), null, null, null, false, 1, entry, festaOrder);
+          List.of(), null, null, null, false, 1, entry, festaOrder, null, null, null, null, null, null);
     }
 
     @Test
@@ -321,6 +322,115 @@ class ProjectAdminServiceTest {
 
       assertThat(updated.festaEntry()).isFalse();
       assertThat(updated.festaOrder()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("프로젝트 필드 확장 (이슈 #221)")
+  class Details {
+
+    private Long saveFile(String key) {
+      return TestStoredFiles.stored(fileAssetRepository, fileStorage,
+          key, key + ".png", "https://cdn/" + key + ".png", 10L, "image/png", 1L).getId();
+    }
+
+    private FileStatus statusOf(Long fileId) {
+      return fileAssetRepository.findById(fileId).orElseThrow().getStatus();
+    }
+
+    private ProjectRequest.Write request(List<Long> gallery, List<Long> description) {
+      return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명", List.of(), null, null, null, false, 1,
+          null, null, "한 줄 소개", ProgressStatus.LIVE, "https://play.google.com/x", "https://apps.apple.com/y",
+          gallery, description);
+    }
+
+    @Test
+    @DisplayName("등록하면 확장 필드를 저장하고 갤러리는 순서대로 연결한다")
+    void createsWithDetailsAndImages() {
+      Long g1 = saveFile("det-g1");
+      Long g2 = saveFile("det-g2");
+      Long d1 = saveFile("det-d1");
+
+      ProjectResult.Item item = projectAdminService.createProject(request(List.of(g2, g1), List.of(d1)));
+
+      assertThat(item.oneLiner()).isEqualTo("한 줄 소개");
+      assertThat(item.progressStatus()).isEqualTo(ProgressStatus.LIVE);
+      assertThat(item.progressStatusLabel()).isEqualTo("서비스 중");
+      assertThat(item.playStoreUrl()).isEqualTo("https://play.google.com/x");
+      assertThat(item.galleryFileIds()).containsExactly(g2, g1);
+      assertThat(item.galleryImageUrls()).hasSize(2);
+      assertThat(item.descriptionImageFileIds()).containsExactly(d1);
+      assertThat(statusOf(g1)).isEqualTo(FileStatus.CONNECTED);
+      assertThat(statusOf(d1)).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("확장 필드를 안 보내면 비어 있다")
+    void emptyWhenOmitted() {
+      ProjectResult.Item item = projectAdminService.createProject(request(null, null));
+      assertThat(item.galleryFileIds()).isEmpty();
+      assertThat(item.descriptionImageFileIds()).isEmpty();
+
+      Long id = item.id();
+      ProjectResult.Item cleared = projectAdminService.updateProject(id,
+          new ProjectRequest.Write("t", "팀", "2025-FALL", "설명", List.of(), null, null, null, false, 1,
+              null, null, null, null, null, null, null, null));
+      assertThat(cleared.oneLiner()).isNull();
+      assertThat(cleared.progressStatus()).isNull();
+      assertThat(cleared.progressStatusLabel()).isNull();
+    }
+
+    @Test
+    @DisplayName("수정하면 빠진 파일은 연결을 끊고, 남은 파일은 순서를 맞추고, 새 파일은 연결한다")
+    void updateDiffsImages() {
+      Long g1 = saveFile("upd-g1");
+      Long g2 = saveFile("upd-g2");
+      Long g3 = saveFile("upd-g3");
+      Long id = projectAdminService.createProject(request(List.of(g1, g2), null)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, request(List.of(g3, g2), null));
+
+      assertThat(updated.galleryFileIds()).containsExactly(g3, g2);
+      assertThat(statusOf(g1)).isEqualTo(FileStatus.PENDING);
+      assertThat(statusOf(g2)).isEqualTo(FileStatus.CONNECTED);
+      assertThat(statusOf(g3)).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("갤러리에서 설명으로 옮긴 파일도 다시 저장된다")
+    void movesFileBetweenKinds() {
+      Long file = saveFile("move-1");
+      Long id = projectAdminService.createProject(request(List.of(file), null)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, request(null, List.of(file)));
+
+      assertThat(updated.galleryFileIds()).isEmpty();
+      assertThat(updated.descriptionImageFileIds()).containsExactly(file);
+      assertThat(statusOf(file)).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("같은 파일을 두 번 넣으면 거부한다")
+    void rejectsDuplicateImage() {
+      Long file = saveFile("dup-1");
+
+      assertThatThrownBy(() -> projectAdminService.createProject(request(List.of(file), List.of(file))))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(ProjectErrorCode.DUPLICATE_PROJECT_IMAGE);
+    }
+
+    @Test
+    @DisplayName("삭제하면 이미지 연결을 끊는다")
+    void deleteDisconnectsImages() {
+      Long g1 = saveFile("del-g1");
+      Long d1 = saveFile("del-d1");
+      Long id = projectAdminService.createProject(request(List.of(g1), List.of(d1))).id();
+
+      projectAdminService.deleteProject(id);
+
+      assertThat(statusOf(g1)).isEqualTo(FileStatus.PENDING);
+      assertThat(statusOf(d1)).isEqualTo(FileStatus.PENDING);
     }
   }
 }

@@ -77,7 +77,7 @@ class ProjectAdminControllerTest {
   private String body() throws Exception {
     return objectMapper.writeValueAsString(new ProjectRequest.Write(
         "프로젝트", "팀", "2025-FALL", "설명", List.of("React"),
-        "https://code", "https://demo", null, true, null, null, null));
+        "https://code", "https://demo", null, true, null, null, null, null, null, null, null, null, null));
   }
 
   @Test
@@ -225,7 +225,7 @@ class ProjectAdminControllerTest {
     // 화면의 입력칸을 비워 두면 브라우저는 null 이 아니라 "" 를 보낸다.
     // @Pattern 은 null 은 검사하지 않지만 빈 문자열은 검사해서 400 이 났다 (이슈 #176).
     String body = objectMapper.writeValueAsString(new ProjectRequest.Write(
-        "프로젝트", "팀", "2025-FALL", "설명", List.of(), "", "", null, true, null, null, null));
+        "프로젝트", "팀", "2025-FALL", "설명", List.of(), "", "", null, true, null, null, null, null, null, null, null, null, null));
 
     mockMvc.perform(post(PATH)
             .header("Authorization", adminToken())
@@ -239,7 +239,7 @@ class ProjectAdminControllerTest {
   void stillRejectsNonHttpUrl() throws Exception {
     String body = objectMapper.writeValueAsString(new ProjectRequest.Write(
         "프로젝트", "팀", "2025-FALL", "설명", List.of(),
-        "javascript:alert(1)", null, null, true, null, null, null));
+        "javascript:alert(1)", null, null, true, null, null, null, null, null, null, null, null, null));
 
     mockMvc.perform(post(PATH)
             .header("Authorization", adminToken())
@@ -269,7 +269,7 @@ class ProjectAdminControllerTest {
   void rejectsCommaInTechStack() throws Exception {
     String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
         "프로젝트", "팀", "2025-FALL", null, List.of("React, Redux"),
-        null, null, null, true, null, null, null));
+        null, null, null, true, null, null, null, null, null, null, null, null, null));
 
     mockMvc.perform(post(PATH)
             .header("Authorization", adminToken())
@@ -284,7 +284,7 @@ class ProjectAdminControllerTest {
   void rejectsMalformedSemester() throws Exception {
     String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
         "프로젝트", "팀", "2025 Fall", null, List.of("React"),
-        null, null, null, true, null, null, null));
+        null, null, null, true, null, null, null, null, null, null, null, null, null));
 
     mockMvc.perform(post(PATH)
             .header("Authorization", adminToken())
@@ -305,7 +305,7 @@ class ProjectAdminControllerTest {
 
     String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
         "수정", "팀", "2025-FALL", "설명", List.of("React"),
-        "https://code", "https://demo", fileId, true, null, null, null));
+        "https://code", "https://demo", fileId, true, null, null, null, null, null, null, null, null, null));
 
     mockMvc.perform(put(PATH + "/" + id)
             .header("Authorization", adminToken())

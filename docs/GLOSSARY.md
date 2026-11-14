@@ -263,6 +263,7 @@ SQL 예약어이기 때문이다.
 | `ASSIGNMENT` | 50MB | `PRIVATE` |
 | `PROFILE_IMAGE` | 5MB | `PUBLIC` |
 | `PROJECT_THUMBNAIL` | 5MB | `PUBLIC` |
+| `PROJECT_IMAGE` | 5MB | `PUBLIC` |
 | `ACTIVITY_PHOTO` | 5MB | `PUBLIC` |
 
 - `PUBLIC` — 누구나 URL 로 읽는다. 주소가 고정이라 브라우저 캐시가 걸린다
