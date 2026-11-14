@@ -34,7 +34,8 @@ public class ProjectResult {
       String appStoreUrl,
       List<Long> galleryFileIds,
       List<String> galleryImageUrls,
-      List<Long> descriptionImageFileIds
+      List<Long> descriptionImageFileIds,
+      Long groupId
   ) {
 
     public static Item of(Project project, String thumbnailUrl, ProjectImages images) {
@@ -63,7 +64,8 @@ public class ProjectResult {
           project.getAppStoreUrl(),
           images.galleryFileIds(),
           images.galleryImageUrls(),
-          images.descriptionImageFileIds());
+          images.descriptionImageFileIds(),
+          project.getGroupId());
     }
   }
 }

@@ -101,7 +101,7 @@ public class FestaPortfolioService {
   private void validateProjects(Long userId, List<FestaPortfolioRequest.Investment> investments) {
     Map<Long, ProjectView> entries = projectQueryService.findFestaEntries().stream()
         .collect(Collectors.toMap(ProjectView::id, Function.identity()));
-    Long myGroupId = memberGroupService.findMyGroup(userId).map(GroupWithMembersResult::id).orElse(null);
+    Long myGroupId = findMyGroupId(userId);
 
     for (FestaPortfolioRequest.Investment investment : investments) {
       ProjectView project = entries.get(investment.projectId());
@@ -150,7 +150,22 @@ public class FestaPortfolioService {
         .filter(FestaInvestor::hasPhoneNumber)
         .map(investor -> mask(investor.getPhoneNumber()))
         .orElse(null);
-    return new FestaPortfolioResult(BUDGET, UNIT, BUDGET - invested, masked, investments);
+    return new FestaPortfolioResult(BUDGET, UNIT, BUDGET - invested, masked, investments, ownProjectIds(userId));
+  }
+
+  private List<Long> ownProjectIds(Long userId) {
+    Long myGroupId = findMyGroupId(userId);
+    if (myGroupId == null) {
+      return List.of();
+    }
+    return projectQueryService.findFestaEntries().stream()
+        .filter(project -> myGroupId.equals(project.groupId()))
+        .map(ProjectView::id)
+        .toList();
+  }
+
+  private Long findMyGroupId(Long userId) {
+    return memberGroupService.findMyGroup(userId).map(GroupWithMembersResult::id).orElse(null);
   }
 
   /** 010-1234-5678 → 010-****-5678 */

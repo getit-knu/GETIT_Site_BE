@@ -151,6 +151,13 @@ public class Project extends BaseTimeEntity {
 
   public void updateOrder(int order) { this.order = order; }
 
+  /**
+   * 어드민이 낸 프로젝트의 소속 조를 정한다. FESTA 의 "우리 조 투자 금지" 판정은 이 값으로 한다. (이슈 #228)
+   */
+  public void assignGroup(Long groupId) {
+    this.groupId = groupId;
+  }
+
   /** 확장 필드는 통째로 바꾼다. 비어 있는 값은 비운다. (이슈 #221) */
   public void updateDetails(ProjectDetails details) {
     this.oneLiner = details.oneLiner();
