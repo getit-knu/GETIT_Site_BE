@@ -1,5 +1,6 @@
 package com.getit.domain.project.admin.service;
 
+import com.getit.domain.file.service.FileConnectionService;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.project.admin.dto.ProjectRequest;
@@ -29,6 +30,7 @@ public class ProjectAdminService {
 
   private final ProjectRepository projectRepository;
   private final FileQueryService fileQueryService;
+  private final FileConnectionService fileConnectionService;
 
   /**
    * @param status 생략하면 전체. 어드민은 승인 대기 중인 것도 봐야 하므로 기본이 전체다
@@ -49,16 +51,19 @@ public class ProjectAdminService {
   public ProjectResult.Item createProject(ProjectRequest.Write request) {
     int order = request.order() == null ? projectRepository.findMaxOrder() + 1 : request.order();
     Project saved = projectRepository.save(Project.create(request.toCommand(), order));
+    replaceThumbnail(null, saved.getFileId());
     return toItem(saved);
   }
 
   @Transactional
   public ProjectResult.Item updateProject(Long projectId, ProjectRequest.Write request) {
     Project project = findProject(projectId);
+    Long oldFileId = project.getFileId();
     project.update(request.toCommand());
     if (request.order() != null) {
       project.updateOrder(request.order());
     }
+    replaceThumbnail(oldFileId, project.getFileId());
     return toItem(project);
   }
 
@@ -104,7 +109,22 @@ public class ProjectAdminService {
 
   @Transactional
   public void deleteProject(Long projectId) {
-    projectRepository.delete(findProject(projectId));
+    Project project = findProject(projectId);
+    replaceThumbnail(project.getFileId(), null);
+    projectRepository.delete(project);
+  }
+
+  /** 연결하지 않은 파일은 24시간 뒤 OrphanFileCleaner 가 지운다. 파일이 바뀐 경우에만 연결을 옮긴다. */
+  private void replaceThumbnail(Long oldFileId, Long newFileId) {
+    if (Objects.equals(oldFileId, newFileId)) {
+      return;
+    }
+    if (oldFileId != null) {
+      fileConnectionService.disconnectAll(List.of(oldFileId));
+    }
+    if (newFileId != null) {
+      fileConnectionService.connectAll(List.of(newFileId));
+    }
   }
 
   private Project findProject(Long projectId) {

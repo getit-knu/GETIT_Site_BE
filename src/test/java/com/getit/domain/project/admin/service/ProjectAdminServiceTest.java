@@ -3,8 +3,11 @@ package com.getit.domain.project.admin.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.entity.FileStatus;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.admin.dto.ProjectResult;
 import com.getit.domain.project.dto.ProjectCommand;
@@ -33,6 +36,9 @@ class ProjectAdminServiceTest {
 
   @Autowired
   private FileAssetRepository fileAssetRepository;
+
+  @Autowired
+  private FileStorage fileStorage;
 
   private ProjectRequest.Write write(String title, String semester, Long fileId, Integer order) {
     return new ProjectRequest.Write(title, "팀", semester, "설명",
@@ -64,13 +70,13 @@ class ProjectAdminServiceTest {
     @Test
     @DisplayName("fileId 가 있으면 thumbnailUrl 을 해석한다")
     void resolvesThumbnailUrl() {
-      FileAsset file = fileAssetRepository.save(FileAsset.upload(
-          "key", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L));
+      FileAsset file = TestStoredFiles.stored(fileAssetRepository, fileStorage,
+          "admin-thumb-key", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L);
       projectAdminService.createProject(write("썸네일", "2025-FALL", file.getId(), 1));
 
       var result = projectAdminService.getProjects("2025-FALL", null, PageRequest.of(0, 20));
 
-      assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("http://localhost:8080/api/public/files/key");
+      assertThat(result.content().get(0).thumbnailUrl()).isEqualTo("http://localhost:8080/api/public/files/admin-thumb-key");
     }
 
     @Test
@@ -112,8 +118,69 @@ class ProjectAdminServiceTest {
   class ThumbnailFileId {
 
     private Long saveFile(String key) {
-      return fileAssetRepository.save(FileAsset.upload(
-          key, key + ".png", "https://cdn/" + key + ".png", 10L, "image/png", 1L)).getId();
+      return TestStoredFiles.stored(fileAssetRepository, fileStorage,
+          key, key + ".png", "https://cdn/" + key + ".png", 10L, "image/png", 1L).getId();
+    }
+
+    private FileStatus statusOf(Long fileId) {
+      return fileAssetRepository.findById(fileId).orElseThrow().getStatus();
+    }
+
+    @Test
+    @DisplayName("등록하면 썸네일 파일을 연결한다 (이슈 #218)")
+    void connectsThumbnailOnCreate() {
+      Long fileId = saveFile("conn");
+
+      projectAdminService.createProject(write("t", "2025-FALL", fileId, 1));
+
+      // 연결해 두지 않으면 미연결 파일 정리 배치가 24시간 뒤 썸네일을 지운다.
+      assertThat(statusOf(fileId)).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("썸네일을 교체하면 새 파일은 연결하고 이전 파일은 연결을 끊는다 (이슈 #218)")
+    void swapsConnectionOnReplace() {
+      Long oldFile = saveFile("swap-old");
+      Long newFile = saveFile("swap-new");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", oldFile, 1)).id();
+
+      projectAdminService.updateProject(id, write("t", "2025-FALL", newFile, 1));
+
+      assertThat(statusOf(newFile)).isEqualTo(FileStatus.CONNECTED);
+      assertThat(statusOf(oldFile)).isEqualTo(FileStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("같은 파일로 다시 저장해도 연결이 유지된다 (이슈 #218)")
+    void keepsConnectionWhenSameFile() {
+      Long fileId = saveFile("same");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", fileId, 1)).id();
+
+      projectAdminService.updateProject(id, write("제목만", "2025-FALL", fileId, 1));
+
+      assertThat(statusOf(fileId)).isEqualTo(FileStatus.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("fileId 를 비우면 이전 파일의 연결을 끊는다 (이슈 #218)")
+    void disconnectsWhenFileCleared() {
+      Long fileId = saveFile("clear");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", fileId, 1)).id();
+
+      projectAdminService.updateProject(id, write("t", "2025-FALL", null, 1));
+
+      assertThat(statusOf(fileId)).isEqualTo(FileStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("삭제하면 썸네일 연결을 끊는다 (이슈 #218)")
+    void disconnectsOnDelete() {
+      Long fileId = saveFile("del");
+      Long id = projectAdminService.createProject(write("t", "2025-FALL", fileId, 1)).id();
+
+      projectAdminService.deleteProject(id);
+
+      assertThat(statusOf(fileId)).isEqualTo(FileStatus.PENDING);
     }
 
     private String url(String key) {

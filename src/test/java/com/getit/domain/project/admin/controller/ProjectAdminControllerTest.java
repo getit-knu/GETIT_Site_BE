@@ -9,8 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.getit.domain.auth.jwt.JwtProvider;
-import com.getit.domain.file.entity.FileAsset;
+import com.getit.domain.file.TestStoredFiles;
 import com.getit.domain.file.repository.FileAssetRepository;
+import com.getit.domain.file.storage.FileStorage;
 import com.getit.domain.project.admin.dto.ProjectRejectRequest;
 import com.getit.domain.project.admin.dto.ProjectRequest;
 import com.getit.domain.project.dto.ProjectCommand;
@@ -56,6 +57,9 @@ class ProjectAdminControllerTest {
 
   @Autowired
   private FileAssetRepository fileAssetRepository;
+
+  @Autowired
+  private FileStorage fileStorage;
 
   private Long adminId;
 
@@ -296,8 +300,8 @@ class ProjectAdminControllerTest {
     ProjectCommand command = new ProjectCommand(
         "원본", "팀", "2025-FALL", null, List.of(), null, null, false, null);
     Long id = projectRepository.save(Project.create(command, 1)).getId();
-    Long fileId = fileAssetRepository.save(FileAsset.upload(
-        "thumb", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L)).getId();
+    Long fileId = TestStoredFiles.stored(fileAssetRepository, fileStorage,
+        "ctrl-thumb", "thumb.png", "https://cdn/thumb.png", 10L, "image/png", 1L).getId();
 
     String json = objectMapper.writeValueAsString(new ProjectRequest.Write(
         "수정", "팀", "2025-FALL", "설명", List.of("React"),
