@@ -28,6 +28,10 @@ public enum FilePurpose {
   PROJECT_THUMBNAIL(
       5 * 1024 * 1024L, Set.of("png", "jpg", "jpeg", "webp"),
       StorageVisibility.PUBLIC),
+  /** 프로젝트 갤러리 스크린샷과 설명 속 이미지. 공개 페이지에 그대로 뜬다. 권장 크기는 1600x900. */
+  PROJECT_IMAGE(
+      5 * 1024 * 1024L, Set.of("png", "jpg", "jpeg", "webp"),
+      StorageVisibility.PUBLIC),
   /** 홈 화면 활동 사진 마퀴. 공개 페이지에 그대로 뜨므로 공개 저장소에 둔다. */
   ACTIVITY_PHOTO(
       5 * 1024 * 1024L, Set.of("png", "jpg", "jpeg", "webp"),

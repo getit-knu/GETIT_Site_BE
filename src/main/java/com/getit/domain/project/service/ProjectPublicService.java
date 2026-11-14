@@ -2,6 +2,7 @@ package com.getit.domain.project.service;
 
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
+import com.getit.domain.project.dto.ProjectImages;
 import com.getit.domain.project.dto.ProjectShowcaseResult;
 import java.util.List;
 import java.util.Locale;
@@ -21,13 +22,16 @@ public class ProjectPublicService {
 
   private final ProjectQueryService projectQueryService;
   private final FileQueryService fileQueryService;
+  private final ProjectImageService projectImageService;
 
   public ProjectShowcaseResult getShowcase(String semester, Pageable pageable) {
     String normalized = semester == null || semester.isBlank() ? null : semester;
     Page<ProjectView> viewPage = projectQueryService.findShowcase(normalized, pageable);
 
     Map<Long, String> urlByFileId = resolveThumbnails(viewPage.getContent());
-    Page<ProjectShowcaseResult.Item> itemPage = viewPage.map(view -> toItem(view, urlByFileId));
+    Map<Long, ProjectImages> images = projectImageService.findAll(
+        viewPage.getContent().stream().map(ProjectView::id).toList());
+    Page<ProjectShowcaseResult.Item> itemPage = viewPage.map(view -> toItem(view, urlByFileId, images));
 
     return ProjectShowcaseResult.of(projectQueryService.findDistinctSemesters(), itemPage);
   }
@@ -36,7 +40,8 @@ public class ProjectPublicService {
   public List<ProjectShowcaseResult.Item> getFestaProjects() {
     List<ProjectView> views = projectQueryService.findFestaEntries();
     Map<Long, String> urlByFileId = resolveThumbnails(views);
-    return views.stream().map(view -> toItem(view, urlByFileId)).toList();
+    Map<Long, ProjectImages> images = projectImageService.findAll(views.stream().map(ProjectView::id).toList());
+    return views.stream().map(view -> toItem(view, urlByFileId, images)).toList();
   }
 
   private Map<Long, String> resolveThumbnails(List<ProjectView> views) {
@@ -52,11 +57,17 @@ public class ProjectPublicService {
         .collect(Collectors.toMap(FileInfo::fileId, FileInfo::url));
   }
 
-  private ProjectShowcaseResult.Item toItem(ProjectView view, Map<Long, String> urlByFileId) {
+  private ProjectShowcaseResult.Item toItem(
+      ProjectView view, Map<Long, String> urlByFileId, Map<Long, ProjectImages> images
+  ) {
     String thumbnailUrl = view.fileId() == null ? null : urlByFileId.get(view.fileId());
     return new ProjectShowcaseResult.Item(
         view.id(), view.title(), view.teamName(), view.semester(), toSemesterLabel(view.semester()),
-        view.description(), view.techStacks(), view.codeUrl(), view.demoUrl(), thumbnailUrl);
+        view.description(), view.techStacks(), view.codeUrl(), view.demoUrl(), thumbnailUrl,
+        view.oneLiner(), view.progressStatus(),
+        view.progressStatus() == null ? null : view.progressStatus().getLabel(),
+        view.playStoreUrl(), view.appStoreUrl(),
+        images.getOrDefault(view.id(), ProjectImages.EMPTY).galleryImageUrls());
   }
 
   private static String toSemesterLabel(String semester) {

@@ -1,6 +1,8 @@
 package com.getit.domain.project.member.dto;
 
 import com.getit.domain.project.dto.ProjectCommand;
+import com.getit.domain.project.dto.ProjectDetails;
+import com.getit.domain.project.entity.ProgressStatus;
 import com.getit.global.validation.HttpUrl;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -25,8 +27,18 @@ public record ProjectSubmitRequest(
     @Size(max = 10) List<@Size(max = 40) @Pattern(regexp = "[^,]+") String> techStacks,
     @Size(max = 512) @HttpUrl String codeUrl,
     @Size(max = 512) @HttpUrl String demoUrl,
-    @Positive Long fileId
+    @Positive Long fileId,
+    @Size(max = 60) String oneLiner,
+    ProgressStatus progressStatus,
+    @Size(max = 512) @HttpUrl String playStoreUrl,
+    @Size(max = 512) @HttpUrl String appStoreUrl,
+    @Size(max = 5) List<@Positive Long> galleryFileIds,
+    @Size(max = 10) List<@Positive Long> descriptionImageFileIds
 ) {
+
+  public ProjectDetails toDetails() {
+    return new ProjectDetails(oneLiner, progressStatus, playStoreUrl, appStoreUrl);
+  }
 
   public ProjectCommand toCommand(String teamName) {
     return new ProjectCommand(

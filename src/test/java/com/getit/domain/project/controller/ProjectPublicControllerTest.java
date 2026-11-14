@@ -111,4 +111,35 @@ class ProjectPublicControllerTest {
     }
     projectRepository.save(project);
   }
+
+  @Autowired
+  private com.getit.domain.project.service.ProjectImageService projectImageService;
+
+  @Autowired
+  private com.getit.domain.file.storage.FileStorage fileStorage;
+
+  @Test
+  @DisplayName("쇼케이스에 한 줄 소개 · 진행 상태 · 스토어 링크 · 갤러리 이미지를 싣는다 (이슈 #221)")
+  void showcaseIncludesDetails() throws Exception {
+    Project project = Project.create(new ProjectCommand(
+        "상세", "팀", "2025-FALL", "설명", List.of(), null, null, false, null), 1);
+    project.updateDetails(new com.getit.domain.project.dto.ProjectDetails(
+        "한 줄 소개", com.getit.domain.project.entity.ProgressStatus.LIVE,
+        "https://play.google.com/x", null));
+    projectRepository.saveAndFlush(project);
+    Long g1 = com.getit.domain.file.TestStoredFiles.stored(fileAssetRepository, fileStorage,
+        "pub-g1", "g1.png", "https://cdn/g1.png", 10L, "image/png", 1L).getId();
+    Long g2 = com.getit.domain.file.TestStoredFiles.stored(fileAssetRepository, fileStorage,
+        "pub-g2", "g2.png", "https://cdn/g2.png", 10L, "image/png", 1L).getId();
+    projectImageService.replace(project.getId(), List.of(g2, g1), null);
+
+    mockMvc.perform(get(PROJECTS_PATH).param("semester", "2025-FALL"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content[0].oneLiner").value("한 줄 소개"))
+        .andExpect(jsonPath("$.data.content[0].progressStatus").value("LIVE"))
+        .andExpect(jsonPath("$.data.content[0].progressStatusLabel").value("서비스 중"))
+        .andExpect(jsonPath("$.data.content[0].playStoreUrl").value("https://play.google.com/x"))
+        .andExpect(jsonPath("$.data.content[0].galleryImageUrls.length()").value(2))
+        .andExpect(jsonPath("$.data.content[0].galleryImageUrls[0]").value(org.hamcrest.Matchers.endsWith("pub-g2")));
+  }
 }

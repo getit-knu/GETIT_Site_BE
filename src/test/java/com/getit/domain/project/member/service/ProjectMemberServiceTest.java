@@ -88,7 +88,7 @@ class ProjectMemberServiceTest {
   private ProjectSubmitRequest request(Long fileId) {
     return new ProjectSubmitRequest(
         "우리 조 프로젝트", "2026-SPRING", "설명", List.of("Java", "Spring"),
-        "https://github.com/getit-knu/x", "https://demo.getit.com", fileId);
+        "https://github.com/getit-knu/x", "https://demo.getit.com", fileId, null, null, null, null, null, null);
   }
 
   private List<String> showcaseTitles() {
@@ -279,7 +279,7 @@ class ProjectMemberServiceTest {
     void adminCreatedProjectIsApprovedFromTheStart() {
       ProjectResult.Item created = projectAdminService.createProject(
           new ProjectRequest.Write("어드민 프로젝트", "운영진", "2026-SPRING", null, List.of(),
-              null, null, null, false, null, null, null));
+              null, null, null, false, null, null, null, null, null, null, null, null, null));
 
       assertThat(created.status()).isEqualTo(ProjectStatus.APPROVED);
       assertThat(showcaseTitles()).contains("어드민 프로젝트");

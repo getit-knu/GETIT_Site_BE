@@ -140,6 +140,31 @@ class ProjectMemberControllerTest {
   }
 
   @Test
+  @DisplayName("스토어 링크가 http(s) 가 아니거나 갤러리가 5장을 넘으면 400 이다 (이슈 #221)")
+  void rejectsBadDetails() throws Exception {
+    Group group = groupRepository.save(Group.create(activeGeneration.getId(), "3조"));
+    User member = guest("google-sub-project-bad-details");
+    member.promoteToMember(activeGeneration.getGenerationNo());
+    member.assignToGroup(group.getId());
+    userRepository.flush();
+
+    String badStore = BODY.replace("\"codeUrl\"", "\"playStoreUrl\": \"javascript:alert(1)\", \"codeUrl\"");
+    mockMvc.perform(post(PATH).header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON).content(badStore))
+        .andExpect(status().isBadRequest());
+
+    String tooMany = BODY.replace("\"codeUrl\"", "\"galleryFileIds\": [1,2,3,4,5,6], \"codeUrl\"");
+    mockMvc.perform(post(PATH).header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON).content(tooMany))
+        .andExpect(status().isBadRequest());
+
+    String tooLong = BODY.replace("\"codeUrl\"", "\"oneLiner\": \"" + "가".repeat(61) + "\", \"codeUrl\"");
+    mockMvc.perform(post(PATH).header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON).content(tooLong))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("토큰이 없으면 401 이다")
   void requiresAuthentication() throws Exception {
     mockMvc.perform(post(PATH)
