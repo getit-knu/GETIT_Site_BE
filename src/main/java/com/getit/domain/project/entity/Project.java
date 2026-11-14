@@ -65,6 +65,16 @@ public class Project extends BaseTimeEntity {
   @Column(name = "is_featured", nullable = false)
   private boolean isFeatured;
 
+  /**
+   * 모의투자 FESTA 출전 여부. 홈 소개용 {@link #isFeatured} 와는 별개다. (이슈 #220)
+   */
+  @Column(name = "festa_entry", nullable = false)
+  private boolean festaEntry;
+
+  /** 출전 프로젝트 안의 노출 순서. 비어 있으면 목록 맨 뒤로 간다. */
+  @Column(name = "festa_order", nullable = true)
+  private Integer festaOrder;
+
   @Column(name = "project_order", nullable = false)
   private int order;
 
@@ -124,6 +134,12 @@ public class Project extends BaseTimeEntity {
   }
 
   public void updateOrder(int order) { this.order = order; }
+
+  /** 출전을 끄면 순서도 비운다. 꺼진 프로젝트에 순서가 남아 있으면 다시 켤 때 엉뚱한 자리에 간다. */
+  public void updateFesta(boolean festaEntry, Integer festaOrder) {
+    this.festaEntry = festaEntry;
+    this.festaOrder = festaEntry ? festaOrder : null;
+  }
 
   /** 반려한 것을 다시 승인할 수도 있으므로 PENDING 에서만 오는 것으로 보지 않는다. */
   /**

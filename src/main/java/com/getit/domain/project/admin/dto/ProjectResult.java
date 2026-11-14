@@ -22,7 +22,9 @@ public class ProjectResult {
       int order,
       ProjectStatus status,
       String statusLabel,
-      String rejectReason
+      String rejectReason,
+      boolean festaEntry,
+      Integer festaOrder
   ) {
 
     public static Item of(Project project, String thumbnailUrl) {
@@ -41,7 +43,9 @@ public class ProjectResult {
           project.getOrder(),
           project.getStatus(),
           project.getStatus().getLabel(),
-          project.getRejectReason());
+          project.getRejectReason(),
+          project.isFestaEntry(),
+          project.getFestaOrder());
     }
   }
 }

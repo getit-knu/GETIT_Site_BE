@@ -33,6 +33,14 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
   List<Project> findByIsFeaturedTrueAndStatusOrderByOrderAscIdAsc(ProjectStatus status);
 
+  /** FESTA 출전 프로젝트. 순서를 안 정한 것은 맨 뒤로 보낸다. (이슈 #220) */
+  @Query("""
+      select p from Project p
+      where p.festaEntry = true and p.status = :status
+      order by case when p.festaOrder is null then 1 else 0 end, p.festaOrder asc, p.id asc
+      """)
+  List<Project> findFestaEntries(@Param("status") ProjectStatus status);
+
   /**
    * 우리 조가 낸 프로젝트. 최신순. (이슈 #190)
    *

@@ -42,7 +42,7 @@ class ProjectAdminServiceTest {
 
   private ProjectRequest.Write write(String title, String semester, Long fileId, Integer order) {
     return new ProjectRequest.Write(title, "팀", semester, "설명",
-        List.of("React"), "https://code", "https://demo", fileId, false, order);
+        List.of("React"), "https://code", "https://demo", fileId, false, order, null, null);
   }
 
   private Project seed(String title, String semester, int order) {
@@ -271,6 +271,56 @@ class ProjectAdminServiceTest {
           .isInstanceOf(BusinessException.class)
           .extracting("errorCode")
           .isEqualTo(ProjectErrorCode.PROJECT_NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("FESTA 출전 (이슈 #220)")
+  class FestaEntry {
+
+    private ProjectRequest.Write withFesta(Boolean entry, Integer festaOrder) {
+      return new ProjectRequest.Write("t", "팀", "2025-FALL", "설명",
+          List.of(), null, null, null, false, 1, entry, festaOrder);
+    }
+
+    @Test
+    @DisplayName("등록할 때 출전과 순서를 저장하고 응답에 싣는다")
+    void createsWithFesta() {
+      ProjectResult.Item item = projectAdminService.createProject(withFesta(true, 2));
+
+      assertThat(item.festaEntry()).isTrue();
+      assertThat(item.festaOrder()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("festaEntry 를 안 보내면 기본은 미출전이다")
+    void defaultsToNotEntered() {
+      ProjectResult.Item item = projectAdminService.createProject(withFesta(null, null));
+
+      assertThat(item.festaEntry()).isFalse();
+      assertThat(item.festaOrder()).isNull();
+    }
+
+    @Test
+    @DisplayName("수정할 때 festaEntry 를 안 보내면 기존 출전 설정을 건드리지 않는다")
+    void keepsFestaWhenOmitted() {
+      Long id = projectAdminService.createProject(withFesta(true, 3)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, withFesta(null, null));
+
+      assertThat(updated.festaEntry()).isTrue();
+      assertThat(updated.festaOrder()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("출전을 끄면 순서도 비운다")
+    void clearsOrderWhenDisabled() {
+      Long id = projectAdminService.createProject(withFesta(true, 3)).id();
+
+      ProjectResult.Item updated = projectAdminService.updateProject(id, withFesta(false, 3));
+
+      assertThat(updated.festaEntry()).isFalse();
+      assertThat(updated.festaOrder()).isNull();
     }
   }
 }

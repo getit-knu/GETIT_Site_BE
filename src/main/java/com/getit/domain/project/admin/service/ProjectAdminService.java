@@ -50,7 +50,9 @@ public class ProjectAdminService {
   @Transactional
   public ProjectResult.Item createProject(ProjectRequest.Write request) {
     int order = request.order() == null ? projectRepository.findMaxOrder() + 1 : request.order();
-    Project saved = projectRepository.save(Project.create(request.toCommand(), order));
+    Project created = Project.create(request.toCommand(), order);
+    applyFesta(created, request);
+    Project saved = projectRepository.save(created);
     replaceThumbnail(null, saved.getFileId());
     return toItem(saved);
   }
@@ -63,8 +65,16 @@ public class ProjectAdminService {
     if (request.order() != null) {
       project.updateOrder(request.order());
     }
+    applyFesta(project, request);
     replaceThumbnail(oldFileId, project.getFileId());
     return toItem(project);
+  }
+
+  /** festaEntry 를 안 보내면 건드리지 않는다. FESTA 를 모르는 기존 요청이 출전 설정을 지우면 안 된다. */
+  private void applyFesta(Project project, ProjectRequest.Write request) {
+    if (request.festaEntry() != null) {
+      project.updateFesta(request.festaEntry(), request.festaOrder());
+    }
   }
 
   private ProjectResult.Item toItem(Project project) {
