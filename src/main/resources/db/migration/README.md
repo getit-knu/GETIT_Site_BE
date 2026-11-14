@@ -100,6 +100,7 @@ docker compose up -d
 | V33 | `add_group_id_to_project` |
 | V34 | `add_privacy_consent` |
 | V35 | `add_festa_to_project` |
+| V36 | `create_festa_investment_schema` |
 
 현재 번호를 다시 확인하려면:
 

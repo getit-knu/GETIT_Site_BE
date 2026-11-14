@@ -14,7 +14,8 @@ public record ProjectView(
     String demoUrl,
     Long fileId,
     boolean isFeatured,
-    int order
+    int order,
+    Long groupId
 ) {
 
   public static ProjectView from(Project project) {
@@ -29,6 +30,7 @@ public record ProjectView(
         project.getDemoUrl(),
         project.getFileId(),
         project.isFeatured(),
-        project.getOrder());
+        project.getOrder(),
+        project.getGroupId());
   }
 }
