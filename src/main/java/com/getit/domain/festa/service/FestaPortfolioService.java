@@ -11,7 +11,6 @@ import com.getit.domain.project.service.ProjectQueryService;
 import com.getit.domain.project.service.ProjectView;
 import com.getit.domain.setting.feature.entity.FeatureKey;
 import com.getit.domain.setting.feature.service.FeatureQueryService;
-import com.getit.domain.setting.feature.service.FeatureView;
 import com.getit.domain.user.dto.GroupWithMembersResult;
 import com.getit.domain.user.service.MemberGroupService;
 import com.getit.global.exception.BusinessException;
