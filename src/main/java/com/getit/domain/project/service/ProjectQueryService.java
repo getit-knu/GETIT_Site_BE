@@ -15,4 +15,7 @@ public interface ProjectQueryService {
   List<String> findDistinctSemesters();
 
   List<ProjectView> findFeatured();
+
+  /** FESTA 출전 프로젝트. 승인된 것만, 어드민이 정한 순서대로. */
+  List<ProjectView> findFestaEntries();
 }

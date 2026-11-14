@@ -36,4 +36,11 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
         .map(ProjectView::from)
         .toList();
   }
+
+  @Override
+  public List<ProjectView> findFestaEntries() {
+    return projectRepository.findFestaEntries(ProjectStatus.APPROVED).stream()
+        .map(ProjectView::from)
+        .toList();
+  }
 }

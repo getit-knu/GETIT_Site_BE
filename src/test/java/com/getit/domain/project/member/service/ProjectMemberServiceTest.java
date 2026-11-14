@@ -279,7 +279,7 @@ class ProjectMemberServiceTest {
     void adminCreatedProjectIsApprovedFromTheStart() {
       ProjectResult.Item created = projectAdminService.createProject(
           new ProjectRequest.Write("어드민 프로젝트", "운영진", "2026-SPRING", null, List.of(),
-              null, null, null, false, null));
+              null, null, null, false, null, null, null));
 
       assertThat(created.status()).isEqualTo(ProjectStatus.APPROVED);
       assertThat(showcaseTitles()).contains("어드민 프로젝트");

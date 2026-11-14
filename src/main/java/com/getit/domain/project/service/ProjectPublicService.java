@@ -32,6 +32,13 @@ public class ProjectPublicService {
     return ProjectShowcaseResult.of(projectQueryService.findDistinctSemesters(), itemPage);
   }
 
+  /** 2.4 쇼케이스 item 과 같은 모양이라 FE 가 카드 컴포넌트를 그대로 쓴다. 출전 팀이 적어 페이징은 없다. */
+  public List<ProjectShowcaseResult.Item> getFestaProjects() {
+    List<ProjectView> views = projectQueryService.findFestaEntries();
+    Map<Long, String> urlByFileId = resolveThumbnails(views);
+    return views.stream().map(view -> toItem(view, urlByFileId)).toList();
+  }
+
   private Map<Long, String> resolveThumbnails(List<ProjectView> views) {
     List<Long> fileIds = views.stream()
         .map(ProjectView::fileId)

@@ -9,6 +9,7 @@ import com.getit.domain.file.entity.FileAsset;
 import com.getit.domain.file.repository.FileAssetRepository;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
+import com.getit.domain.project.entity.ProjectStatus;
 import com.getit.domain.project.repository.ProjectRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -81,5 +82,33 @@ class ProjectPublicControllerTest {
         .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("http://localhost:8080/api/public/files/k1"))
         .andExpect(jsonPath("$.data.content[1].thumbnailUrl").isEmpty())
         .andExpect(jsonPath("$.data.content[2].thumbnailUrl").isEmpty());
+  }
+
+  @Test
+  @DisplayName("FESTA 출전 목록: 출전 + 승인만, festaOrder 순, 순서 없는 것은 맨 뒤 (이슈 #220)")
+  void returnsFestaEntries() throws Exception {
+    seedFesta("C", true, 2, ProjectStatus.APPROVED);
+    seedFesta("A", true, 1, ProjectStatus.APPROVED);
+    seedFesta("N", true, null, ProjectStatus.APPROVED);
+    seedFesta("미출전", false, null, ProjectStatus.APPROVED);
+    seedFesta("대기", true, 1, ProjectStatus.PENDING);
+
+    mockMvc.perform(get("/api/public/festa/projects"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(3))
+        .andExpect(jsonPath("$.data[0].title").value("A"))
+        .andExpect(jsonPath("$.data[1].title").value("C"))
+        .andExpect(jsonPath("$.data[2].title").value("N"))
+        .andExpect(jsonPath("$.data[0].semesterLabel").value("2025 Fall"));
+  }
+
+  private void seedFesta(String title, boolean entry, Integer festaOrder, ProjectStatus status) {
+    Project project = Project.create(new ProjectCommand(
+        title, "팀", "2025-FALL", "설명", List.of(), null, null, false, null), 1);
+    project.updateFesta(entry, festaOrder);
+    if (status != ProjectStatus.APPROVED) {
+      project.changeStatus(status);
+    }
+    projectRepository.save(project);
   }
 }

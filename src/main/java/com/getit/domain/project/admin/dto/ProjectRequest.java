@@ -22,7 +22,9 @@ public class ProjectRequest {
       @HttpUrl String demoUrl,
       @Positive Long fileId,
       @NotNull Boolean isFeatured,
-      @Min(1) Integer order
+      @Min(1) Integer order,
+      Boolean festaEntry,
+      @Min(1) Integer festaOrder
   ) {
 
     public ProjectCommand toCommand() {
