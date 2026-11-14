@@ -117,6 +117,29 @@ class ProjectMemberControllerTest {
   }
 
   @Test
+  @DisplayName("codeUrl · demoUrl 이 http(s) 주소가 아니면 400 이다 (이슈 #219)")
+  void rejectsNonHttpUrl() throws Exception {
+    Group group = groupRepository.save(Group.create(activeGeneration.getId(), "3조"));
+    User member = guest("google-sub-project-bad-url");
+    member.promoteToMember(activeGeneration.getGenerationNo());
+    member.assignToGroup(group.getId());
+    userRepository.flush();
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(BODY.replace("https://github.com/getit-knu/x", "javascript:alert(1)")))
+        .andExpect(status().isBadRequest());
+
+    mockMvc.perform(post(PATH)
+            .header("Authorization", bearerFor(member))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(BODY.replace("\"codeUrl\": \"https://github.com/getit-knu/x\"",
+                "\"demoUrl\": \"javascript:alert(1)\"")))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("토큰이 없으면 401 이다")
   void requiresAuthentication() throws Exception {
     mockMvc.perform(post(PATH)
