@@ -4,6 +4,7 @@ import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.domain.festa.dto.FestaPhoneDestroyResult;
 import com.getit.domain.festa.dto.FestaResetResult;
 import com.getit.domain.festa.dto.FestaResultsResult;
+import com.getit.domain.festa.dto.FestaVoteResultsResult;
 import com.getit.domain.festa.service.FestaAdminService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,8 +33,14 @@ public class FestaAdminController {
     return ApiResponse.success(festaAdminService.getResults());
   }
 
+  @Operation(summary = "투표 득표 집계", description = "이슈 #232")
+  @GetMapping("/vote-results")
+  public ApiResponse<FestaVoteResultsResult> getVoteResults() {
+    return ApiResponse.success(festaAdminService.getVoteResults());
+  }
+
   /** 바이너리(CSV) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. */
-  @Operation(summary = "추첨용 투자자 명단 CSV", description = "이슈 #222")
+  @Operation(summary = "추첨용 참여자 명단 CSV", description = "이슈 #222, #232. 투자자와 투표자를 합친다")
   @GetMapping("/investors.csv")
   public ResponseEntity<byte[]> exportInvestors(@AuthenticationPrincipal CustomUserDetails principal) {
     byte[] csv = festaAdminService.exportInvestorsCsv(principal.getUserId());

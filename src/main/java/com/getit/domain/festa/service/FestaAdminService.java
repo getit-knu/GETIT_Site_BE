@@ -3,18 +3,24 @@ package com.getit.domain.festa.service;
 import com.getit.domain.festa.dto.FestaPhoneDestroyResult;
 import com.getit.domain.festa.dto.FestaResetResult;
 import com.getit.domain.festa.dto.FestaResultsResult;
+import com.getit.domain.festa.dto.FestaVoteResultsResult;
 import com.getit.domain.festa.exception.FestaErrorCode;
 import com.getit.domain.festa.repository.FestaInvestmentRepository;
 import com.getit.domain.festa.repository.FestaInvestmentRepository.InvestorRow;
 import com.getit.domain.festa.repository.FestaInvestmentRepository.ProjectTotal;
 import com.getit.domain.festa.repository.FestaInvestorRepository;
+import com.getit.domain.festa.repository.FestaVoteRepository;
+import com.getit.domain.festa.repository.FestaVoteRepository.ProjectCount;
+import com.getit.domain.festa.repository.FestaVoteRepository.VoterRow;
 import com.getit.domain.project.service.ProjectQueryService;
 import com.getit.domain.setting.feature.entity.FeatureKey;
 import com.getit.domain.setting.feature.service.FeatureQueryService;
 import com.getit.domain.user.service.UserQueryService;
 import com.getit.global.exception.BusinessException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +44,7 @@ public class FestaAdminService {
 
   private final FestaInvestmentRepository investmentRepository;
   private final FestaInvestorRepository investorRepository;
+  private final FestaVoteRepository voteRepository;
   private final ProjectQueryService projectQueryService;
   private final UserQueryService userQueryService;
   private final FeatureQueryService featureQueryService;
@@ -59,21 +66,51 @@ public class FestaAdminService {
     return new FestaResultsResult(investmentRepository.countInvestors(), projects);
   }
 
+  /** 출전 프로젝트 전부를 득표 내림차순으로. 표가 없는 프로젝트도 0 으로 나온다. (이슈 #232) */
+  public FestaVoteResultsResult getVoteResults() {
+    Map<Long, Long> counts = voteRepository.countByProject().stream()
+        .collect(Collectors.toMap(ProjectCount::projectId, ProjectCount::voteCount));
+    List<FestaVoteResultsResult.ProjectResult> projects = projectQueryService.findFestaEntries().stream()
+        .map(project -> new FestaVoteResultsResult.ProjectResult(
+            project.id(), project.title(), project.teamName(), counts.getOrDefault(project.id(), 0L)))
+        .sorted(Comparator.comparingLong(FestaVoteResultsResult.ProjectResult::voteCount).reversed())
+        .toList();
+    return new FestaVoteResultsResult(voteRepository.count(), projects);
+  }
+
   /** 전체 번호가 들어간다. 누가 몇 건을 내려받았는지만 로그로 남기고 번호는 남기지 않는다. */
   public byte[] exportInvestorsCsv(Long adminId) {
-    List<InvestorRow> rows = investmentRepository.findInvestorRows();
+    Map<Long, ParticipantRow> byUser = new HashMap<>();
+    for (InvestorRow row : investmentRepository.findInvestorRows()) {
+      byUser.merge(row.userId(), new ParticipantRow(row.userId(), row.phoneNumber(), row.lastInvestedAt()),
+          FestaAdminService::later);
+    }
+    for (VoterRow row : voteRepository.findVoterRows()) {
+      byUser.merge(row.userId(), new ParticipantRow(row.userId(), row.phoneNumber(), row.votedAt()),
+          FestaAdminService::later);
+    }
+    List<ParticipantRow> rows = byUser.values().stream()
+        .sorted(Comparator.comparing(ParticipantRow::lastAt).reversed())
+        .toList();
     Map<Long, String> names = userQueryService.findNamesByIds(
-        rows.stream().map(InvestorRow::userId).toList());
+        rows.stream().map(ParticipantRow::userId).toList());
 
-    StringBuilder csv = new StringBuilder(BOM).append("이름,전화번호,마지막 투자 시각\r\n");
-    for (InvestorRow row : rows) {
+    StringBuilder csv = new StringBuilder(BOM).append("이름,전화번호,마지막 참여 시각\r\n");
+    for (ParticipantRow row : rows) {
       csv.append(cell(names.getOrDefault(row.userId(), ""))).append(',')
           .append(cell(row.phoneNumber())).append(',')
-          .append(cell(TIME.format(row.lastInvestedAt()))).append("\r\n");
+          .append(cell(TIME.format(row.lastAt()))).append("\r\n");
     }
     log.info("FESTA 투자자 명단 내려받기. adminId={} rows={}", adminId, rows.size());
     return csv.toString().getBytes(StandardCharsets.UTF_8);
   }
+
+  private static ParticipantRow later(ParticipantRow a, ParticipantRow b) {
+    return a.lastAt().isAfter(b.lastAt()) ? a : b;
+  }
+
+  /** 투자나 투표로 참여한 사람과 그 마지막 시각. 한 사람이 둘 다 했으면 늦은 쪽을 쓴다. */
+  private record ParticipantRow(Long userId, String phoneNumber, LocalDateTime lastAt) { }
 
   /** 번호와 동의 기록만 지운다. 투자 내역과 집계는 남는다. */
   @Transactional
@@ -84,7 +121,7 @@ public class FestaAdminService {
   }
 
   /**
-   * 투자 내역과 전화번호를 모두 지운다. 리허설 데이터를 행사 전에 비우는 용도다. (이슈 #229)
+   * 투자 내역, 투표, 전화번호를 모두 지운다. 리허설 데이터를 행사 전에 비우는 용도다. (이슈 #229)
    *
    * <p>토글이 켜져 있으면 거부한다 — 행사 중 실수로 누르는 것을 막는다. 서버는 행사 전인지 후인지
    * 구분하지 못한다. 결과 발표 전에 지우면 안 된다는 것은 화면 안내가 지킨다.
@@ -98,6 +135,7 @@ public class FestaAdminService {
     }
     long investorCount = investorRepository.count();
     investmentRepository.deleteAllInBatch();
+    voteRepository.deleteAllInBatch();
     investorRepository.deleteAllInBatch();
     log.warn("FESTA 투자 데이터 초기화. adminId={} deletedInvestorCount={}", adminId, investorCount);
     return new FestaResetResult(investorCount);
