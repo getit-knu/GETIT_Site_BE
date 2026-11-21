@@ -100,6 +100,12 @@ class FestaControllerTest {
     return "Bearer " + jwtProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
   }
 
+  /** 명단 CSV 는 투표가 끝난 뒤에만 받을 수 있다. 일정이 없으면 토글을 끈다. */
+  private void closeFesta() {
+    featureToggleRepository.findById(FeatureKey.MOCK_INVESTMENT).orElseThrow().updateEnabled(false, 1L);
+    featureToggleRepository.flush();
+  }
+
   private String adminBearer() {
     User admin = userRepository.findAll().stream()
         .filter(user -> user.getRole() == Role.ADMIN)
@@ -291,6 +297,7 @@ class FestaControllerTest {
     save(zeroed, body("010-9999-0000", true, projectA.getId(), 100_000));
     save(zeroed, body(null, null, projectA.getId(), 0));
 
+    closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith("text/csv"))
@@ -305,6 +312,7 @@ class FestaControllerTest {
         User.createGuest("c3", "c3@getit.com", "=HYPERLINK(\"x\")", "https://cdn.getit.com/1.png"));
     save(evil, body(PHONE, true, projectA.getId(), 100_000));
 
+    closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(content().string(containsString("\"'=HYPERLINK(\"\"x\"\")\"")));
   }
@@ -324,6 +332,7 @@ class FestaControllerTest {
         .andExpect(jsonPath("$.data.investments[0].amount").value(1_000_000));
     mockMvc.perform(get(ADMIN + "/results").header("Authorization", adminBearer()))
         .andExpect(jsonPath("$.data.projects[0].totalAmount").value(1_000_000));
+    closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString(PHONE))));
   }

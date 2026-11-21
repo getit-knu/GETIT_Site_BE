@@ -100,6 +100,7 @@ nano /opt/getit/.env
 |---|---|
 | `DB_PASSWORD` · `MYSQL_ROOT_PASSWORD` | 직접 생성 |
 | `JWT_SECRET` | `openssl rand -base64 48`. **로컬 값 재사용 금지** |
+| `FESTA_PHONE_KEY` | `openssl rand -base64 32`. FESTA 추첨 번호 암호화 키. **없으면 서버가 뜨지 않고, 잃으면 저장된 번호를 못 읽는다.** 별도 안전한 곳에 백업 |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | Google Cloud Console |
 | `CORS_ALLOWED_ORIGINS` | 프론트 주소 |
 | `OAUTH2_REDIRECT_URI` | `{프론트 주소}/oauth/callback` |
