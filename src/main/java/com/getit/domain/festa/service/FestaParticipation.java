@@ -1,8 +1,10 @@
 package com.getit.domain.festa.service;
 
 import com.getit.domain.festa.entity.FestaInvestor;
+import com.getit.domain.festa.entity.FestaSchedule;
 import com.getit.domain.festa.exception.FestaErrorCode;
 import com.getit.domain.festa.repository.FestaInvestorRepository;
+import com.getit.domain.festa.repository.FestaScheduleRepository;
 import com.getit.domain.project.service.ProjectQueryService;
 import com.getit.domain.project.service.ProjectView;
 import com.getit.domain.setting.feature.entity.FeatureKey;
@@ -29,6 +31,7 @@ class FestaParticipation {
   private static final Pattern PHONE_NUMBER = Pattern.compile("010-\\d{4}-\\d{4}");
 
   private final FestaInvestorRepository investorRepository;
+  private final FestaScheduleRepository scheduleRepository;
   private final FeatureQueryService featureQueryService;
   private final ProjectQueryService projectQueryService;
   private final MemberGroupService memberGroupService;
@@ -37,9 +40,16 @@ class FestaParticipation {
   void ensureOpen() {
     boolean open = featureQueryService.findAll().stream()
         .anyMatch(feature -> feature.key() == FeatureKey.MOCK_INVESTMENT && feature.enabled());
-    if (!open) {
+    if (!open || !withinSchedule()) {
       throw new BusinessException(FestaErrorCode.FESTA_CLOSED);
     }
+  }
+
+  /** 일정이 없으면 통과한다. 관리자가 깜빡해도 행사가 막히지 않게 한다. */
+  private boolean withinSchedule() {
+    return scheduleRepository.findById(FestaSchedule.SINGLETON_ID)
+        .map(schedule -> schedule.contains(LocalDateTime.now(clock)))
+        .orElse(true);
   }
 
   /** 출전하지 않았거나 우리 조 프로젝트면 거부한다. */
