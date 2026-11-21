@@ -92,7 +92,7 @@ class FestaParticipation {
   String maskedPhoneNumber(Long userId) {
     return investorRepository.findByUserId(userId)
         .filter(FestaInvestor::hasPhoneNumber)
-        .map(investor -> mask(investor.getPhoneNumber()))
+        .map(investor -> mask(investor.revealPhoneNumber()))
         .orElse(null);
   }
 

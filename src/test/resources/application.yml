@@ -40,6 +40,11 @@ getit:
     allowed-origins:
       - http://localhost:3000
 
+  festa:
+    # 테스트 전용 고정 키(32바이트). 실제 키가 아니므로 커밋해도 무방하다.
+    phone-key: dGVzdC1mZXN0YS1waG9uZS1rZXktMzItYnl0ZXMhISE=
+    phone-retention-days: 30
+
   jwt:
     # 테스트 전용 고정 키. 실제 시크릿이 아니므로 커밋해도 무방하다 (HS256 최소 32바이트)
     secret: test-secret-key-for-getit-authentication-only-do-not-use-in-production
