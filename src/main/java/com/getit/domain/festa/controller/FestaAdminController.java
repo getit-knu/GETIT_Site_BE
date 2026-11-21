@@ -4,11 +4,15 @@ import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.domain.festa.dto.FestaPhoneDestroyResult;
 import com.getit.domain.festa.dto.FestaResetResult;
 import com.getit.domain.festa.dto.FestaResultsResult;
+import com.getit.domain.festa.dto.FestaScheduleRequest;
+import com.getit.domain.festa.dto.FestaScheduleResult;
 import com.getit.domain.festa.dto.FestaVoteResultsResult;
 import com.getit.domain.festa.service.FestaAdminService;
+import com.getit.domain.festa.service.FestaScheduleService;
 import com.getit.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,6 +32,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class FestaAdminController {
 
   private final FestaAdminService festaAdminService;
+  private final FestaScheduleService festaScheduleService;
+
+  @Operation(summary = "투표 기간 조회", description = "이슈 #234. 미설정이면 startAt, endAt 이 null")
+  @GetMapping("/schedule")
+  public ApiResponse<FestaScheduleResult> getSchedule() {
+    return ApiResponse.success(festaScheduleService.getSchedule());
+  }
+
+  @Operation(summary = "투표 기간 저장", description = "이슈 #234. startAt < endAt")
+  @PutMapping("/schedule")
+  public ApiResponse<FestaScheduleResult> saveSchedule(@Valid @RequestBody FestaScheduleRequest request) {
+    return ApiResponse.success(festaScheduleService.saveSchedule(request));
+  }
 
   @Operation(summary = "투자 결과 집계", description = "이슈 #222")
   @GetMapping("/results")

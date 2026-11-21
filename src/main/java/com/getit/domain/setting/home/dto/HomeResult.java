@@ -11,7 +11,8 @@ public record HomeResult(
     List<CurriculumInfo> curriculums,
     List<FeaturedProjectInfo> featuredProjects,
     List<FaqInfo> faqs,
-    FeaturesInfo features
+    FeaturesInfo features,
+    FestaScheduleInfo festaSchedule
 ) {
 
   /** 활성 기수가 없으면 null 이다 — 공개 API 라 404 로 실패하지 않는다(2.8과 동일 원칙). */
@@ -33,6 +34,9 @@ public record HomeResult(
   public record FeaturedProjectInfo(Long id, String title, String description, String thumbnailUrl) { }
 
   public record FaqInfo(Long id, String question, String answer) { }
+
+  /** FESTA 투표 기간. 미설정이면 null (generation 과 같은 원칙). (이슈 #234) */
+  public record FestaScheduleInfo(OffsetDateTime startAt, OffsetDateTime endAt) { }
 
   public record FeaturesInfo(boolean stockGame, boolean mockInvestment) { }
 }

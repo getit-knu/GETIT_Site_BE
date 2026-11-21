@@ -1,5 +1,6 @@
 package com.getit.domain.setting.home.service;
 
+import com.getit.domain.festa.service.FestaScheduleQueryService;
 import com.getit.domain.file.service.FileInfo;
 import com.getit.domain.file.service.FileQueryService;
 import com.getit.domain.project.service.ProjectQueryService;
@@ -44,6 +45,7 @@ public class HomeService {
   private final FaqQueryService faqQueryService;
   private final FeatureQueryService featureQueryService;
   private final FileQueryService fileQueryService;
+  private final FestaScheduleQueryService festaScheduleQueryService;
 
   public HomeResult getHome() {
     Optional<GenerationSummary> activeGeneration = generationQueryService.findActive();
@@ -54,7 +56,8 @@ public class HomeService {
         toCurriculums(activeGeneration.orElse(null)),
         toFeaturedProjects(),
         toFaqs(),
-        toFeatures());
+        toFeatures(),
+        toFestaSchedule());
   }
 
   private HomeResult.GenerationInfo toGenerationInfo(GenerationSummary generation) {
@@ -113,6 +116,12 @@ public class HomeService {
     return faqQueryService.findVisible().stream()
         .map(view -> new HomeResult.FaqInfo(view.id(), view.question(), view.answer()))
         .toList();
+  }
+
+  private HomeResult.FestaScheduleInfo toFestaSchedule() {
+    return festaScheduleQueryService.findSchedule()
+        .map(view -> new HomeResult.FestaScheduleInfo(view.startAt(), view.endAt()))
+        .orElse(null);
   }
 
   private HomeResult.FeaturesInfo toFeatures() {
