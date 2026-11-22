@@ -12,6 +12,7 @@ import com.getit.domain.user.service.UserAdminService;
 import com.getit.domain.user.service.UserPromotionService;
 import com.getit.global.dto.ApiResponse;
 import com.getit.global.dto.PageResponse;
+import com.getit.global.dto.PhoneNumberResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -80,17 +81,33 @@ public class UserAdminController {
     return ApiResponse.success(userPromotionService.promote(request.generationId(), request.applicationIds()));
   }
 
+  @Operation(summary = "부원 전체 번호", description = "이슈 #237. 목록에는 가린 번호만 준다. 조회할 때마다 기록한다")
+  @GetMapping("/{id}/phone")
+  public ResponseEntity<ApiResponse<PhoneNumberResult>> getPhoneNumber(
+      @PathVariable Long id,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(ApiResponse.success(userAdminService.revealPhoneNumber(id, principal.getUserId())));
+  }
+
   /** 바이너리(XLSX) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. (7.6과 같은 이유) */
-  @Operation(summary = "사용자 목록 엑셀 다운로드", description = "명세서 9.5")
+  @Operation(summary = "사용자 목록 엑셀 다운로드", description = "명세서 9.5. 연락처는 includePhone=true 일 때만 (이슈 #237). "
+      + "내려받을 때마다 기록한다")
   @GetMapping("/export")
   public ResponseEntity<byte[]> exportExcel(
+      @AuthenticationPrincipal CustomUserDetails principal,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Role role,
       @RequestParam(required = false) String groupId,
-      @RequestParam(required = false) Integer generationNo
+      @RequestParam(required = false) Integer generationNo,
+      @RequestParam(defaultValue = "false") boolean includePhone
   ) {
-    byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter(keyword, role, groupId, generationNo));
+    byte[] excel = userAdminService.exportUsersExcel(
+        new UserExportFilter(keyword, role, groupId, generationNo, includePhone), principal.getUserId());
     return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=users.xlsx")
         .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
         .body(excel);

@@ -8,12 +8,16 @@ import com.getit.domain.user.entity.Role;
  * <p>{@code keyword} 와 {@code groupId} 가 둘 다 {@code String} 이라 서비스 메서드가 네 인자를
  * 그대로 받으면 호출부에서 순서가 바뀌어도 컴파일 에러 없이 통과한다. 필터 값을 record 로 묶어서
  * 인자 순서 실수를 컴파일 타임에 막는다 (PR #71 Copilot 리뷰 지적).
+ *
+ * <p>{@code includePhone} 이 true 일 때만 연락처 칸을 넣는다. 기본은 뺀다 — 파일이 PC 나 메신저에 남아도
+ * 부원 번호가 같이 새지 않게 한다 (이슈 #237).
  */
 public record UserExportFilter(
     String keyword,
     Role role,
     String groupId,
-    Integer generationNo
+    Integer generationNo,
+    boolean includePhone
 ) {
 
 }

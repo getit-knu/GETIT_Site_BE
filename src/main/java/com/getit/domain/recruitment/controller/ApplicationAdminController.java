@@ -15,6 +15,7 @@ import com.getit.domain.recruitment.service.ApplicationAdminService;
 import com.getit.domain.recruitment.service.ApplicationEvaluationService;
 import com.getit.domain.auth.security.CustomUserDetails;
 import com.getit.global.dto.ApiResponse;
+import com.getit.global.dto.PhoneNumberResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -64,6 +65,17 @@ public class ApplicationAdminController {
   @GetMapping("/{id}")
   public ApiResponse<ApplicantDetailResult> getApplicantDetail(@PathVariable Long id) {
     return ApiResponse.success(applicationAdminService.getApplicantDetail(id));
+  }
+
+  @Operation(summary = "지원자 전체 번호", description = "이슈 #237. 상세에는 가린 번호만 준다. 조회할 때마다 기록한다")
+  @GetMapping("/{id}/phone")
+  public ResponseEntity<ApiResponse<PhoneNumberResult>> getPhoneNumber(
+      @PathVariable Long id,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(ApiResponse.success(applicationAdminService.revealPhoneNumber(id, principal.getUserId())));
   }
 
   @Operation(

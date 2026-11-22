@@ -17,7 +17,10 @@ import com.getit.domain.setting.generation.dto.GenerationSummary;
 import com.getit.domain.setting.generation.service.GenerationQueryService;
 import com.getit.domain.user.service.CollegeQueryService;
 import com.getit.domain.user.util.ExcelExporter;
+import com.getit.global.audit.AdminAuditAction;
+import com.getit.global.audit.AdminAuditRecorder;
 import com.getit.global.dto.PageResponse;
+import com.getit.global.dto.PhoneNumberResult;
 import com.getit.global.exception.BusinessException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -63,6 +66,7 @@ public class ApplicationAdminService {
   private final CollegeQueryService collegeQueryService;
   private final ApplicationAnswerRepository applicationAnswerRepository;
   private final GenerationQueryService generationQueryService;
+  private final AdminAuditRecorder auditRecorder;
 
   /**
    * 7.1. {@code generationId} 가 없으면 활성 기수를 대상으로 한다 (PR #48 리뷰 지적 — 예전에는
@@ -148,6 +152,14 @@ public class ApplicationAdminService {
             .toList();
 
     return ApplicantDetailResult.of(application, answers);
+  }
+
+  /** 지원자 전체 번호 단건 조회. 상세와 같은 대상만 볼 수 있다. 볼 때마다 기록한다. (이슈 #237) */
+  @Transactional
+  public PhoneNumberResult revealPhoneNumber(Long applicationId, Long adminId) {
+    Application application = findEvaluableApplication(applicationId);
+    auditRecorder.record(AdminAuditAction.VIEW_APPLICANT_PHONE, adminId, applicationId, 1);
+    return new PhoneNumberResult(application.getPhoneNumber());
   }
 
   /**

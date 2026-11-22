@@ -1,6 +1,6 @@
 # 마이그레이션 번호 예약 표
 
-> **다음에 쓸 번호: `V43`**
+> **다음에 쓸 번호: `V44`**
 
 스키마를 건드리는 작업을 시작하면 **코드를 쓰기 전에** 아래 예약 표에 한 줄 추가하고
 그 번호를 쓴다. 등록은 PR 이 아니라 **작업을 시작할 때** 한다.
@@ -107,6 +107,7 @@ docker compose up -d
 | V40 | `secure_festa_phone_number` |
 | V41 | `create_festa_winner` |
 | V42 | `encrypt_member_phone_number` |
+| V43 | `create_admin_audit_log` |
 
 현재 번호를 다시 확인하려면:
 
