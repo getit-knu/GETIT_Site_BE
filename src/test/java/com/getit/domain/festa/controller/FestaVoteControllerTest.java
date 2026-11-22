@@ -104,6 +104,12 @@ class FestaVoteControllerTest {
     return "Bearer " + jwtProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
   }
 
+  /** 명단 CSV 는 투표가 끝난 뒤에만 받을 수 있다. 일정이 없으면 토글을 끈다. */
+  private void closeFesta() {
+    featureToggleRepository.findById(FeatureKey.MOCK_INVESTMENT).orElseThrow().updateEnabled(false, 1L);
+    featureToggleRepository.flush();
+  }
+
   private String adminBearer() {
     User admin = userRepository.findAll().stream()
         .filter(user -> user.getRole() == Role.ADMIN)
@@ -256,6 +262,7 @@ class FestaVoteControllerTest {
   void csvIncludesVotersAndDestroy() throws Exception {
     vote(guest("v16"), projectA.getId(), PHONE, true).andExpect(status().isOk());
 
+    closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(PHONE)));
@@ -263,6 +270,7 @@ class FestaVoteControllerTest {
     mockMvc.perform(delete(ADMIN + "/investors/phones").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.destroyedCount").value(1));
+    closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString(PHONE))));
   }

@@ -59,12 +59,14 @@ public class FestaAdminController {
   }
 
   /** 바이너리(CSV) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. */
-  @Operation(summary = "추첨용 참여자 명단 CSV", description = "이슈 #222, #232. 투자자와 투표자를 합친다")
+  @Operation(summary = "추첨용 참여자 명단 CSV", description = "이슈 #222, #232. 투자자와 투표자를 합친다. 투표 종료 뒤에만")
   @GetMapping("/investors.csv")
   public ResponseEntity<byte[]> exportInvestors(@AuthenticationPrincipal CustomUserDetails principal) {
     byte[] csv = festaAdminService.exportInvestorsCsv(principal.getUserId());
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=festa-investors.csv")
+        // 브라우저·프록시가 번호가 든 파일을 캐시에 남기지 않게 한다.
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
         .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
         .body(csv);
   }

@@ -12,6 +12,7 @@ public enum FestaErrorCode implements ErrorCode {
 
   FESTA_CLOSED(HttpStatus.CONFLICT, "모의투자 기간이 아닙니다."),
   FESTA_RESET_WHILE_OPEN(HttpStatus.CONFLICT, "모의투자가 열려 있는 동안에는 투자 데이터를 초기화할 수 없습니다."),
+  FESTA_EXPORT_BEFORE_END(HttpStatus.CONFLICT, "투표가 끝난 뒤에 추첨 명단을 내려받을 수 있습니다."),
   INVALID_FESTA_SCHEDULE(HttpStatus.BAD_REQUEST, "시작 시각은 종료 시각보다 앞서야 합니다."),
   DUPLICATE_PROJECT(HttpStatus.BAD_REQUEST, "같은 프로젝트를 두 번 넣을 수 없습니다."),
   INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "투자금은 0 이상, 10만 원 단위여야 합니다."),
