@@ -95,7 +95,7 @@ class UserAdminServiceTest {
 
       // 같은 쿼리를 쓰므로 함께 반영돼야 한다.
       byte[] excel = userAdminService.exportUsersExcel(
-          new UserExportFilter(null, null, null, null));
+          new UserExportFilter(null, null, null, null, true), 1L);
 
       // 바이트가 비지 않았다는 것만 보면 필터가 풀려도 통과한다. 시트를 열어 이름을 본다.
       try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
@@ -112,7 +112,7 @@ class UserAdminServiceTest {
     }
 
     @Test
-    @DisplayName("연락처를 함께 반환한다")
+    @DisplayName("연락처를 가려서 함께 반환한다")
     void includesPhoneNumber() {
       User member = guest("google-phone", "phone@getit.com", "김부원");
       member.updateApplicantInfo("010-1234-5678", "IT대학", "컴퓨터학부", 3, "2021110000");
@@ -126,7 +126,7 @@ class UserAdminServiceTest {
       assertThat(result.content())
           .filteredOn(summary -> summary.id().equals(member.getId()))
           .extracting(UserSummary::phoneNumber)
-          .containsExactly("010-1234-5678");
+          .containsExactly("010-****-5678"); // 목록에는 가린 번호만 준다 (이슈 #237)
     }
 
     @Test
@@ -621,7 +621,8 @@ class UserAdminServiceTest {
       target.assignToGroup(group.getId());
       guest("google-24", "y@getit.com", "이회원");
 
-      byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter("김", null, null, null));
+      byte[] excel = userAdminService.exportUsersExcel(
+          new UserExportFilter("김", null, null, null, true), 1L);
 
       try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
         Sheet sheet = workbook.getSheetAt(0);
@@ -638,7 +639,8 @@ class UserAdminServiceTest {
     @Test
     @DisplayName("대상이 없으면 헤더만 있는 시트를 반환한다")
     void returnsHeaderOnlyWhenNoMatch() throws IOException {
-      byte[] excel = userAdminService.exportUsersExcel(new UserExportFilter(null, Role.ADMIN, null, null));
+      byte[] excel = userAdminService.exportUsersExcel(
+          new UserExportFilter(null, Role.ADMIN, null, null, true), 1L);
 
       try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
         Sheet sheet = workbook.getSheetAt(0);

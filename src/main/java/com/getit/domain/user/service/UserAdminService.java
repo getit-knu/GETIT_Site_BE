@@ -13,9 +13,13 @@ import com.getit.domain.user.exception.UserErrorCode;
 import com.getit.domain.user.repository.GroupRepository;
 import com.getit.domain.user.repository.UserRepository;
 import com.getit.domain.user.util.ExcelExporter;
+import com.getit.global.audit.AdminAuditAction;
+import com.getit.global.audit.AdminAuditRecorder;
 import com.getit.global.dto.PageResponse;
+import com.getit.global.dto.PhoneNumberResult;
 import com.getit.global.exception.BusinessException;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -40,11 +44,14 @@ public class UserAdminService {
 
   private static final List<String> EXCEL_HEADERS =
       List.of("이름", "이메일", "연락처", "단과대학", "전공", "학년", "권한", "기수", "그룹", "가입일", "상태");
+  /** {@link #EXCEL_HEADERS} 에서 연락처 칸의 위치. 연락처를 빼고 내려받을 때 지운다. (이슈 #237) */
+  private static final int PHONE_COLUMN = 2;
   private static final DateTimeFormatter EXCEL_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final GenerationQueryService generationQueryService;
+  private final AdminAuditRecorder auditRecorder;
 
   /**
    * 9.1. {@code groupId} 는 세 가지 상태를 표현한다 — 미전달(필터 없음) · {@code "none"}(미배정만) ·
@@ -84,7 +91,8 @@ public class UserAdminService {
    * 둘 다 {@code String} 이라, 네 인자를 그대로 받으면 호출부에서 순서가 바뀌어도 컴파일 에러 없이
    * 통과한다(PR #71 Copilot 리뷰 지적).
    */
-  public byte[] exportUsersExcel(UserExportFilter filter) {
+  @Transactional
+  public byte[] exportUsersExcel(UserExportFilter filter, Long adminId) {
     boolean unassignedOnly = UNASSIGNED_GROUP_FILTER.equalsIgnoreCase(filter.groupId());
     Long targetGroupId = parseGroupId(filter.groupId(), unassignedOnly);
 
@@ -95,10 +103,31 @@ public class UserAdminService {
     Map<Long, GroupSummary> groupsById = loadGroups(users.getContent());
 
     List<List<Object>> rows = users.getContent().stream()
-        .map(user -> toExcelRow(user, groupsById.get(user.getGroupId())))
+        .map(user -> withoutPhoneUnless(filter.includePhone(), toExcelRow(user, groupsById.get(user.getGroupId()))))
         .toList();
 
-    return ExcelExporter.toXlsx("사용자 목록", EXCEL_HEADERS, rows);
+    auditRecorder.record(
+        filter.includePhone() ? AdminAuditAction.EXPORT_USERS_WITH_PHONE : AdminAuditAction.EXPORT_USERS,
+        adminId, null, rows.size());
+    return ExcelExporter.toXlsx("사용자 목록", withoutPhoneUnless(filter.includePhone(), EXCEL_HEADERS), rows);
+  }
+
+  private static <T> List<T> withoutPhoneUnless(boolean includePhone, List<T> row) {
+    if (includePhone) {
+      return row;
+    }
+    List<T> copy = new ArrayList<>(row);
+    copy.remove(PHONE_COLUMN);
+    return copy;
+  }
+
+  /** 전체 번호 단건 조회. 볼 때마다 기록한다. 번호가 없으면 null 이지만 조회 자체는 기록한다. (이슈 #237) */
+  @Transactional
+  public PhoneNumberResult revealPhoneNumber(Long userId, Long adminId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+    auditRecorder.record(AdminAuditAction.VIEW_USER_PHONE, adminId, userId, 1);
+    return new PhoneNumberResult(user.getPhoneNumber());
   }
 
   private List<Object> toExcelRow(User user, GroupSummary group) {
