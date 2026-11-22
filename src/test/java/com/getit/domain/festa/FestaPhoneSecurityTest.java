@@ -214,7 +214,7 @@ class FestaPhoneSecurityTest {
   }
 
   @Test
-  @DisplayName("종료 뒤 내려받으면 복호화된 번호가 나오고, 캐시 금지와 감사 기록이 남는다")
+  @DisplayName("종료 뒤 내려받으면 번호는 가려서 나오고, 캐시 금지와 감사 기록이 남는다")
   void exportAfterEndAudited() throws Exception {
     vote(guest("p7"), PHONE).andExpect(status().isOk());
     scheduleRepository.saveAndFlush(FestaSchedule.of(now().minusDays(2), now().minusMinutes(1)));
@@ -222,7 +222,8 @@ class FestaPhoneSecurityTest {
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(header().string("Cache-Control", "no-store"))
-        .andExpect(content().string(containsString(PHONE)));
+        .andExpect(content().string(containsString("010-****-5678")))
+        .andExpect(content().string(not(containsString(PHONE))));
 
     List<FestaAuditLog> logs = auditLogRepository.findAll();
     assertThat(logs).hasSize(1);

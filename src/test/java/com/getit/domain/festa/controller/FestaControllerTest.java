@@ -301,8 +301,8 @@ class FestaControllerTest {
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith("text/csv"))
-        .andExpect(content().string(containsString(PHONE)))
-        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("010-9999-0000"))));
+        .andExpect(content().string(containsString("010-****-5678")))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("010-****-0000"))));
   }
 
   @Test
@@ -334,7 +334,7 @@ class FestaControllerTest {
         .andExpect(jsonPath("$.data.projects[0].totalAmount").value(1_000_000));
     closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
-        .andExpect(content().string(org.hamcrest.Matchers.not(containsString(PHONE))));
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("010-****-5678"))));
   }
 
   @Test

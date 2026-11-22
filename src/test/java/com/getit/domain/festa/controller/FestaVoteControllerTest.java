@@ -265,14 +265,14 @@ class FestaVoteControllerTest {
     closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString(PHONE)));
+        .andExpect(content().string(containsString("010-****-5678")));
 
     mockMvc.perform(delete(ADMIN + "/investors/phones").header("Authorization", adminBearer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.destroyedCount").value(1));
     closeFesta();
     mockMvc.perform(get(ADMIN + "/investors.csv").header("Authorization", adminBearer()))
-        .andExpect(content().string(org.hamcrest.Matchers.not(containsString(PHONE))));
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("010-****-5678"))));
   }
 
   @Test
