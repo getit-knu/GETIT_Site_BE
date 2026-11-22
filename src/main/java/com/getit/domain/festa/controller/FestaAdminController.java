@@ -1,12 +1,14 @@
 package com.getit.domain.festa.controller;
 
 import com.getit.domain.auth.security.CustomUserDetails;
+import com.getit.domain.festa.dto.FestaDrawRequest;
 import com.getit.domain.festa.dto.FestaPhoneDestroyResult;
 import com.getit.domain.festa.dto.FestaResetResult;
 import com.getit.domain.festa.dto.FestaResultsResult;
 import com.getit.domain.festa.dto.FestaScheduleRequest;
 import com.getit.domain.festa.dto.FestaScheduleResult;
 import com.getit.domain.festa.dto.FestaVoteResultsResult;
+import com.getit.domain.festa.dto.FestaWinnersResult;
 import com.getit.domain.festa.service.FestaAdminService;
 import com.getit.domain.festa.service.FestaScheduleService;
 import com.getit.global.dto.ApiResponse;
@@ -20,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,8 +61,29 @@ public class FestaAdminController {
     return ApiResponse.success(festaAdminService.getVoteResults());
   }
 
+  @Operation(summary = "경품 추첨", description = "이슈 #238. 번호를 낸 참여자 중 count(기본 5)명. 투표 종료 뒤에만. "
+      + "이미 뽑았으면 additional=true 일 때만 이어서 더 뽑는다")
+  @PostMapping("/draw")
+  public ApiResponse<FestaWinnersResult> draw(
+      @AuthenticationPrincipal CustomUserDetails principal,
+      @Valid @RequestBody(required = false) FestaDrawRequest request
+  ) {
+    FestaDrawRequest body = request == null ? new FestaDrawRequest(null, null) : request;
+    return ApiResponse.success(festaAdminService.draw(principal.getUserId(), body));
+  }
+
+  @Operation(summary = "경품 당첨자", description = "이슈 #238. 전체 번호를 준다. 조회할 때마다 기록한다")
+  @GetMapping("/winners")
+  public ResponseEntity<ApiResponse<FestaWinnersResult>> getWinners(
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(ApiResponse.success(festaAdminService.getWinners(principal.getUserId())));
+  }
+
   /** 바이너리(CSV) 응답이라 {@code ApiResponse} envelope 을 쓰지 않는다. */
-  @Operation(summary = "추첨용 참여자 명단 CSV", description = "이슈 #222, #232. 투자자와 투표자를 합친다. 투표 종료 뒤에만")
+  @Operation(summary = "참여자 명단 CSV", description = "이슈 #222, #232, #238. 투자자와 투표자를 합친다. 번호는 가린다. 투표 종료 뒤에만")
   @GetMapping("/investors.csv")
   public ResponseEntity<byte[]> exportInvestors(@AuthenticationPrincipal CustomUserDetails principal) {
     byte[] csv = festaAdminService.exportInvestorsCsv(principal.getUserId());
