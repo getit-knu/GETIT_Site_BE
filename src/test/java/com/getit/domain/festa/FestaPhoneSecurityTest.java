@@ -13,15 +13,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.getit.domain.auth.jwt.JwtProvider;
-import com.getit.domain.festa.config.FestaProperties;
 import com.getit.domain.festa.entity.FestaAuditAction;
 import com.getit.domain.festa.entity.FestaAuditLog;
 import com.getit.domain.festa.entity.FestaSchedule;
 import com.getit.domain.festa.repository.FestaAuditLogRepository;
 import com.getit.domain.festa.repository.FestaInvestorRepository;
 import com.getit.domain.festa.repository.FestaScheduleRepository;
-import com.getit.domain.festa.security.PhoneNumberCipher;
-import com.getit.domain.festa.security.PlainPhoneNumberEncryptor;
 import com.getit.domain.festa.service.FestaAdminService;
 import com.getit.domain.project.dto.ProjectCommand;
 import com.getit.domain.project.entity.Project;
@@ -33,6 +30,9 @@ import com.getit.domain.setting.feature.repository.FeatureToggleRepository;
 import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.repository.UserRepository;
+import com.getit.global.crypto.PhoneNumberCipher;
+import com.getit.global.crypto.PlainPhoneNumberEncryptor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -69,6 +69,7 @@ class FestaPhoneSecurityTest {
   @Autowired private PlainPhoneNumberEncryptor plainPhoneNumberEncryptor;
   @Autowired private PhoneNumberCipher cipher;
   @Autowired private EntityManager entityManager;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private Project project;
 
@@ -115,8 +116,9 @@ class FestaPhoneSecurityTest {
   }
 
   private String rawPhone(Long userId) {
-    Long id = investorRepository.findByUserId(userId).orElseThrow().getId();
-    return investorRepository.findRawPhoneNumber(id);
+    entityManager.flush();
+    return jdbcTemplate.queryForObject(
+        "select phone_number from festa_investor where user_id = ?", String.class, userId);
   }
 
   private void closeToggle() {
@@ -162,8 +164,7 @@ class FestaPhoneSecurityTest {
   @DisplayName("다른 키로는 풀리지 않는다")
   void wrongKeyFails() {
     String stored = cipher.encrypt(PHONE);
-    PhoneNumberCipher other = new PhoneNumberCipher(
-        new FestaProperties("b3RoZXIta2V5LW90aGVyLWtleS1vdGhlci1rZXkhISE=", 30));
+    PhoneNumberCipher other = new PhoneNumberCipher("b3RoZXIta2V5LW90aGVyLWtleS1vdGhlci1rZXkhISE=", null);
     assertThatThrownBy(() -> other.decrypt(stored))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageNotContaining(stored);
@@ -172,9 +173,9 @@ class FestaPhoneSecurityTest {
   @Test
   @DisplayName("키가 없거나 32바이트가 아니면 기동하지 않는다")
   void rejectsBadKey() {
-    assertThatThrownBy(() -> new PhoneNumberCipher(new FestaProperties(null, 30)))
+    assertThatThrownBy(() -> new PhoneNumberCipher(null, null))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(() -> new PhoneNumberCipher(new FestaProperties("c2hvcnQ=", 30)))
+    assertThatThrownBy(() -> new PhoneNumberCipher("c2hvcnQ=", null))
         .isInstanceOf(IllegalStateException.class);
   }
 
@@ -183,14 +184,14 @@ class FestaPhoneSecurityTest {
   void encryptsLegacyPlainRows() throws Exception {
     User user = guest("p5");
     vote(user, PHONE).andExpect(status().isOk());
-    Long id = investorRepository.findByUserId(user.getId()).orElseThrow().getId();
-    investorRepository.updateRawPhoneNumber(id, PHONE);
-    assertThat(investorRepository.findPlainPhoneNumberIds()).contains(id);
+    entityManager.flush();
+    jdbcTemplate.update("update festa_investor set phone_number = ? where user_id = ?", PHONE, user.getId());
+    entityManager.clear();
+    assertThat(rawPhone(user.getId())).isEqualTo(PHONE);
 
     plainPhoneNumberEncryptor.encryptPlainRows();
 
-    assertThat(investorRepository.findRawPhoneNumber(id)).startsWith("v1:");
-    assertThat(investorRepository.findPlainPhoneNumberIds()).isEmpty();
+    assertThat(rawPhone(user.getId())).startsWith("v1:");
     mockMvc.perform(get("/api/festa/vote").header("Authorization", bearer(user)))
         .andExpect(jsonPath("$.data.maskedPhoneNumber").value("010-****-5678"));
   }

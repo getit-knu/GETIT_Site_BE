@@ -1,10 +1,11 @@
-package com.getit.domain.festa.security;
+package com.getit.global.crypto;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
 /**
- * {@code FestaInvestor.phoneNumber} 를 DB 에 암호문으로 쓰고 읽을 때 푼다.
+ * 전화번호를 DB 에 암호문으로 쓰고 읽을 때 푼다. {@code User} · {@code Application} ·
+ * {@code FestaInvestor} 의 번호에 붙인다. (이슈 #239)
  *
  * <p>암호화 빈을 생성자로 받지 않고 값을 변환할 때 찾는다. {@code @DataJpaTest} 같은 슬라이스
  * 테스트는 모든 엔티티의 컨버터를 만들지만 이 빈은 띄우지 않기 때문이다. 번호를 실제로 읽거나 쓰는데

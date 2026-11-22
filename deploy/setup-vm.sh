@@ -82,7 +82,7 @@ MYSQL_ROOT_PASSWORD=여기를_채우세요
 # --- 인증 ---
 # openssl rand -base64 48 로 만든다. 로컬 값을 재사용하지 말 것.
 JWT_SECRET=여기를_채우세요
-# 추첨용 전화번호 암호화 키. openssl rand -base64 32. 잃으면 번호를 못 읽는다.
+# 전화번호 암호화 키(부원 · 지원서 · FESTA). openssl rand -base64 32. 잃으면 번호를 못 읽는다.
 FESTA_PHONE_KEY=여기를_채우세요
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

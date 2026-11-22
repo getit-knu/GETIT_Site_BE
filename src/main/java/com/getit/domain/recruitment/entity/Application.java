@@ -9,6 +9,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.getit.global.crypto.PhoneNumberConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -59,7 +61,9 @@ public class Application extends BaseTimeEntity {
   @Column(nullable = false, length = 255)
   private String email;
 
-  @Column(length = 20)
+  /** DB 에는 암호문으로 저장된다. (이슈 #239) */
+  @Convert(converter = PhoneNumberConverter.class)
+  @Column(length = 100)
   private String phoneNumber;
 
   /** 지원서 폼이 단과대를 고르지 않으면 null 이다. 마스터 데이터는 2.6 에 있다 (이슈 #184). */

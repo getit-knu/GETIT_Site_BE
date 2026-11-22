@@ -100,7 +100,7 @@ nano /opt/getit/.env
 |---|---|
 | `DB_PASSWORD` · `MYSQL_ROOT_PASSWORD` | 직접 생성 |
 | `JWT_SECRET` | `openssl rand -base64 48`. **로컬 값 재사용 금지** |
-| `FESTA_PHONE_KEY` | `openssl rand -base64 32`. FESTA 추첨 번호 암호화 키. **없으면 서버가 뜨지 않고, 잃으면 저장된 번호를 못 읽는다.** 별도 안전한 곳에 백업 |
+| `FESTA_PHONE_KEY` | `openssl rand -base64 32`. 전화번호 암호화 키(부원 · 지원서 · FESTA 공통, 이름은 FESTA 때 그대로). **없으면 서버가 뜨지 않고, 잃으면 저장된 번호를 못 읽는다.** 별도 안전한 곳에 백업 |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | Google Cloud Console |
 | `CORS_ALLOWED_ORIGINS` | 프론트 주소 |
 | `OAUTH2_REDIRECT_URI` | `{프론트 주소}/oauth/callback` |
@@ -339,10 +339,11 @@ docker compose logs app --tail 50
 `ddl-auto: validate` 가 스키마 불일치로 기동을 막는다.
 그럴 때는 백업 시점에 맞는 이미지 태그로 함께 롤백한다.
 
-### FESTA 전화번호 암호화 키
+### 전화번호 암호화 키
 
-`festa_investor.phone_number` 는 `FESTA_PHONE_KEY` 로 AES-256-GCM 암호화해 `v1:` 접두어를
-붙여 저장한다. DB 와 백업 파일에는 암호문만 남는다.
+`users` · `application` · `festa_investor` 의 `phone_number` 는 `FESTA_PHONE_KEY` 로
+AES-256-GCM 암호화해 `v1:` 접두어를 붙여 저장한다. DB 와 백업 파일에는 암호문만 남는다.
+암호화 이전 평문은 앱이 기동할 때 암호화한다. 변수 이름은 FESTA 때 만든 것을 그대로 쓴다.
 
 **보관**
 
@@ -352,23 +353,27 @@ docker compose logs app --tail 50
 - **백업을 복구할 때는 그 백업을 만들던 시점의 키가 필요하다.** 키를 바꿨다면 이전 키도
   백업 보관 기간(14일) 동안은 버리지 않는다.
 
-**교체**
+**교체** — 부원 번호는 계속 남으므로 파기하고 바꿀 수 없다. 이전 키를 함께 두고 재시작하면
+앱이 기동할 때 전부 새 키로 다시 암호화한다.
 
-지금 코드는 키 하나만 읽는다(`v1`). 키를 바꾸면 기존 암호문은 복호화되지 않으므로,
-번호가 남아 있는 동안에는 교체하지 않는다. 교체가 필요하면 다음 순서로 한다.
-
-1. 추첨을 끝내고 어드민에서 "전화번호 파기"를 누르거나, 자동 파기(투표 종료 + `FESTA_PHONE_RETENTION_DAYS`)를 기다린다.
-2. DB 에서 남은 번호가 없는지 확인한다.
+1. 지금 키를 `FESTA_PHONE_KEY_PREVIOUS` 로 옮기고, `FESTA_PHONE_KEY` 에 새 키(`openssl rand -base64 32`)를 넣는다.
 
    ```bash
-   docker compose exec mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" \
-     -e "select count(*) from festa_investor where phone_number is not null"
+   cd /opt/getit
+   OLD=$(grep '^FESTA_PHONE_KEY=' .env | cut -d= -f2-)
+   sed -i '/^FESTA_PHONE_KEY=/d;/^FESTA_PHONE_KEY_PREVIOUS=/d' .env
+   echo "FESTA_PHONE_KEY_PREVIOUS=$OLD" >> .env
+   echo "FESTA_PHONE_KEY=$(openssl rand -base64 32)" >> .env
    ```
 
-3. `openssl rand -base64 32` 로 새 키를 만들어 `.env` 와 비밀 저장소를 갱신하고, 앱을 재시작한다.
-4. 이전 키는 백업 보관 기간(14일)이 지난 뒤 폐기한다.
+2. 새 키를 비밀 저장소에 보관하고 앱을 재시작한다(`docker compose up -d app`).
+3. 로그에서 `전화번호 N건을 암호화했습니다. rotating=true` 를 확인한다.
+4. `.env` 에서 `FESTA_PHONE_KEY_PREVIOUS` 를 지우고 다시 재시작한다. 이전 키로 된 값이 남아 있으면
+   이때 복호화 오류가 나므로, 오류가 없으면 교체가 끝난 것이다.
+5. 이전 키는 백업 보관 기간(14일)이 지난 뒤 폐기한다. 그 전에 옛 백업을 복구하면 이전 키를
+   다시 `FESTA_PHONE_KEY_PREVIOUS` 에 넣고 재시작한다.
 
-**키가 새었다고 의심되면** 위 1번부터 바로 진행한다. 남은 번호를 즉시 파기하는 것이 가장 빠른 대응이다.
+**키가 새었다고 의심되면** 바로 교체한다. FESTA 번호는 추첨이 끝났으면 먼저 파기한다.
 
 **파기 기록** — 명단 내려받기, 수동 파기, 자동 파기, 전체 초기화는 `festa_audit_log` 에
 어드민 id, 건수, 시각으로 남는다. 번호 자체는 기록하지 않는다.
