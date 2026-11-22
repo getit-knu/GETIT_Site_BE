@@ -1,7 +1,7 @@
 package com.getit.domain.festa.entity;
 
 import com.getit.global.entity.BaseTimeEntity;
-import com.getit.domain.festa.security.PhoneNumberConverter;
+import com.getit.global.crypto.PhoneNumberConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;

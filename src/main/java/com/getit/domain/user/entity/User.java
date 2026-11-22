@@ -9,6 +9,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.getit.global.crypto.PhoneNumberConverter;
+import jakarta.persistence.Convert;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -51,8 +53,9 @@ public class User extends SoftDeletableEntity {
   @Column(nullable = false, length = 50)
   private String name;
 
-  /** 지원서에서 수집한다. 최초 로그인 시점에는 null. */
-  @Column(length = 20)
+  /** 지원서에서 수집한다. 최초 로그인 시점에는 null. DB 에는 암호문으로 저장된다. (이슈 #239) */
+  @Convert(converter = PhoneNumberConverter.class)
+  @Column(length = 100)
   private String phoneNumber;
 
   @Column(length = 50)

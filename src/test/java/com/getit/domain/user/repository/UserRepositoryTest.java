@@ -7,6 +7,7 @@ import com.getit.domain.user.entity.Role;
 import com.getit.domain.user.entity.User;
 import com.getit.domain.user.entity.UserStatus;
 import com.getit.global.config.JpaAuditingConfig;
+import com.getit.global.crypto.PhoneNumberCipher;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,7 +26,8 @@ import org.springframework.data.domain.PageRequest;
  * 없으면 createdAt 이 null 로 남아 nullable=false 제약에 걸린다.
  */
 @DataJpaTest
-@Import(JpaAuditingConfig.class)
+// 번호 칸이 암호화 컨버터를 쓰므로 암호화 빈도 넣는다. (이슈 #239)
+@Import({JpaAuditingConfig.class, PhoneNumberCipher.class})
 class UserRepositoryTest {
 
   @Autowired

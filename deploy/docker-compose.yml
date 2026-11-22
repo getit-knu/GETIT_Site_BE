@@ -59,6 +59,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 이 .env 에 없습니다}
       # 추첨용 전화번호 암호화 키. 없으면 서버가 뜨지 않는다. openssl rand -base64 32
       FESTA_PHONE_KEY: ${FESTA_PHONE_KEY:?FESTA_PHONE_KEY 가 .env 에 없습니다}
+      # 키 교체 중에만 채운다. 비어 있으면 무시한다. (이슈 #239)
+      FESTA_PHONE_KEY_PREVIOUS: ${FESTA_PHONE_KEY_PREVIOUS:-}
       FESTA_PHONE_RETENTION_DAYS: ${FESTA_PHONE_RETENTION_DAYS:-30}
       # 빈 문자열을 넘기면 Spring Security 가 "Client id must not be empty" 로 기동에 실패한다.
       # 값이 없을 때는 애플리케이션의 기본값(not-configured)이 쓰이도록 자리표시자를 넣는다.
